@@ -232,4 +232,32 @@ def example_usage():
     return cleaned_df
 
 if __name__ == "__main__":
-    result_df = example_usage()
+    result_df = example_usage()import pandas as pd
+
+def clean_dataset(input_file, output_file):
+    """
+    Load a CSV file, remove rows with null values,
+    drop duplicate rows, and save the cleaned data.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original shape: {df.shape}")
+        
+        df_cleaned = df.dropna()
+        print(f"After removing nulls: {df_cleaned.shape}")
+        
+        df_cleaned = df_cleaned.drop_duplicates()
+        print(f"After removing duplicates: {df_cleaned.shape}")
+        
+        df_cleaned.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to: {output_file}")
+        return True
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        return False
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+
+if __name__ == "__main__":
+    clean_dataset("raw_data.csv", "cleaned_data.csv")
