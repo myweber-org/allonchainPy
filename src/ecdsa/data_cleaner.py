@@ -56,4 +56,47 @@ def validate_data(df, required_columns=None, min_rows=1):
         if missing_cols:
             return False, f"Missing required columns: {missing_cols}"
     
-    return True, "Data validation passed"
+    return True, "Data validation passed"import numpy as np
+import pandas as pd
+from scipy import stats
+
+def normalize_data(data, method='zscore'):
+    if method == 'zscore':
+        return (data - np.mean(data)) / np.std(data)
+    elif method == 'minmax':
+        return (data - np.min(data)) / (np.max(data) - np.min(data))
+    else:
+        raise ValueError("Method must be 'zscore' or 'minmax'")
+
+def remove_outliers_iqr(data, threshold=1.5):
+    q1 = np.percentile(data, 25)
+    q3 = np.percentile(data, 75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    return data[(data >= lower_bound) & (data <= upper_bound)]
+
+def clean_dataset(df, column, normalize_method='zscore', outlier_threshold=1.5):
+    if column not in df.columns:
+        raise ValueError(f"Column {column} not found in DataFrame")
+    
+    original_data = df[column].dropna().values
+    cleaned_data = remove_outliers_iqr(original_data, outlier_threshold)
+    normalized_data = normalize_data(cleaned_data, normalize_method)
+    
+    result_df = pd.DataFrame({
+        'original': original_data,
+        'cleaned': np.concatenate([cleaned_data, [np.nan] * (len(original_data) - len(cleaned_data))]),
+        'normalized': np.concatenate([normalized_data, [np.nan] * (len(original_data) - len(normalized_data))])
+    })
+    
+    return result_df
+
+def calculate_statistics(data):
+    return {
+        'mean': np.mean(data),
+        'std': np.std(data),
+        'median': np.median(data),
+        'skewness': stats.skew(data),
+        'kurtosis': stats.kurtosis(data)
+    }
