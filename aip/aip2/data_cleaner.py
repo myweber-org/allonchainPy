@@ -117,3 +117,138 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataframe(cleaned_df, required_columns=['id', 'value'])
     print(f"\nValidation: {message}")
+import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    subset (list, optional): Columns to consider for duplicates
+    keep (str): Which duplicates to keep - 'first', 'last', or False
+    
+    Returns:
+    pd.DataFrame: DataFrame with duplicates removed
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(df) - len(cleaned_df)
+    print(f"Removed {removed_count} duplicate rows")
+    
+    return cleaned_df
+
+def handle_missing_values(df, strategy='drop', fill_value=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): 'drop' to remove rows, 'fill' to fill values
+    fill_value: Value to fill missing entries with
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    if df.empty:
+        return df
+    
+    if strategy == 'drop':
+        cleaned_df = df.dropna()
+        removed_count = len(df) - len(cleaned_df)
+        print(f"Removed {removed_count} rows with missing values")
+    elif strategy == 'fill':
+        if fill_value is None:
+            fill_value = df.mean(numeric_only=True)
+        cleaned_df = df.fillna(fill_value)
+        print(f"Filled missing values with {fill_value}")
+    else:
+        raise ValueError("Strategy must be 'drop' or 'fill'")
+    
+    return cleaned_df
+
+def validate_data_types(df, expected_types):
+    """
+    Validate column data types.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    expected_types (dict): Dictionary mapping columns to expected dtypes
+    
+    Returns:
+    bool: True if all types match, False otherwise
+    """
+    mismatches = []
+    
+    for column, expected_type in expected_types.items():
+        if column in df.columns:
+            actual_type = df[column].dtype
+            if actual_type != expected_type:
+                mismatches.append((column, expected_type, actual_type))
+    
+    if mismatches:
+        print("Data type mismatches found:")
+        for column, expected, actual in mismatches:
+            print(f"  {column}: expected {expected}, got {actual}")
+        return False
+    
+    print("All data types are valid")
+    return True
+
+def clean_dataframe(df, cleaning_steps):
+    """
+    Apply multiple cleaning steps to DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    cleaning_steps (list): List of cleaning functions and their arguments
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    for step in cleaning_steps:
+        func = step['function']
+        args = step.get('args', [])
+        kwargs = step.get('kwargs', {})
+        
+        cleaned_df = func(cleaned_df, *args, **kwargs)
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 3, 1, 4, 5, 3],
+        'name': ['Alice', 'Bob', 'Charlie', 'Alice', 'David', 'Eve', 'Charlie'],
+        'age': [25, 30, 35, 25, 28, np.nan, 35],
+        'score': [85.5, 92.0, 78.5, 85.5, 88.0, 91.5, 78.5]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Define cleaning steps
+    steps = [
+        {
+            'function': remove_duplicates,
+            'kwargs': {'subset': ['id', 'name'], 'keep': 'first'}
+        },
+        {
+            'function': handle_missing_values,
+            'kwargs': {'strategy': 'fill', 'fill_value': 0}
+        }
+    ]
+    
+    # Apply cleaning
+    cleaned_df = clean_dataframe(df, steps)
+    
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
