@@ -104,3 +104,72 @@ if __name__ == "__main__":
         print(f"\n{col}:")
         for stat_name, stat_value in col_stats.items():
             print(f"  {stat_name}: {stat_value:.2f}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing column names.
+    """
+    # Standardize column names
+    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+    
+    # Remove duplicate rows
+    df = df.drop_duplicates()
+    
+    # Fill missing numeric values with column median
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        df[col] = df[col].fillna(df[col].median())
+    
+    # Fill missing categorical values with mode
+    categorical_cols = df.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'unknown')
+    
+    # Remove rows where all values are null
+    df = df.dropna(how='all')
+    
+    return df
+
+def validate_dataset(df, required_columns=None):
+    """
+    Validate the dataset for required columns and data integrity.
+    """
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    # Check for negative values in numeric columns where not appropriate
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if (df[col] < 0).any():
+            print(f"Warning: Column '{col}' contains negative values")
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'Customer ID': [1, 2, 3, 4, 5],
+        'Order Value': [100.5, None, 75.3, 120.0, 90.2],
+        'Product Category': ['Electronics', 'Clothing', None, 'Electronics', 'Home'],
+        'Region': ['North', 'South', 'East', 'West', 'North']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned_df = clean_dataset(df)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print("\n")
+    
+    try:
+        validate_dataset(cleaned_df, required_columns=['customer_id', 'order_value'])
+        print("Dataset validation passed")
+    except ValueError as e:
+        print(f"Validation error: {e}")
