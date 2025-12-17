@@ -134,4 +134,62 @@ def validate_dataframe(df, required_columns=None, numeric_columns=None):
     if df.empty:
         return False, "DataFrame is empty"
     
-    return True, "DataFrame validation passed"
+    return True, "DataFrame validation passed"import pandas as pd
+
+def clean_dataset(df, columns_to_check=None, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
+    
+    Args:
+        df: pandas DataFrame to clean.
+        columns_to_check: List of columns to check for duplicates. If None, checks all columns.
+        drop_duplicates: Boolean indicating whether to drop duplicate rows.
+        fill_missing: Strategy to fill missing values. Options: 'mean', 'median', 'mode', or a scalar value.
+    
+    Returns:
+        Cleaned pandas DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        if columns_to_check:
+            cleaned_df = cleaned_df.drop_duplicates(subset=columns_to_check)
+        else:
+            cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing is not None:
+        for column in cleaned_df.select_dtypes(include=['number']).columns:
+            if cleaned_df[column].isnull().any():
+                if fill_missing == 'mean':
+                    fill_value = cleaned_df[column].mean()
+                elif fill_missing == 'median':
+                    fill_value = cleaned_df[column].median()
+                elif fill_missing == 'mode':
+                    fill_value = cleaned_df[column].mode()[0]
+                else:
+                    fill_value = fill_missing
+                
+                cleaned_df[column] = cleaned_df[column].fillna(fill_value)
+    
+    return cleaned_df
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Args:
+        df: pandas DataFrame.
+        column: Column name to process.
+        multiplier: IQR multiplier for outlier detection.
+    
+    Returns:
+        DataFrame with outliers removed.
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
