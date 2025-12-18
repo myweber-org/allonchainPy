@@ -355,4 +355,109 @@ if __name__ == "__main__":
     print("Cleaned data shape:", cleaned_data.shape)
     
     sample_data.to_csv('sample_data.csv', index=False)
-    save_cleaned_data(cleaned_data, 'sample_data.csv')
+    save_cleaned_data(cleaned_data, 'sample_data.csv')import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def calculate_basic_stats(df, column):
+    """
+    Calculate basic statistics for a DataFrame column.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to analyze
+    
+    Returns:
+        dict: Dictionary containing statistical measures
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
+    
+    return stats
+
+def normalize_column(df, column):
+    """
+    Normalize a DataFrame column using min-max scaling.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to normalize
+    
+    Returns:
+        pd.DataFrame: DataFrame with normalized column
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_normalized = df.copy()
+    min_val = df[column].min()
+    max_val = df[column].max()
+    
+    if max_val == min_val:
+        df_normalized[f'{column}_normalized'] = 0.5
+    else:
+        df_normalized[f'{column}_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    
+    return df_normalized
+
+def handle_missing_values(df, strategy='mean'):
+    """
+    Handle missing values in numeric columns of a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        strategy (str): Imputation strategy ('mean', 'median', or 'zero')
+    
+    Returns:
+        pd.DataFrame: DataFrame with missing values handled
+    """
+    df_processed = df.copy()
+    numeric_cols = df_processed.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        if df_processed[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df_processed[col].mean()
+            elif strategy == 'median':
+                fill_value = df_processed[col].median()
+            elif strategy == 'zero':
+                fill_value = 0
+            else:
+                raise ValueError("Strategy must be 'mean', 'median', or 'zero'")
+            
+            df_processed[col] = df_processed[col].fillna(fill_value)
+    
+    return df_processed
