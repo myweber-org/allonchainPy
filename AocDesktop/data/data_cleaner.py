@@ -195,3 +195,72 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
     print(f"Removed {removed_count} outliers from column '{column}'")
     
     return df[mask].reset_index(drop=True)
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by removing duplicates and standardizing column names.
+    """
+    # Create a copy to avoid modifying the original DataFrame
+    cleaned_df = df.copy()
+    
+    # Remove duplicate rows
+    cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Standardize column names: lowercase and replace spaces with underscores
+    cleaned_df.columns = cleaned_df.columns.str.lower().str.replace(' ', '_')
+    
+    # Fill missing numeric values with column mean
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+    
+    # Fill missing categorical values with mode
+    categorical_cols = cleaned_df.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        mode_value = cleaned_df[col].mode()
+        if not mode_value.empty:
+            cleaned_df[col] = cleaned_df[col].fillna(mode_value.iloc[0])
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    """
+    if required_columns:
+        missing_columns = set(required_columns) - set(df.columns)
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    return True
+
+def main():
+    # Example usage
+    sample_data = {
+        'Name': ['Alice', 'Bob', 'Alice', 'Charlie', None],
+        'Age': [25, 30, 25, 35, 40],
+        'City': ['New York', 'London', 'New York', 'Paris', 'Tokyo'],
+        'Salary': [50000, 60000, 50000, 70000, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned_df = clean_dataframe(df)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    
+    try:
+        validate_dataframe(cleaned_df, required_columns=['name', 'age', 'city'])
+        print("\nData validation passed")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
+
+if __name__ == "__main__":
+    main()
