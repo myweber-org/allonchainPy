@@ -218,4 +218,122 @@ def calculate_summary_statistics(data, column):
         'max': data[column].max()
     }
     
-    return stats
+    return statsimport pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        drop_duplicates (bool): Whether to drop duplicate rows
+        fill_missing (str): Strategy for filling missing values ('mean', 'median', 'mode', or 'drop')
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+        print("Dropped rows with missing values")
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+            else:
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+        print(f"Filled missing numeric values with {fill_missing}")
+    elif fill_missing == 'mode':
+        for col in cleaned_df.columns:
+            if cleaned_df[col].dtype == 'object':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'Unknown')
+        print("Filled missing categorical values with mode")
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None):
+    """
+    Validate a DataFrame for basic quality checks.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+    
+    Returns:
+        dict: Dictionary with validation results
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum()
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        validation_results['missing_required_columns'] = missing_columns
+        validation_results['all_required_columns_present'] = len(missing_columns) == 0
+    
+    return validation_results
+
+def normalize_numeric_columns(df, columns=None, method='minmax'):
+    """
+    Normalize numeric columns in a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of columns to normalize (defaults to all numeric columns)
+        method (str): Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+        pd.DataFrame: DataFrame with normalized columns
+    """
+    normalized_df = df.copy()
+    
+    if columns is None:
+        columns = normalized_df.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in normalized_df.columns and pd.api.types.is_numeric_dtype(normalized_df[col]):
+            if method == 'minmax':
+                col_min = normalized_df[col].min()
+                col_max = normalized_df[col].max()
+                if col_max > col_min:
+                    normalized_df[col] = (normalized_df[col] - col_min) / (col_max - col_min)
+            elif method == 'zscore':
+                col_mean = normalized_df[col].mean()
+                col_std = normalized_df[col].std()
+                if col_std > 0:
+                    normalized_df[col] = (normalized_df[col] - col_mean) / col_std
+    
+    return normalized_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'value': [10.5, 20.3, 20.3, None, 40.1, 50.0],
+        'category': ['A', 'B', 'B', 'C', None, 'A']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original dataset:")
+    print(df)
+    print("\nValidation results:")
+    print(validate_dataset(df))
+    
+    cleaned = clean_dataset(df, fill_missing='mean')
+    print("\nCleaned dataset:")
+    print(cleaned)
+    
+    normalized = normalize_numeric_columns(cleaned, method='minmax')
+    print("\nNormalized dataset:")
+    print(normalized)
