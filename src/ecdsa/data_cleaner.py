@@ -82,3 +82,116 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B'], min_rows=3)
     print(f"\nData is valid: {is_valid}")
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
+
+def calculate_basic_stats(df, column):
+    """
+    Calculate basic statistics for a DataFrame column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing statistical measures
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count(),
+        'missing': df[column].isnull().sum()
+    }
+    
+    return stats
+
+def validate_numeric_data(df, columns=None):
+    """
+    Validate that specified columns contain only numeric data.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to validate
+    
+    Returns:
+    dict: Validation results for each column
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    validation_results = {}
+    
+    for col in columns:
+        if col in df.columns:
+            is_numeric = pd.api.types.is_numeric_dtype(df[col])
+            non_numeric_count = df[col].apply(lambda x: not isinstance(x, (int, float, np.number))).sum()
+            
+            validation_results[col] = {
+                'is_numeric': is_numeric,
+                'non_numeric_count': non_numeric_count,
+                'total_count': df[col].count()
+            }
+    
+    return validation_results
+
+def example_usage():
+    """
+    Example demonstrating the usage of data cleaning functions.
+    """
+    np.random.seed(42)
+    
+    data = {
+        'temperature': np.random.normal(25, 5, 100),
+        'humidity': np.random.uniform(30, 80, 100),
+        'pressure': np.random.normal(1013, 10, 100)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    print("Original DataFrame shape:", df.shape)
+    
+    cleaned_df = remove_outliers_iqr(df, 'temperature')
+    print("Cleaned DataFrame shape:", cleaned_df.shape)
+    
+    stats = calculate_basic_stats(cleaned_df, 'temperature')
+    print("Temperature statistics:", stats)
+    
+    validation = validate_numeric_data(cleaned_df)
+    print("Data validation results:", validation)
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    result_df = example_usage()
+    print("Data cleaning completed successfully.")
