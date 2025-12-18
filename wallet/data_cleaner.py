@@ -300,4 +300,41 @@ def calculate_statistics(df):
         return pd.DataFrame()
     
     stats = df[numeric_cols].agg(['count', 'mean', 'std', 'min', 'max', 'median'])
-    return stats.T
+    return stats.Timport pandas as pd
+import numpy as np
+
+def clean_csv_data(input_file, output_file):
+    """
+    Clean a CSV file by removing duplicates, handling missing values,
+    and converting data types.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        print(f"Original shape: {df.shape}")
+        
+        df = df.drop_duplicates()
+        print(f"After removing duplicates: {df.shape}")
+        
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+        
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        df[categorical_cols] = df[categorical_cols].fillna('Unknown')
+        
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to: {output_file}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    cleaned_data = clean_csv_data('raw_data.csv', 'cleaned_data.csv')
+    if cleaned_data is not None:
+        print("Data cleaning completed successfully.")
