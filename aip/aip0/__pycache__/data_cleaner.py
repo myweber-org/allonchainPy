@@ -446,4 +446,31 @@ if __name__ == "__main__":
     # Normalize columns
     normalized = normalize_columns(cleaned, method='minmax')
     print("\nNormalized DataFrame:")
-    print(normalized)
+    print(normalized)import pandas as pd
+
+def remove_duplicates(input_file, output_file, column_name):
+    """
+    Read a CSV file, remove duplicate rows based on specified column,
+    and save cleaned data to a new file.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        initial_count = len(df)
+        df_cleaned = df.drop_duplicates(subset=[column_name], keep='first')
+        final_count = len(df_cleaned)
+        df_cleaned.to_csv(output_file, index=False)
+        print(f"Data cleaning complete. Removed {initial_count - final_count} duplicate entries.")
+        print(f"Original rows: {initial_count}, Cleaned rows: {final_count}")
+        return df_cleaned
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        return None
+    except KeyError:
+        print(f"Error: Column '{column_name}' not found in the data.")
+        return None
+
+if __name__ == "__main__":
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    unique_column = "id"
+    cleaned_data = remove_duplicates(input_csv, output_csv, unique_column)
