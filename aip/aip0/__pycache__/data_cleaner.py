@@ -93,4 +93,79 @@ if __name__ == "__main__":
     print("\nCleaned dataset:")
     print(cleaned_df)
     print("\nCleaned statistics for 'temperature':")
-    print(calculate_basic_stats(cleaned_df, 'temperature'))
+    print(calculate_basic_stats(cleaned_df, 'temperature'))import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fillna_method=None, fillna_value=None):
+    """
+    Clean a pandas DataFrame by handling missing values and duplicates.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default True.
+    fillna_method (str): Method to fill missing values ('ffill', 'bfill', etc). Default None.
+    fillna_value: Value to fill missing values with if fillna_method is None.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if fillna_method is not None:
+        cleaned_df = cleaned_df.fillna(method=fillna_method)
+    elif fillna_value is not None:
+        cleaned_df = cleaned_df.fillna(fillna_value)
+    
+    # Remove duplicates
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None):
+    """
+    Validate dataset for required columns and basic integrity.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    return True, "Dataset is valid"
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data with missing values and duplicates
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 4],
+        'name': ['Alice', 'Bob', 'Bob', None, 'Eve', 'Eve'],
+        'score': [85, 90, 90, 78, None, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nDataFrame info:")
+    print(df.info())
+    
+    # Clean the dataset
+    cleaned = clean_dataset(df, fillna_value=0)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    # Validate the cleaned dataset
+    is_valid, message = validate_dataset(cleaned, required_columns=['id', 'name', 'score'])
+    print(f"\nValidation: {message}")
