@@ -157,3 +157,91 @@ def validate_data(df, required_columns=None, min_rows=1):
             return False, f"Missing required columns: {missing_cols}"
     
     return True, "Data validation passed"
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, columns=None):
+    """
+    Remove outliers from specified columns using IQR method.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to process. If None, process all numeric columns.
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        
+        mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+        df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def calculate_summary_stats(df, columns=None):
+    """
+    Calculate summary statistics for specified columns.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to process. If None, process all numeric columns.
+    
+    Returns:
+        Dictionary containing summary statistics
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    stats = {}
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        stats[col] = {
+            'mean': df[col].mean(),
+            'median': df[col].median(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            'max': df[col].max(),
+            'count': df[col].count(),
+            'missing': df[col].isnull().sum()
+        }
+    
+    return stats
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 3, 4, 5, 100],
+        'B': [10, 20, 30, 40, 50, 200],
+        'C': ['x', 'y', 'z', 'x', 'y', 'z']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print()
+    
+    cleaned_df = remove_outliers_iqr(df, columns=['A', 'B'])
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print()
+    
+    stats = calculate_summary_stats(df, columns=['A', 'B'])
+    print("Summary Statistics:")
+    for col, col_stats in stats.items():
+        print(f"{col}: {col_stats}")
