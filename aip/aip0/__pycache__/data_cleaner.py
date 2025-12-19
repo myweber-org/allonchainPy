@@ -509,4 +509,54 @@ def clean_dataset(file_path):
         return None
 
 if __name__ == "__main__":
-    cleaned_df = clean_dataset('raw_data.csv')
+    cleaned_df = clean_dataset('raw_data.csv')import re
+import unicodedata
+
+def clean_text(text, remove_digits=False, remove_punctuation=False, to_lower=True):
+    """
+    Clean and normalize input text.
+
+    Args:
+        text (str): Input text string.
+        remove_digits (bool): If True, remove all digits.
+        remove_punctuation (bool): If True, remove all punctuation.
+        to_lower (bool): If True, convert text to lowercase.
+
+    Returns:
+        str: Cleaned text.
+    """
+    if not isinstance(text, str):
+        raise TypeError("Input must be a string")
+
+    cleaned = text
+
+    if to_lower:
+        cleaned = cleaned.lower()
+
+    cleaned = unicodedata.normalize('NFKD', cleaned).encode('ascii', 'ignore').decode('ascii')
+
+    if remove_digits:
+        cleaned = re.sub(r'\d+', '', cleaned)
+
+    if remove_punctuation:
+        cleaned = re.sub(r'[^\w\s]', '', cleaned)
+
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+
+    return cleaned
+
+def tokenize_text(text, tokenizer=None):
+    """
+    Tokenize text using provided tokenizer or simple whitespace split.
+
+    Args:
+        text (str): Input text.
+        tokenizer (callable, optional): Custom tokenizer function.
+
+    Returns:
+        list: List of tokens.
+    """
+    cleaned = clean_text(text)
+    if tokenizer:
+        return tokenizer(cleaned)
+    return cleaned.split()
