@@ -258,4 +258,132 @@ if __name__ == "__main__":
     result = clean_dataset(sample_data, numeric_cols)
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {result.shape}")
-    print(result.head())
+    print(result.head())import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_threshold=0.5, fill_strategy='mean'):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    drop_threshold (float): Threshold for dropping columns with missing values (0 to 1)
+    fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode')
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    # Create a copy to avoid modifying original
+    cleaned_df = df.copy()
+    
+    # Standardize column names
+    cleaned_df.columns = cleaned_df.columns.str.strip().str.lower().str.replace(' ', '_')
+    
+    # Calculate missing percentage for each column
+    missing_percent = cleaned_df.isnull().sum() / len(cleaned_df)
+    
+    # Drop columns with missing values above threshold
+    columns_to_drop = missing_percent[missing_percent > drop_threshold].index
+    cleaned_df = cleaned_df.drop(columns=columns_to_drop)
+    
+    # Fill remaining missing values based on strategy
+    for column in cleaned_df.columns:
+        if cleaned_df[column].isnull().any():
+            if cleaned_df[column].dtype in ['int64', 'float64']:
+                if fill_strategy == 'mean':
+                    fill_value = cleaned_df[column].mean()
+                elif fill_strategy == 'median':
+                    fill_value = cleaned_df[column].median()
+                else:
+                    fill_value = cleaned_df[column].mode()[0] if not cleaned_df[column].mode().empty else 0
+                cleaned_df[column].fillna(fill_value, inplace=True)
+            else:
+                # For categorical columns, fill with mode or 'unknown'
+                if not cleaned_df[column].mode().empty:
+                    fill_value = cleaned_df[column].mode()[0]
+                else:
+                    fill_value = 'unknown'
+                cleaned_df[column].fillna(fill_value, inplace=True)
+    
+    # Remove duplicate rows
+    cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Reset index
+    cleaned_df.reset_index(drop=True, inplace=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    dict: Dictionary with validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': [],
+        'stats': {}
+    }
+    
+    # Check if input is a DataFrame
+    if not isinstance(df, pd.DataFrame):
+        validation_results['is_valid'] = False
+        validation_results['errors'].append('Input is not a pandas DataFrame')
+        return validation_results
+    
+    # Check for empty DataFrame
+    if df.empty:
+        validation_results['warnings'].append('DataFrame is empty')
+    
+    # Check required columns
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f'Missing required columns: {missing_columns}')
+    
+    # Calculate statistics
+    validation_results['stats']['row_count'] = len(df)
+    validation_results['stats']['column_count'] = len(df.columns)
+    validation_results['stats']['missing_values'] = int(df.isnull().sum().sum())
+    validation_results['stats']['duplicate_rows'] = df.duplicated().sum()
+    
+    # Data type distribution
+    dtype_counts = df.dtypes.value_counts().to_dict()
+    validation_results['stats']['dtype_distribution'] = {str(k): int(v) for k, v in dtype_counts.items()}
+    
+    return validation_results
+
+# Example usage (commented out for production)
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'ID': [1, 2, 3, 4, 5],
+        'Name': ['Alice', 'Bob', None, 'David', 'Eve'],
+        'Age': [25, 30, None, 35, None],
+        'Score': [85.5, 92.0, 78.5, None, 88.0],
+        'Category': ['A', 'B', 'A', None, 'C']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned = clean_dataset(df, drop_threshold=0.3, fill_strategy='mean')
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print("\n" + "="*50 + "\n")
+    
+    # Validate the data
+    validation = validate_dataframe(cleaned, required_columns=['id', 'name', 'age'])
+    print("Validation Results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
