@@ -183,3 +183,109 @@ if __name__ == "__main__":
         print(f"\nStatistics for column '{col}':")
         print(f"Outliers removed: {col_stats['outliers_removed']}")
         print(f"Percentage removed: {col_stats['percentage_removed']:.2f}%")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, missing_strategy='mean', outlier_method='iqr', columns=None):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    missing_strategy (str): Strategy for missing values ('mean', 'median', 'mode', 'drop').
+    outlier_method (str): Method for outlier detection ('iqr', 'zscore').
+    columns (list): Specific columns to clean. If None, clean all numeric columns.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        columns = df_clean.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in columns:
+        if col not in df_clean.columns:
+            continue
+            
+        if missing_strategy != 'drop':
+            if missing_strategy == 'mean':
+                fill_value = df_clean[col].mean()
+            elif missing_strategy == 'median':
+                fill_value = df_clean[col].median()
+            elif missing_strategy == 'mode':
+                fill_value = df_clean[col].mode()[0] if not df_clean[col].mode().empty else np.nan
+            else:
+                fill_value = 0
+            df_clean[col].fillna(fill_value, inplace=True)
+        else:
+            df_clean = df_clean.dropna(subset=[col])
+        
+        if outlier_method == 'iqr':
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df_clean[col] = np.where((df_clean[col] < lower_bound) | (df_clean[col] > upper_bound),
+                                     df_clean[col].median(), df_clean[col])
+        elif outlier_method == 'zscore':
+            mean_val = df_clean[col].mean()
+            std_val = df_clean[col].std()
+            z_scores = (df_clean[col] - mean_val) / std_val
+            df_clean[col] = np.where(np.abs(z_scores) > 3, mean_val, df_clean[col])
+    
+    return df_clean
+
+def validate_data(df, required_columns=None, unique_constraints=None):
+    """
+    Validate DataFrame structure and constraints.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): Columns that must be present.
+    unique_constraints (list): Columns that should have unique values.
+    
+    Returns:
+    dict: Validation results with issues found.
+    """
+    validation_results = {'valid': True, 'issues': []}
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            validation_results['valid'] = False
+            validation_results['issues'].append(f'Missing required columns: {missing_cols}')
+    
+    if unique_constraints:
+        for col in unique_constraints:
+            if col in df.columns:
+                duplicates = df[col].duplicated().sum()
+                if duplicates > 0:
+                    validation_results['valid'] = False
+                    validation_results['issues'].append(f'Column {col} has {duplicates} duplicate values')
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if df[col].isnull().any():
+            validation_results['issues'].append(f'Column {col} has missing values')
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'id': [1, 2, 3, 4, 5],
+        'value': [10, 20, None, 1000, 30],
+        'category': ['A', 'B', 'A', 'C', 'B']
+    })
+    
+    print("Original Data:")
+    print(sample_data)
+    
+    cleaned_data = clean_dataset(sample_data, missing_strategy='median', outlier_method='iqr')
+    print("\nCleaned Data:")
+    print(cleaned_data)
+    
+    validation = validate_data(cleaned_data, required_columns=['id', 'value'])
+    print("\nValidation Results:")
+    print(validation)
