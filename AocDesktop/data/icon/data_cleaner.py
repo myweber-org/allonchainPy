@@ -412,3 +412,89 @@ def clean_dataset(input_file, output_file):
 
 if __name__ == "__main__":
     clean_dataset("raw_data.csv", "cleaned_data.csv")
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def clean_csv_data(input_path, output_path=None, strategy='mean'):
+    """
+    Clean CSV data by handling missing values.
+    
+    Args:
+        input_path: Path to input CSV file
+        output_path: Path for cleaned output CSV (optional)
+        strategy: Method for handling missing values ('mean', 'median', 'mode', 'drop')
+    
+    Returns:
+        DataFrame with cleaned data
+    """
+    try:
+        df = pd.read_csv(input_path)
+        
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        
+        if strategy == 'mean':
+            for col in numeric_cols:
+                df[col].fillna(df[col].mean(), inplace=True)
+        elif strategy == 'median':
+            for col in numeric_cols:
+                df[col].fillna(df[col].median(), inplace=True)
+        elif strategy == 'mode':
+            for col in numeric_cols:
+                df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 0, inplace=True)
+        elif strategy == 'drop':
+            df.dropna(subset=numeric_cols, inplace=True)
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+        
+        if output_path:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {input_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_csv_file(file_path):
+    """
+    Validate if file exists and is a CSV.
+    
+    Args:
+        file_path: Path to file
+    
+    Returns:
+        Boolean indicating if file is valid
+    """
+    path = Path(file_path)
+    return path.exists() and path.suffix.lower() == '.csv'
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, 2, 3, 4, 5],
+        'C': [1, 2, 3, 4, 5],
+        'category': ['X', 'Y', 'X', 'Y', 'X']
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    print("Testing data cleaning utility...")
+    cleaned = clean_csv_data('test_data.csv', 'cleaned_data.csv', strategy='mean')
+    
+    if cleaned is not None:
+        print("Original data:")
+        print(test_df)
+        print("\nCleaned data:")
+        print(cleaned)
+        
+        import os
+        if os.path.exists('test_data.csv'):
+            os.remove('test_data.csv')
+        if os.path.exists('cleaned_data.csv'):
+            os.remove('cleaned_data.csv')
