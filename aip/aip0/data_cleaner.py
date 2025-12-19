@@ -141,3 +141,29 @@ if __name__ == "__main__":
     print("\nFilling missing values...")
     filled = cleaner.fill_missing_median()
     print(f"Missing values after filling: {filled.isnull().sum().sum()}")
+import re
+
+def clean_string(input_string):
+    """
+    Clean and normalize a string by:
+    1. Removing leading and trailing whitespace.
+    2. Replacing multiple spaces with a single space.
+    3. Converting the entire string to lowercase.
+    """
+    if not isinstance(input_string, str):
+        raise TypeError("Input must be a string")
+
+    # Strip leading/trailing whitespace
+    cleaned = input_string.strip()
+    # Replace multiple spaces/newlines/tabs with a single space
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+    # Convert to lowercase
+    cleaned = cleaned.lower()
+    return cleaned
+
+def process_list(string_list):
+    """
+    Apply clean_string to each element in a list.
+    Returns a new list with cleaned strings.
+    """
+    return [clean_string(s) for s in string_list if isinstance(s, str)]
