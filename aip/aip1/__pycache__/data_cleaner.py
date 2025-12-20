@@ -541,3 +541,76 @@ def validate_data(df, required_columns=None, min_rows=1):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "Data validation passed"
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def clean_dataset(df, numeric_columns):
+    """
+    Clean multiple numeric columns in a DataFrame by removing outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    numeric_columns (list): List of column names to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+    
+    return cleaned_df.reset_index(drop=True)
+
+def calculate_statistics(df, column):
+    """
+    Calculate basic statistics for a column before and after cleaning.
+    
+    Parameters:
+    df (pd.DataFrame): Original DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing statistics
+    """
+    stats = {
+        'original_count': len(df),
+        'original_mean': df[column].mean(),
+        'original_std': df[column].std(),
+        'original_min': df[column].min(),
+        'original_max': df[column].max()
+    }
+    
+    cleaned_df = remove_outliers_iqr(df, column)
+    
+    stats['cleaned_count'] = len(cleaned_df)
+    stats['cleaned_mean'] = cleaned_df[column].mean()
+    stats['cleaned_std'] = cleaned_df[column].std()
+    stats['cleaned_min'] = cleaned_df[column].min()
+    stats['cleaned_max'] = cleaned_df[column].max()
+    stats['removed_outliers'] = stats['original_count'] - stats['cleaned_count']
+    
+    return stats
