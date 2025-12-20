@@ -556,4 +556,125 @@ def validate_data(df, required_columns=None, min_rows=1):
         if missing_columns:
             return False, f"Missing required columns: {missing_columns}"
     
-    return True, "Data validation passed"
+    return True, "Data validation passed"import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+def clean_dataset(df: pd.DataFrame, 
+                  drop_duplicates: bool = True, 
+                  columns_to_check: Optional[List[str]] = None,
+                  fillna_strategy: str = 'drop',
+                  fillna_value: Optional[float] = None) -> pd.DataFrame:
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
+    
+    Parameters:
+    df: Input DataFrame
+    drop_duplicates: Whether to drop duplicate rows
+    columns_to_check: Specific columns to check for duplicates (None for all columns)
+    fillna_strategy: Strategy for handling NaN values ('drop', 'fill', or 'ignore')
+    fillna_value: Value to fill NaN with when strategy is 'fill'
+    
+    Returns:
+    Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Handle duplicates
+    if drop_duplicates:
+        if columns_to_check:
+            cleaned_df = cleaned_df.drop_duplicates(subset=columns_to_check)
+        else:
+            cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Handle missing values
+    if fillna_strategy == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif fillna_strategy == 'fill':
+        if fillna_value is not None:
+            cleaned_df = cleaned_df.fillna(fillna_value)
+        else:
+            cleaned_df = cleaned_df.fillna(0)
+    elif fillna_strategy != 'ignore':
+        raise ValueError("fillna_strategy must be 'drop', 'fill', or 'ignore'")
+    
+    # Reset index after cleaning operations
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df: pd.DataFrame, 
+                      required_columns: List[str] = None) -> bool:
+    """
+    Validate that DataFrame meets basic requirements.
+    
+    Parameters:
+    df: DataFrame to validate
+    required_columns: List of columns that must be present
+    
+    Returns:
+    Boolean indicating if DataFrame is valid
+    """
+    if df.empty:
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+def remove_outliers_iqr(df: pd.DataFrame, 
+                       column: str, 
+                       multiplier: float = 1.5) -> pd.DataFrame:
+    """
+    Remove outliers from a DataFrame column using IQR method.
+    
+    Parameters:
+    df: Input DataFrame
+    column: Column name to process
+    multiplier: IQR multiplier for outlier detection
+    
+    Returns:
+    DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'id': [1, 2, 3, 4, 5, 5, 6],
+        'value': [10.5, 20.3, np.nan, 15.7, 1000.0, 1000.0, 12.1],
+        'category': ['A', 'B', 'A', 'B', 'A', 'A', 'C']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    # Clean the data
+    cleaned = clean_dataset(df, fillna_strategy='fill', fillna_value=0)
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print("\n")
+    
+    # Remove outliers
+    no_outliers = remove_outliers_iqr(cleaned, 'value')
+    print("DataFrame without outliers:")
+    print(no_outliers)
