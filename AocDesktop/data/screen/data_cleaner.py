@@ -657,4 +657,144 @@ def clean_data_pipeline(df, outlier_columns=None, normalize_columns=None,
     df_clean = remove_outliers_iqr(df_clean, columns=outlier_columns)
     df_clean = normalize_data(df_clean, columns=normalize_columns, method=normalize_method)
     
-    return df_clean
+    return df_cleanimport numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        factor: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+
+def normalize_minmax(data, column):
+    """
+    Normalize column using min-max scaling to [0, 1] range.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        Series with normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return pd.Series([0.5] * len(data), index=data.index)
+    
+    return (data[column] - min_val) / (max_val - min_val)
+
+def standardize_zscore(data, column):
+    """
+    Standardize column using z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to standardize
+    
+    Returns:
+        Series with standardized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return pd.Series([0] * len(data), index=data.index)
+    
+    return (data[column] - mean_val) / std_val
+
+def clean_dataset(df, numeric_columns=None, outlier_factor=1.5, normalization_method='minmax'):
+    """
+    Clean dataset by removing outliers and normalizing numeric columns.
+    
+    Args:
+        df: pandas DataFrame
+        numeric_columns: list of numeric column names (if None, auto-detect)
+        outlier_factor: IQR multiplier for outlier removal
+        normalization_method: 'minmax' or 'zscore'
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col not in cleaned_df.columns:
+            continue
+            
+        cleaned_df = remove_outliers_iqr(cleaned_df, col, outlier_factor)
+        
+        if normalization_method == 'minmax':
+            cleaned_df[f'{col}_normalized'] = normalize_minmax(cleaned_df, col)
+        elif normalization_method == 'zscore':
+            cleaned_df[f'{col}_standardized'] = standardize_zscore(cleaned_df, col)
+        else:
+            raise ValueError("normalization_method must be 'minmax' or 'zscore'")
+    
+    return cleaned_df.reset_index(drop=True)
+
+def validate_data(df, required_columns=None, allow_nan_columns=None):
+    """
+    Validate DataFrame structure and data quality.
+    
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: list of required column names
+        allow_nan_columns: list of columns allowed to have NaN values
+    
+    Returns:
+        Dictionary with validation results
+    """
+    validation_result = {
+        'is_valid': True,
+        'missing_columns': [],
+        'null_counts': {},
+        'data_types': {}
+    }
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            validation_result['is_valid'] = False
+            validation_result['missing_columns'] = missing
+    
+    for col in df.columns:
+        null_count = df[col].isnull().sum()
+        validation_result['null_counts'][col] = null_count
+        
+        if allow_nan_columns and col in allow_nan_columns:
+            continue
+            
+        if null_count > 0:
+            validation_result['is_valid'] = False
+    
+    validation_result['data_types'] = df.dtypes.to_dict()
+    
+    return validation_result
