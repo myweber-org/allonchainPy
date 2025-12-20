@@ -566,3 +566,69 @@ def example_usage():
 
 if __name__ == "__main__":
     result = example_usage()
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def clean_dataset(input_path, output_path=None):
+    """
+    Load a CSV file, remove duplicate rows, standardize column names,
+    and handle missing values.
+    """
+    df = pd.read_csv(input_path)
+    
+    # Remove duplicates
+    initial_count = len(df)
+    df.drop_duplicates(inplace=True)
+    duplicates_removed = initial_count - len(df)
+    
+    # Standardize column names
+    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+    
+    # Fill missing numeric values with column median
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        df[col].fillna(df[col].median(), inplace=True)
+    
+    # Fill missing categorical values with mode
+    categorical_cols = df.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'unknown', inplace=True)
+    
+    # Generate output filename if not provided
+    if output_path is None:
+        input_file = Path(input_path)
+        output_path = input_file.parent / f"{input_file.stem}_cleaned{input_file.suffix}"
+    
+    # Save cleaned data
+    df.to_csv(output_path, index=False)
+    
+    # Print summary
+    print(f"Data cleaning complete:")
+    print(f"  - Removed {duplicates_removed} duplicate rows")
+    print(f"  - Processed {len(numeric_cols)} numeric columns")
+    print(f"  - Processed {len(categorical_cols)} categorical columns")
+    print(f"  - Saved cleaned data to: {output_path}")
+    
+    return df, output_path
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'ID': [1, 2, 2, 3, 4, 5],
+        'Name': ['Alice', 'Bob', 'Bob', 'Charlie', 'David', 'Eve'],
+        'Age': [25, 30, 30, None, 35, 28],
+        'City': ['NYC', 'LA', 'LA', None, 'Chicago', 'Boston'],
+        'Score': [85.5, 92.0, 92.0, 78.5, None, 88.0]
+    }
+    
+    # Create sample DataFrame
+    df_sample = pd.DataFrame(sample_data)
+    df_sample.to_csv('sample_data.csv', index=False)
+    
+    # Clean the sample data
+    cleaned_df, output_file = clean_dataset('sample_data.csv')
+    
+    # Display results
+    print("\nFirst few rows of cleaned data:")
+    print(cleaned_df.head())
