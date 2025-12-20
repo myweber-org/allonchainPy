@@ -316,3 +316,79 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataset(cleaned, required_columns=['A', 'B', 'C'])
     print(f"\nValidation: {message}")
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Args:
+        data: List or numpy array of numerical values
+        column: Column name or index to process
+    
+    Returns:
+        Cleaned data with outliers removed
+    """
+    if not isinstance(data, np.ndarray):
+        data_array = np.array(data)
+    else:
+        data_array = data
+    
+    q1 = np.percentile(data_array, 25)
+    q3 = np.percentile(data_array, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    filtered_data = data_array[(data_array >= lower_bound) & (data_array <= upper_bound)]
+    
+    return filtered_data
+
+def calculate_statistics(data):
+    """
+    Calculate basic statistics for the cleaned data.
+    
+    Args:
+        data: Numerical data array
+    
+    Returns:
+        Dictionary containing mean, median, and standard deviation
+    """
+    stats = {
+        'mean': np.mean(data),
+        'median': np.median(data),
+        'std_dev': np.std(data),
+        'min': np.min(data),
+        'max': np.max(data),
+        'count': len(data)
+    }
+    
+    return stats
+
+def process_dataset(data, column_index=0):
+    """
+    Complete pipeline for cleaning data and calculating statistics.
+    
+    Args:
+        data: Dataset containing numerical values
+        column_index: Index of column to process
+    
+    Returns:
+        Tuple of (cleaned_data, statistics)
+    """
+    cleaned = remove_outliers_iqr(data, column_index)
+    stats = calculate_statistics(cleaned)
+    
+    return cleaned, stats
+
+if __name__ == "__main__":
+    sample_data = np.random.normal(100, 15, 1000)
+    sample_data = np.append(sample_data, [500, -500, 1000])
+    
+    cleaned_data, statistics = process_dataset(sample_data)
+    
+    print(f"Original data points: {len(sample_data)}")
+    print(f"Cleaned data points: {len(cleaned_data)}")
+    print(f"Removed outliers: {len(sample_data) - len(cleaned_data)}")
+    print(f"Statistics: {statistics}")
