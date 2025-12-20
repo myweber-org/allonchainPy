@@ -111,4 +111,117 @@ def standardize_columns(df, columns=None):
             std = df[col].std()
             if std > 0:
                 df_standardized[col] = (df[col] - mean) / std
-    return df_standardized
+    return df_standardizedimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, threshold=1.5):
+    """
+    Detect outliers using Interquartile Range method.
+    
+    Args:
+        data: Array-like data
+        threshold: IQR multiplier (default 1.5)
+    
+    Returns:
+        Boolean mask of outliers
+    """
+    q1 = np.percentile(data, 25)
+    q3 = np.percentile(data, 75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    return (data < lower_bound) | (data > upper_bound)
+
+def winsorize_data(data, limits=(0.05, 0.05)):
+    """
+    Apply winsorization to limit extreme values.
+    
+    Args:
+        data: Array-like data
+        limits: Tuple of lower and upper limits
+    
+    Returns:
+        Winsorized data
+    """
+    return stats.mstats.winsorize(data, limits=limits)
+
+def normalize_minmax(data):
+    """
+    Normalize data to [0, 1] range using min-max scaling.
+    
+    Args:
+        data: Array-like data
+    
+    Returns:
+        Normalized data
+    """
+    data_min = np.min(data)
+    data_max = np.max(data)
+    if data_max == data_min:
+        return np.zeros_like(data)
+    return (data - data_min) / (data_max - data_min)
+
+def clean_dataframe(df, columns=None, outlier_method='iqr', normalize=False):
+    """
+    Clean DataFrame by handling outliers and optionally normalizing.
+    
+    Args:
+        df: Input DataFrame
+        columns: List of columns to process (default: all numeric columns)
+        outlier_method: 'iqr' or 'winsorize'
+        normalize: Whether to apply min-max normalization
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    result_df = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        col_data = df[col].values
+        
+        if outlier_method == 'iqr':
+            outliers = detect_outliers_iqr(col_data)
+            if np.any(outliers):
+                col_median = np.median(col_data[~outliers])
+                result_df.loc[outliers, col] = col_median
+        elif outlier_method == 'winsorize':
+            result_df[col] = winsorize_data(col_data)
+        
+        if normalize:
+            result_df[col] = normalize_minmax(result_df[col].values)
+    
+    return result_df
+
+def calculate_statistics(df):
+    """
+    Calculate basic statistics for numeric columns.
+    
+    Args:
+        df: Input DataFrame
+    
+    Returns:
+        Dictionary of statistics
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    stats_dict = {}
+    
+    for col in numeric_cols:
+        col_data = df[col].dropna()
+        stats_dict[col] = {
+            'mean': np.mean(col_data),
+            'median': np.median(col_data),
+            'std': np.std(col_data),
+            'min': np.min(col_data),
+            'max': np.max(col_data),
+            'count': len(col_data),
+            'missing': df[col].isna().sum()
+        }
+    
+    return stats_dict
