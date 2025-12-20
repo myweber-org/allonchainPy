@@ -158,3 +158,46 @@ if __name__ == "__main__":
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {result.shape}")
     print(result.head())
+import pandas as pd
+
+def clean_dataset(df, drop_na=True, column_case='lower'):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing column names.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_na (bool): If True, drop rows with any null values. Default True.
+    column_case (str): Target case for column names ('lower', 'upper', 'title'). Default 'lower'.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_na:
+        cleaned_df = cleaned_df.dropna()
+    
+    if column_case == 'lower':
+        cleaned_df.columns = cleaned_df.columns.str.lower()
+    elif column_case == 'upper':
+        cleaned_df.columns = cleaned_df.columns.str.upper()
+    elif column_case == 'title':
+        cleaned_df.columns = cleaned_df.columns.str.title()
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    subset (list): Columns to consider for duplicates. If None, all columns are used.
+    keep (str): Which duplicates to keep ('first', 'last', False). Default 'first'.
+    
+    Returns:
+    pd.DataFrame: DataFrame with duplicates removed.
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
