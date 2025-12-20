@@ -367,4 +367,139 @@ if __name__ == "__main__":
     
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("\nCleaned statistics for column 'A':")
-    print(calculate_basic_stats(cleaned_df, 'A'))
+    print(calculate_basic_stats(cleaned_df, 'A'))import pandas as pd
+import numpy as np
+
+def clean_missing_data(df, strategy='mean', columns=None):
+    """
+    Handle missing values in a DataFrame using specified strategy.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        strategy (str): Strategy for handling missing values. 
+                       Options: 'mean', 'median', 'mode', 'drop', 'fill_zero'
+        columns (list): List of columns to apply cleaning. If None, applies to all numeric columns.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    df_cleaned = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    for col in columns:
+        if col not in df_cleaned.columns:
+            continue
+            
+        if strategy == 'mean':
+            fill_value = df_cleaned[col].mean()
+        elif strategy == 'median':
+            fill_value = df_cleaned[col].median()
+        elif strategy == 'mode':
+            fill_value = df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 0
+        elif strategy == 'fill_zero':
+            fill_value = 0
+        elif strategy == 'drop':
+            df_cleaned = df_cleaned.dropna(subset=[col])
+            continue
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+        
+        df_cleaned[col] = df_cleaned[col].fillna(fill_value)
+    
+    return df_cleaned
+
+def detect_outliers_iqr(df, columns=None, threshold=1.5):
+    """
+    Detect outliers using Interquartile Range method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of columns to check for outliers
+        threshold (float): IQR multiplier threshold
+    
+    Returns:
+        dict: Dictionary with outlier counts per column
+    """
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    outliers = {}
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        
+        outlier_mask = (df[col] < lower_bound) | (df[col] > upper_bound)
+        outliers[col] = outlier_mask.sum()
+    
+    return outliers
+
+def normalize_data(df, columns=None, method='minmax'):
+    """
+    Normalize data using specified method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of columns to normalize
+        method (str): Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+        pd.DataFrame: Normalized DataFrame
+    """
+    df_normalized = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_normalized.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    for col in columns:
+        if col not in df_normalized.columns:
+            continue
+            
+        if method == 'minmax':
+            col_min = df_normalized[col].min()
+            col_max = df_normalized[col].max()
+            if col_max != col_min:
+                df_normalized[col] = (df_normalized[col] - col_min) / (col_max - col_min)
+        
+        elif method == 'zscore':
+            col_mean = df_normalized[col].mean()
+            col_std = df_normalized[col].std()
+            if col_std != 0:
+                df_normalized[col] = (df_normalized[col] - col_mean) / col_std
+    
+    return df_normalized
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [10, np.nan, 30, 40, 50],
+        'C': [100, 200, 300, 400, 500]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_missing_data(df, strategy='mean')
+    print("\nCleaned DataFrame (mean imputation):")
+    print(cleaned_df)
+    
+    outliers = detect_outliers_iqr(cleaned_df)
+    print("\nOutlier counts:")
+    print(outliers)
+    
+    normalized_df = normalize_data(cleaned_df, method='minmax')
+    print("\nNormalized DataFrame:")
+    print(normalized_df)
