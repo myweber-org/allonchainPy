@@ -123,4 +123,105 @@ def validate_dataframe(df, required_columns=None):
 #     cleaned = clean_dataset(df, fill_missing='median')
 #     print("Original shape:", df.shape)
 #     print("Cleaned shape:", cleaned.shape)
-#     print("Validation:", validate_dataframe(cleaned))
+#     print("Validation:", validate_dataframe(cleaned))import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, handle_nulls='drop', fill_value=None):
+    """
+    Clean a pandas DataFrame by handling duplicates and null values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    handle_nulls (str): Strategy for null handling - 'drop', 'fill', or 'ignore'.
+    fill_value: Value to fill nulls with if handle_nulls is 'fill'.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if handle_nulls == 'drop':
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.dropna()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} rows with null values")
+    elif handle_nulls == 'fill':
+        if fill_value is not None:
+            cleaned_df = cleaned_df.fillna(fill_value)
+            print(f"Filled null values with {fill_value}")
+        else:
+            cleaned_df = cleaned_df.fillna(0)
+            print("Filled null values with 0")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
+    
+    Returns:
+    bool: True if validation passes, False otherwise.
+    """
+    if not isinstance(df, pd.DataFrame):
+        print("Error: Input is not a pandas DataFrame")
+        return False
+    
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return True
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Error: Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+def calculate_missing_percentage(df):
+    """
+    Calculate percentage of missing values for each column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    
+    Returns:
+    pd.Series: Percentage of missing values per column.
+    """
+    if df.empty:
+        return pd.Series()
+    
+    total_rows = len(df)
+    missing_counts = df.isnull().sum()
+    missing_percentage = (missing_counts / total_rows) * 100
+    
+    return missing_percentage.round(2)
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', None, 'Eve', None],
+        'score': [85, 92, 92, 78, None, 88],
+        'age': [25, 30, 30, 22, 28, 35]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nMissing values percentage:")
+    print(calculate_missing_percentage(df))
+    
+    cleaned = clean_dataset(df, handle_nulls='fill', fill_value='Unknown')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
