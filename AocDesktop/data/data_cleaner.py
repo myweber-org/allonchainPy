@@ -784,3 +784,87 @@ if __name__ == "__main__":
     
     is_valid, msg = validate_dataframe(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation: {msg}")
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, columns=None):
+    """
+    Remove outliers from DataFrame using Interquartile Range method.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to process (default: all numeric columns)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+            df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize numeric columns to have zero mean and unit variance.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to standardize
+    
+    Returns:
+        DataFrame with standardized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_standardized = df.copy()
+    
+    for col in columns:
+        if col in df.columns and df[col].std() > 0:
+            df_standardized[col] = (df[col] - df[col].mean()) / df[col].std()
+    
+    return df_standardized
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        strategy: 'mean', 'median', 'mode', or 'drop'
+        columns: list of column names to process
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = df.columns.tolist()
+    
+    df_processed = df.copy()
+    
+    for col in columns:
+        if col in df.columns and df[col].isnull().any():
+            if strategy == 'mean' and np.issubdtype(df[col].dtype, np.number):
+                df_processed[col].fillna(df[col].mean(), inplace=True)
+            elif strategy == 'median' and np.issubdtype(df[col].dtype, np.number):
+                df_processed[col].fillna(df[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df_processed[col].fillna(df[col].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                df_processed = df_processed.dropna(subset=[col])
+    
+    return df_processed.reset_index(drop=True)
