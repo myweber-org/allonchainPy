@@ -614,3 +614,136 @@ def calculate_statistics(df, column):
     stats['removed_outliers'] = stats['original_count'] - stats['cleaned_count']
     
     return stats
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, threshold=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data.copy()
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = np.abs(stats.zscore(data[column].dropna()))
+    filtered_indices = np.where(z_scores < threshold)[0]
+    filtered_data = data.iloc[filtered_indices].copy()
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].copy()
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def normalize_zscore(data, column):
+    """
+    Normalize data using Z-score standardization
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].copy()
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns
+    """
+    if columns is None:
+        columns = data.columns
+    
+    data_clean = data.copy()
+    
+    for column in columns:
+        if column not in data.columns:
+            continue
+            
+        if data[column].isnull().any():
+            if strategy == 'mean':
+                fill_value = data[column].mean()
+            elif strategy == 'median':
+                fill_value = data[column].median()
+            elif strategy == 'mode':
+                fill_value = data[column].mode()[0]
+            elif strategy == 'drop':
+                data_clean = data_clean.dropna(subset=[column])
+                continue
+            else:
+                raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+            
+            data_clean[column] = data_clean[column].fillna(fill_value)
+    
+    return data_clean
+
+def clean_dataset(data, config):
+    """
+    Main function to clean dataset based on configuration
+    """
+    data_clean = data.copy()
+    
+    # Handle missing values
+    if 'missing_values' in config:
+        missing_config = config['missing_values']
+        data_clean = handle_missing_values(
+            data_clean,
+            strategy=missing_config.get('strategy', 'mean'),
+            columns=missing_config.get('columns')
+        )
+    
+    # Remove outliers
+    if 'outliers' in config:
+        outlier_config = config['outliers']
+        method = outlier_config.get('method', 'iqr')
+        threshold = outlier_config.get('threshold', 3 if method == 'zscore' else 1.5)
+        
+        for column in outlier_config.get('columns', []):
+            if method == 'iqr':
+                data_clean = remove_outliers_iqr(data_clean, column, threshold)
+            elif method == 'zscore':
+                data_clean = remove_outliers_zscore(data_clean, column, threshold)
+    
+    # Normalize data
+    if 'normalization' in config:
+        norm_config = config['normalization']
+        method = norm_config.get('method', 'minmax')
+        
+        for column in norm_config.get('columns', []):
+            if method == 'minmax':
+                data_clean[column] = normalize_minmax(data_clean, column)
+            elif method == 'zscore':
+                data_clean[column] = normalize_zscore(data_clean, column)
+    
+    return data_clean.reset_index(drop=True)
