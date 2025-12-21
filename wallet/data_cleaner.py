@@ -1059,4 +1059,78 @@ if __name__ == "__main__":
     cleaned = clean_dataset(sample_data, ['A', 'B', 'C'])
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {cleaned.shape}")
-    print(f"Removed {len(sample_data) - len(cleaned)} outliers")
+    print(f"Removed {len(sample_data) - len(cleaned)} outliers")import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fillna_method='drop'):
+    """
+    Clean a pandas DataFrame by handling null values and removing duplicates.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        drop_duplicates (bool): Whether to remove duplicate rows
+        fillna_method (str): Method to handle null values - 'drop' or 'fill'
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Handle null values
+    if fillna_method == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif fillna_method == 'fill':
+        cleaned_df = cleaned_df.fillna(method='ffill')
+    
+    # Remove duplicates
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None):
+    """
+    Validate dataset structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+    
+    Returns:
+        dict: Validation results
+    """
+    validation_results = {
+        'row_count': len(df),
+        'column_count': len(df.columns),
+        'null_count': df.isnull().sum().sum(),
+        'duplicate_count': df.duplicated().sum()
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        validation_results['missing_columns'] = missing_columns
+        validation_results['has_all_columns'] = len(missing_columns) == 0
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 3, 3, 4, None],
+        'name': ['Alice', 'Bob', 'Charlie', 'Charlie', None, 'Eve'],
+        'score': [85, 92, 78, 78, 88, 95]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original dataset:")
+    print(df)
+    print("\nValidation results:")
+    print(validate_dataset(df))
+    
+    cleaned = clean_dataset(df, drop_duplicates=True, fillna_method='drop')
+    print("\nCleaned dataset:")
+    print(cleaned)
+    print("\nCleaned validation results:")
+    print(validate_dataset(cleaned))
