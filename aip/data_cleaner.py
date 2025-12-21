@@ -902,4 +902,112 @@ if __name__ == "__main__":
     print("Final data shape:", clean_df.shape)
     print("Missing values after cleaning:", clean_df.isnull().sum().sum())
     print("Normalized ranges - Min:", clean_df[['feature_a', 'feature_b', 'feature_c']].min().values,
-          "Max:", clean_df[['feature_a', 'feature_b', 'feature_c']].max().values)
+          "Max:", clean_df[['feature_a', 'feature_b', 'feature_c']].max().values)import pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, missing_strategy='mean', columns_to_drop=None):
+    """
+    Load and clean CSV data by handling missing values and dropping specified columns.
+    
+    Parameters:
+    filepath (str): Path to the CSV file
+    missing_strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
+    columns_to_drop (list): List of column names to drop from the dataset
+    
+    Returns:
+    pandas.DataFrame: Cleaned DataFrame
+    """
+    
+    try:
+        df = pd.read_csv(filepath)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found at path: {filepath}")
+    except Exception as e:
+        raise Exception(f"Error reading CSV file: {str(e)}")
+    
+    original_shape = df.shape
+    
+    if columns_to_drop:
+        df = df.drop(columns=columns_to_drop, errors='ignore')
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if missing_strategy == 'mean':
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].mean())
+    elif missing_strategy == 'median':
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].median())
+    elif missing_strategy == 'mode':
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 0)
+    elif missing_strategy == 'drop':
+        df = df.dropna()
+    
+    categorical_cols = df.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        df[col] = df[col].fillna('Unknown')
+    
+    print(f"Data cleaning completed:")
+    print(f"  Original shape: {original_shape}")
+    print(f"  Final shape: {df.shape}")
+    print(f"  Missing values handled using: {missing_strategy} strategy")
+    
+    return df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pandas.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    if df.empty:
+        validation_results['is_valid'] = False
+        validation_results['errors'].append('DataFrame is empty')
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f'Missing required columns: {missing_columns}')
+    
+    duplicate_rows = df.duplicated().sum()
+    if duplicate_rows > 0:
+        validation_results['warnings'].append(f'Found {duplicate_rows} duplicate rows')
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 3, 4, 5],
+        'value': [10.5, None, 15.2, None, 20.1],
+        'category': ['A', 'B', None, 'A', 'C'],
+        'score': [85, 92, None, 78, 88]
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('test_data.csv', missing_strategy='mean', columns_to_drop=['id'])
+    
+    validation = validate_dataframe(cleaned_df, required_columns=['value', 'category', 'score'])
+    
+    print("\nValidation results:")
+    print(f"  Is valid: {validation['is_valid']}")
+    print(f"  Errors: {validation['errors']}")
+    print(f"  Warnings: {validation['warnings']}")
+    
+    import os
+    if os.path.exists('test_data.csv'):
+        os.remove('test_data.csv')
