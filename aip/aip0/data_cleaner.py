@@ -594,3 +594,125 @@ if __name__ == "__main__":
     key_column = sys.argv[3]
 
     remove_duplicates(input_file, output_file, key_column)
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_na=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    drop_duplicates (bool): Whether to drop duplicate rows
+    fill_na (bool): Whether to fill missing values
+    fill_value: Value to fill missing entries with
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_na:
+        na_count = cleaned_df.isna().sum().sum()
+        cleaned_df = cleaned_df.fillna(fill_value)
+        print(f"Filled {na_count} missing values with {fill_value}")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of columns that must be present
+    
+    Returns:
+    bool: True if validation passes, False otherwise
+    """
+    if not isinstance(df, pd.DataFrame):
+        print("Error: Input is not a pandas DataFrame")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Error: Missing required columns: {missing_columns}")
+            return False
+    
+    if df.empty:
+        print("Warning: DataFrame is empty")
+    
+    return True
+
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Remove outliers from a specific column using specified method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    method (str): 'iqr' for interquartile range or 'zscore' for standard deviations
+    threshold (float): Threshold value for outlier detection
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        print(f"Error: Column '{column}' not found in DataFrame")
+        return df
+    
+    data = df[column].dropna()
+    
+    if method == 'iqr':
+        Q1 = data.quantile(0.25)
+        Q3 = data.quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        mask = (df[column] >= lower_bound) & (df[column] <= upper_bound)
+    elif method == 'zscore':
+        mean = data.mean()
+        std = data.std()
+        mask = np.abs((df[column] - mean) / std) <= threshold
+    else:
+        print(f"Error: Unknown method '{method}'")
+        return df
+    
+    filtered_df = df[mask]
+    removed = len(df) - len(filtered_df)
+    print(f"Removed {removed} outliers from column '{column}'")
+    
+    return filtered_df
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'value': [10, 20, 20, np.nan, 1000, 30],
+        'category': ['A', 'B', 'B', 'A', 'C', 'A']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned = clean_dataset(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    # Validate
+    is_valid = validate_dataframe(cleaned, required_columns=['id', 'value'])
+    print(f"\nDataFrame validation: {is_valid}")
+    
+    # Remove outliers
+    filtered = remove_outliers(cleaned, 'value', method='iqr')
+    print(f"\nDataFrame after outlier removal: {len(filtered)} rows")
