@@ -479,4 +479,103 @@ def example_usage():
     print(calculate_summary_stats(cleaned_df, 'value'))
 
 if __name__ == "__main__":
-    example_usage()
+    example_usage()import csv
+import os
+
+def clean_csv(input_file, output_file, columns_to_keep=None):
+    """
+    Clean a CSV file by removing rows with missing values
+    and optionally selecting specific columns.
+    """
+    if not os.path.exists(input_file):
+        raise FileNotFoundError(f"Input file '{input_file}' not found.")
+    
+    cleaned_rows = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        original_headers = reader.fieldnames
+        
+        if columns_to_keep:
+            headers = [col for col in columns_to_keep if col in original_headers]
+        else:
+            headers = original_headers
+        
+        for row in reader:
+            # Skip rows with any empty values in selected columns
+            if any(row.get(col, '').strip() == '' for col in headers):
+                continue
+            
+            cleaned_row = {col: row[col].strip() for col in headers}
+            cleaned_rows.append(cleaned_row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=headers)
+        writer.writeheader()
+        writer.writerows(cleaned_rows)
+    
+    return len(cleaned_rows)
+
+def validate_csv(file_path, required_columns):
+    """
+    Validate that a CSV file exists and contains required columns.
+    """
+    if not os.path.exists(file_path):
+        return False, f"File '{file_path}' does not exist."
+    
+    try:
+        with open(file_path, 'r', newline='', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            available_columns = set(reader.fieldnames or [])
+            
+            missing_columns = [col for col in required_columns if col not in available_columns]
+            
+            if missing_columns:
+                return False, f"Missing required columns: {missing_columns}"
+            
+            return True, "CSV file is valid."
+    
+    except Exception as e:
+        return False, f"Error reading CSV file: {str(e)}"
+
+def sample_data(file_path, sample_size=5):
+    """
+    Extract a sample of rows from a CSV file.
+    """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File '{file_path}' not found.")
+    
+    samples = []
+    
+    with open(file_path, 'r', newline='', encoding='utf-8') as file:
+        reader = csv.DictReader(file)
+        
+        for i, row in enumerate(reader):
+            if i >= sample_size:
+                break
+            samples.append(row)
+    
+    return samples
+
+if __name__ == "__main__":
+    # Example usage
+    try:
+        input_csv = "raw_data.csv"
+        output_csv = "cleaned_data.csv"
+        
+        # Keep only these columns
+        columns = ["id", "name", "email", "age"]
+        
+        rows_processed = clean_csv(input_csv, output_csv, columns)
+        print(f"Cleaned {rows_processed} rows. Output saved to {output_csv}")
+        
+        # Validate the cleaned file
+        is_valid, message = validate_csv(output_csv, ["id", "name", "email"])
+        print(f"Validation: {message}")
+        
+        # Show a sample
+        sample = sample_data(output_csv, 3)
+        print("Sample data:", sample)
+    
+    except Exception as e:
+        print(f"Error: {e}")
