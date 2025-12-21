@@ -1247,4 +1247,41 @@ def clean_dataset(input_file, output_file=None, missing_strategy='mean'):
     cleaner.load_data()
     cleaner.handle_missing_values(strategy=missing_strategy)
     cleaner.remove_duplicates()
-    return cleaner.save_cleaned_data(output_file)
+    return cleaner.save_cleaned_data(output_file)import re
+import pandas as pd
+from typing import Optional, Union, List
+
+def remove_duplicates(dataframe: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from a pandas DataFrame.
+    """
+    return dataframe.drop_duplicates(subset=subset, keep='first')
+
+def validate_email(email: str) -> bool:
+    """
+    Validate an email address format using a regular expression.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def normalize_string(text: str) -> str:
+    """
+    Normalize a string by converting to lowercase and stripping whitespace.
+    """
+    return text.strip().lower()
+
+def fill_missing_values(dataframe: pd.DataFrame, column: str, value: Union[str, int, float]) -> pd.DataFrame:
+    """
+    Fill missing values in a specified column with a provided value.
+    """
+    df_copy = dataframe.copy()
+    df_copy[column] = df_copy[column].fillna(value)
+    return df_copy
+
+def convert_to_datetime(dataframe: pd.DataFrame, column: str, format: Optional[str] = None) -> pd.DataFrame:
+    """
+    Convert a column to datetime format.
+    """
+    df_copy = dataframe.copy()
+    df_copy[column] = pd.to_datetime(df_copy[column], format=format, errors='coerce')
+    return df_copy
