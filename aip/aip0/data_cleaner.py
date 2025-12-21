@@ -543,3 +543,54 @@ if __name__ == "__main__":
     print("Cleaned data missing values:", cleaned_df.isnull().sum().sum())
     print("\nFirst 5 rows of cleaned data:")
     print(cleaned_df.head())
+import csv
+import sys
+
+def remove_duplicates(input_file, output_file, key_column):
+    """
+    Reads a CSV file, removes duplicate rows based on a specified key column,
+    and writes the unique rows to a new CSV file.
+    """
+    seen = set()
+    unique_rows = []
+
+    try:
+        with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+            reader = csv.DictReader(infile)
+            fieldnames = reader.fieldnames
+
+            if key_column not in fieldnames:
+                print(f"Error: Key column '{key_column}' not found in CSV header.")
+                sys.exit(1)
+
+            for row in reader:
+                key = row[key_column]
+                if key not in seen:
+                    seen.add(key)
+                    unique_rows.append(row)
+
+        with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+            writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(unique_rows)
+
+        print(f"Successfully removed duplicates. Unique rows: {len(unique_rows)}")
+        print(f"Output written to: {output_file}")
+
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) != 4:
+        print("Usage: python data_cleaner.py <input_file> <output_file> <key_column>")
+        sys.exit(1)
+
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    key_column = sys.argv[3]
+
+    remove_duplicates(input_file, output_file, key_column)
