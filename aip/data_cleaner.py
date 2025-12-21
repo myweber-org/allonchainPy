@@ -789,3 +789,11 @@ if __name__ == "__main__":
     if cleaned_data is not None:
         validation_result = validate_dataframe(cleaned_data)
         print(f"Data validation result: {validation_result}")
+def remove_duplicates(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
