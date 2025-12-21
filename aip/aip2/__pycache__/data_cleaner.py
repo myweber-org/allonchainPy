@@ -710,4 +710,103 @@ if __name__ == "__main__":
     stats = calculate_summary_statistics(cleaned_df, 'values')
     print("\nSummary Statistics:")
     for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+        print(f"{key}: {value:.2f}")import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    subset (list, optional): Columns to consider for duplicates
+    keep (str): Which duplicates to keep - 'first', 'last', or False
+    
+    Returns:
+    pd.DataFrame: DataFrame with duplicates removed
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(df) - len(cleaned_df)
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate rows")
+    
+    return cleaned_df.reset_index(drop=True)
+
+def clean_numeric_column(df, column_name):
+    """
+    Clean a numeric column by removing non-numeric values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column_name (str): Name of column to clean
+    
+    Returns:
+    pd.DataFrame: DataFrame with cleaned column
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    original_count = len(df)
+    df_clean = df.copy()
+    
+    df_clean[column_name] = pd.to_numeric(df_clean[column_name], errors='coerce')
+    
+    removed_count = df_clean[column_name].isna().sum() - df[column_name].isna().sum()
+    if removed_count > 0:
+        print(f"Removed {removed_count} non-numeric values from '{column_name}'")
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list, optional): List of required column names
+    
+    Returns:
+    bool: True if validation passes, False otherwise
+    """
+    if not isinstance(df, pd.DataFrame):
+        print("Error: Input is not a pandas DataFrame")
+        return False
+    
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return True
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Error: Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+def get_data_summary(df):
+    """
+    Generate summary statistics for a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
+    if df.empty:
+        return {"row_count": 0, "column_count": 0}
+    
+    summary = {
+        "row_count": len(df),
+        "column_count": len(df.columns),
+        "column_names": list(df.columns),
+        "data_types": df.dtypes.to_dict(),
+        "missing_values": df.isnull().sum().to_dict(),
+        "numeric_columns": df.select_dtypes(include=['number']).columns.tolist()
+    }
+    
+    return summary
