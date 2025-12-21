@@ -983,3 +983,41 @@ def validate_email_column(df, email_column):
     print(f"Valid emails: {valid_count}/{total_count} ({valid_count/total_count*100:.2f}%)")
     
     return df
+import pandas as pd
+
+def clean_dataset(df, subset=None, fill_method='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and handling missing values.
+
+    Parameters:
+    df (pd.DataFrame): The input DataFrame to clean.
+    subset (list, optional): Column labels to consider for identifying duplicates.
+                             If None, all columns are used.
+    fill_method (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'.
+                       If 'drop', rows with any missing values are removed.
+
+    Returns:
+    pd.DataFrame: The cleaned DataFrame.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates(subset=subset, keep='first')
+
+    # Handle missing values
+    if fill_method == 'drop':
+        df_cleaned = df_cleaned.dropna()
+    elif fill_method in ['mean', 'median']:
+        numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+        if fill_method == 'mean':
+            df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+        else:  # median
+            df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].median())
+    elif fill_method == 'mode':
+        for col in df_cleaned.columns:
+            if df_cleaned[col].dtype == 'object' or pd.api.types.is_categorical_dtype(df_cleaned[col]):
+                mode_val = df_cleaned[col].mode()
+                if not mode_val.empty:
+                    df_cleaned[col] = df_cleaned[col].fillna(mode_val.iloc[0])
+    else:
+        raise ValueError("fill_method must be 'mean', 'median', 'mode', or 'drop'")
+
+    return df_cleaned.reset_index(drop=True)
