@@ -1039,3 +1039,39 @@ def validate_data(df, required_columns, numeric_columns):
         raise ValueError(f"Non-numeric columns specified as numeric: {invalid_numeric}")
     
     return True
+import pandas as pd
+import re
+
+def clean_dataframe(df, text_column):
+    """
+    Remove duplicate rows and normalize text in specified column.
+    """
+    # Remove duplicates
+    df_clean = df.drop_duplicates().reset_index(drop=True)
+    
+    # Normalize text: lowercase and remove extra whitespace
+    df_clean[text_column] = df_clean[text_column].apply(
+        lambda x: re.sub(r'\s+', ' ', str(x).strip().lower())
+    )
+    
+    return df_clean
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned dataframe to CSV.
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = pd.DataFrame({
+        'id': [1, 2, 3, 1, 4],
+        'text': ['Hello World', 'HELLO WORLD', 'Python Code  ', 'hello world', 'Data Science']
+    })
+    
+    cleaned_df = clean_dataframe(sample_data, 'text')
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    
+    save_cleaned_data(cleaned_df, 'cleaned_data.csv')
