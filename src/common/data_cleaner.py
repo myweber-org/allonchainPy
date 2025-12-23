@@ -471,3 +471,124 @@ if __name__ == "__main__":
     
     is_valid = validate_dataframe(cleaned, ['product_name', 'price_usd'])
     print(f"\nDataFrame validation: {is_valid}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        drop_duplicates (bool): Whether to remove duplicate rows
+        fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop')
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if cleaned_df.isnull().sum().any():
+        print("Handling missing values...")
+        
+        if fill_missing == 'drop':
+            cleaned_df = cleaned_df.dropna()
+            print("Dropped rows with missing values")
+        else:
+            for column in cleaned_df.select_dtypes(include=[np.number]).columns:
+                if cleaned_df[column].isnull().any():
+                    if fill_missing == 'mean':
+                        fill_value = cleaned_df[column].mean()
+                    elif fill_missing == 'median':
+                        fill_value = cleaned_df[column].median()
+                    elif fill_missing == 'mode':
+                        fill_value = cleaned_df[column].mode()[0]
+                    else:
+                        fill_value = 0
+                    
+                    cleaned_df[column] = cleaned_df[column].fillna(fill_value)
+                    print(f"Filled missing values in '{column}' with {fill_missing}: {fill_value:.2f}")
+    
+    categorical_cols = cleaned_df.select_dtypes(include=['object']).columns
+    for column in categorical_cols:
+        if cleaned_df[column].isnull().any():
+            cleaned_df[column] = cleaned_df[column].fillna('Unknown')
+            print(f"Filled missing categorical values in '{column}' with 'Unknown'")
+    
+    print(f"Data cleaning complete. Final shape: {cleaned_df.shape}")
+    return cleaned_df
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate the DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+        min_rows (int): Minimum number of rows required
+    
+    Returns:
+        bool: True if validation passes, False otherwise
+    """
+    if len(df) < min_rows:
+        print(f"Validation failed: DataFrame has only {len(df)} rows, minimum required is {min_rows}")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Validation failed: Missing required columns: {missing_columns}")
+            return False
+    
+    print("Data validation passed")
+    return True
+
+def save_cleaned_data(df, output_path, format='csv'):
+    """
+    Save cleaned DataFrame to file.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to save
+        output_path (str): Path to save the file
+        format (str): File format ('csv', 'excel', 'parquet')
+    """
+    try:
+        if format == 'csv':
+            df.to_csv(output_path, index=False)
+        elif format == 'excel':
+            df.to_excel(output_path, index=False)
+        elif format == 'parquet':
+            df.to_parquet(output_path, index=False)
+        else:
+            raise ValueError(f"Unsupported format: {format}")
+        
+        print(f"Cleaned data saved to {output_path} in {format} format")
+        return True
+    except Exception as e:
+        print(f"Error saving data: {str(e)}")
+        return False
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', 'David', 'Eve'],
+        'age': [25, 30, 30, None, 35, 40],
+        'score': [85.5, 92.0, 92.0, 78.5, None, 95.5],
+        'department': ['Sales', 'IT', 'IT', 'HR', None, 'Sales']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original data:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
+    
+    if validate_data(cleaned_df, required_columns=['id', 'name', 'age']):
+        save_cleaned_data(cleaned_df, 'cleaned_data.csv', format='csv')
