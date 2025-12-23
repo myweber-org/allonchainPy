@@ -310,3 +310,46 @@ def filter_dataframe(df, column, threshold, keep_above=True):
         filtered_df = df[df[column] <= threshold]
     
     return filtered_df
+import pandas as pd
+import re
+
+def clean_text_column(series):
+    """Standardize text: lowercase, strip whitespace, remove extra spaces."""
+    if series.dtype == 'object':
+        series = series.astype(str)
+        series = series.str.lower()
+        series = series.str.strip()
+        series = series.apply(lambda x: re.sub(r'\s+', ' ', x))
+    return series
+
+def remove_duplicates(df, subset=None):
+    """Remove duplicate rows, optionally based on a subset of columns."""
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def clean_dataframe(df, text_columns=None, drop_duplicates=True, subset=None):
+    """Apply cleaning functions to a DataFrame."""
+    df_clean = df.copy()
+    
+    if text_columns:
+        for col in text_columns:
+            if col in df_clean.columns:
+                df_clean[col] = clean_text_column(df_clean[col])
+    
+    if drop_duplicates:
+        df_clean = remove_duplicates(df_clean, subset=subset)
+    
+    return df_clean
+
+if __name__ == "__main__":
+    sample_data = {
+        'name': ['  Alice  ', 'bob', 'Alice', '  CAROL  '],
+        'value': [1, 2, 1, 3],
+        'notes': ['Some  text', 'other text', 'some  text', 'MORE']
+    }
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataframe(df, text_columns=['name', 'notes'], subset=['name'])
+    print("\nCleaned DataFrame:")
+    print(cleaned)
