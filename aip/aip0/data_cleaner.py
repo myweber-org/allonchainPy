@@ -930,4 +930,85 @@ def process_dataset(df, numeric_columns):
         if col in cleaned_df.columns:
             cleaned_df = remove_outliers_iqr(cleaned_df, col)
     
-    return cleaned_df
+    return cleaned_dfimport pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, fill_strategy='mean', drop_threshold=0.5):
+    """
+    Load and clean CSV data by handling missing values and removing columns
+    with excessive missing data.
+    """
+    df = pd.read_csv(filepath)
+    
+    # Calculate missing percentage per column
+    missing_percent = df.isnull().sum() / len(df)
+    
+    # Drop columns with missing data above threshold
+    columns_to_drop = missing_percent[missing_percent > drop_threshold].index
+    df_cleaned = df.drop(columns=columns_to_drop)
+    
+    # Fill remaining missing values based on strategy
+    if fill_strategy == 'mean':
+        df_cleaned = df_cleaned.fillna(df_cleaned.mean(numeric_only=True))
+    elif fill_strategy == 'median':
+        df_cleaned = df_cleaned.fillna(df_cleaned.median(numeric_only=True))
+    elif fill_strategy == 'mode':
+        df_cleaned = df_cleaned.fillna(df_cleaned.mode().iloc[0])
+    elif fill_strategy == 'zero':
+        df_cleaned = df_cleaned.fillna(0)
+    else:
+        df_cleaned = df_cleaned.dropna()
+    
+    # Remove duplicate rows
+    df_cleaned = df_cleaned.drop_duplicates()
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    """
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if required_columns:
+        missing_columns = set(required_columns) - set(df.columns)
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    # Check for infinite values
+    if np.any(np.isinf(df.select_dtypes(include=[np.number]))):
+        print("Warning: DataFrame contains infinite values")
+    
+    return True
+
+def save_cleaned_data(df, output_path, format='csv'):
+    """
+    Save cleaned dataframe to file.
+    """
+    if format == 'csv':
+        df.to_csv(output_path, index=False)
+    elif format == 'excel':
+        df.to_excel(output_path, index=False)
+    elif format == 'json':
+        df.to_json(output_path, orient='records')
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+    
+    print(f"Cleaned data saved to {output_path}")
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    try:
+        cleaned_df = clean_csv_data(input_file, fill_strategy='median')
+        validate_dataframe(cleaned_df)
+        save_cleaned_data(cleaned_df, output_file)
+        print("Data cleaning completed successfully")
+    except Exception as e:
+        print(f"Error during data cleaning: {e}")
