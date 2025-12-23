@@ -862,4 +862,40 @@ if __name__ == "__main__":
     stats = calculate_summary_statistics(cleaned_df, 'values')
     print("\nSummary Statistics:")
     for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+        print(f"{key}: {value:.2f}")import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def standardize_zscore(df, column):
+    mean_val = df[column].mean()
+    std_val = df[column].std()
+    df[column + '_standardized'] = (df[column] - mean_val) / std_val
+    return df
+
+def handle_missing_mean(df, column):
+    mean_val = df[column].mean()
+    df[column].fillna(mean_val, inplace=True)
+    return df
+
+def process_dataframe(df, numeric_columns):
+    processed_df = df.copy()
+    for col in numeric_columns:
+        if col in processed_df.columns:
+            processed_df = remove_outliers_iqr(processed_df, col)
+            processed_df = normalize_minmax(processed_df, col)
+            processed_df = standardize_zscore(processed_df, col)
+            processed_df = handle_missing_mean(processed_df, col)
+    return processed_df
