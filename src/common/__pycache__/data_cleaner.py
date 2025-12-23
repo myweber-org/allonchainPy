@@ -1085,3 +1085,109 @@ def validate_dataframe(df, required_columns=None):
             return False
     
     return True
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df
+
+def z_score_normalize(dataframe, column):
+    """
+    Normalize column using z-score normalization
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    mean_val = dataframe[column].mean()
+    std_val = dataframe[column].std()
+    
+    if std_val == 0:
+        return dataframe[column]
+    
+    normalized = (dataframe[column] - mean_val) / std_val
+    return normalized
+
+def min_max_normalize(dataframe, column, feature_range=(0, 1)):
+    """
+    Normalize column using min-max scaling
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    
+    if max_val == min_val:
+        return dataframe[column]
+    
+    normalized = (dataframe[column] - min_val) / (max_val - min_val)
+    
+    if feature_range != (0, 1):
+        new_min, new_max = feature_range
+        normalized = normalized * (new_max - new_min) + new_min
+    
+    return normalized
+
+def handle_missing_values(dataframe, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns
+    """
+    if columns is None:
+        columns = dataframe.columns
+    
+    df_copy = dataframe.copy()
+    
+    for column in columns:
+        if column not in df_copy.columns:
+            continue
+            
+        if df_copy[column].isnull().any():
+            if strategy == 'mean':
+                fill_value = df_copy[column].mean()
+            elif strategy == 'median':
+                fill_value = df_copy[column].median()
+            elif strategy == 'mode':
+                fill_value = df_copy[column].mode()[0]
+            elif strategy == 'constant':
+                fill_value = 0
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            df_copy[column] = df_copy[column].fillna(fill_value)
+    
+    return df_copy
+
+def create_data_summary(dataframe):
+    """
+    Create comprehensive data summary
+    """
+    summary = {
+        'shape': dataframe.shape,
+        'columns': list(dataframe.columns),
+        'dtypes': dataframe.dtypes.to_dict(),
+        'missing_values': dataframe.isnull().sum().to_dict(),
+        'unique_counts': {col: dataframe[col].nunique() for col in dataframe.columns}
+    }
+    
+    numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) > 0:
+        summary['numeric_stats'] = dataframe[numeric_cols].describe().to_dict()
+    
+    return summary
