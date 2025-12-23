@@ -1245,3 +1245,134 @@ if __name__ == "__main__":
     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation result: {is_valid}")
     print(f"Validation message: {message}")
+import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    subset (list, optional): Column labels to consider for duplicates
+    keep (str, optional): Which duplicates to keep: 'first', 'last', or False
+    
+    Returns:
+    pd.DataFrame: DataFrame with duplicates removed
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(df) - len(cleaned_df)
+    print(f"Removed {removed_count} duplicate rows")
+    
+    return cleaned_df
+
+def handle_missing_values(df, strategy='drop', fill_value=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): 'drop' to remove rows, 'fill' to fill values
+    fill_value: Value to use for filling when strategy='fill'
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    if df.empty:
+        return df
+    
+    if strategy == 'drop':
+        cleaned_df = df.dropna()
+        removed_count = len(df) - len(cleaned_df)
+        print(f"Removed {removed_count} rows with missing values")
+    elif strategy == 'fill':
+        if fill_value is not None:
+            cleaned_df = df.fillna(fill_value)
+        else:
+            cleaned_df = df.fillna(df.mean(numeric_only=True))
+        print("Filled missing values")
+    else:
+        raise ValueError("Strategy must be 'drop' or 'fill'")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list, optional): List of required column names
+    
+    Returns:
+    bool: True if validation passes, False otherwise
+    """
+    if not isinstance(df, pd.DataFrame):
+        print("Input is not a pandas DataFrame")
+        return False
+    
+    if df.empty:
+        print("DataFrame is empty")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    print("DataFrame validation passed")
+    return True
+
+def clean_data_pipeline(df, config=None):
+    """
+    Execute a complete data cleaning pipeline.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    config (dict, optional): Configuration dictionary for cleaning steps
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if config is None:
+        config = {
+            'remove_duplicates': True,
+            'handle_missing': 'fill',
+            'validate': True
+        }
+    
+    if not validate_dataframe(df):
+        raise ValueError("DataFrame validation failed")
+    
+    cleaned_df = df.copy()
+    
+    if config.get('remove_duplicates', False):
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if config.get('handle_missing'):
+        strategy = config['handle_missing']
+        cleaned_df = handle_missing_values(cleaned_df, strategy=strategy)
+    
+    print(f"Data cleaning complete. Original: {len(df)} rows, Cleaned: {len(cleaned_df)} rows")
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 4, 5],
+        'value': [10, 20, 20, None, 40, 40, 50],
+        'category': ['A', 'B', 'B', 'C', 'D', 'D', 'E']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned = clean_data_pipeline(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
