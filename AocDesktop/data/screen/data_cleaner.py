@@ -1661,3 +1661,93 @@ if __name__ == "__main__":
     print("Cleaned statistics:", calculate_statistics(cleaned_df, 'value'))
     
     print(f"\nRemoved {len(df) - len(cleaned_df)} outliers")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - factor * IQR
+            upper_bound = Q3 + factor * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean
+
+def remove_outliers_zscore(df, columns, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            z_scores = np.abs(stats.zscore(df[col].dropna()))
+            valid_indices = np.where(z_scores < threshold)[0]
+            df_clean = df_clean.iloc[valid_indices]
+    return df_clean
+
+def normalize_minmax(df, columns):
+    """
+    Normalize data using Min-Max scaling
+    """
+    df_normalized = df.copy()
+    for col in columns:
+        if col in df.columns:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val > min_val:
+                df_normalized[col] = (df[col] - min_val) / (max_val - min_val)
+    return df_normalized
+
+def normalize_zscore(df, columns):
+    """
+    Normalize data using Z-score standardization
+    """
+    df_normalized = df.copy()
+    for col in columns:
+        if col in df.columns:
+            mean_val = df[col].mean()
+            std_val = df[col].std()
+            if std_val > 0:
+                df_normalized[col] = (df[col] - mean_val) / std_val
+    return df_normalized
+
+def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize_method='minmax'):
+    """
+    Main cleaning pipeline
+    """
+    if outlier_method == 'iqr':
+        df_clean = remove_outliers_iqr(df, numeric_columns)
+    elif outlier_method == 'zscore':
+        df_clean = remove_outliers_zscore(df, numeric_columns)
+    else:
+        df_clean = df.copy()
+
+    if normalize_method == 'minmax':
+        df_final = normalize_minmax(df_clean, numeric_columns)
+    elif normalize_method == 'zscore':
+        df_final = normalize_zscore(df_clean, numeric_columns)
+    else:
+        df_final = df_clean
+
+    return df_final
+
+def validate_data(df, required_columns):
+    """
+    Validate data structure and content
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    null_counts = df.isnull().sum()
+    if null_counts.sum() > 0:
+        print(f"Warning: Found {null_counts.sum()} null values in dataset")
+    
+    return True
