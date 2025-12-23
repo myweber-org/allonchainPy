@@ -472,4 +472,150 @@ def validate_data(data, required_columns=None, check_missing=True, check_duplica
         duplicate_count = data.duplicated().sum()
         validation_report['duplicate_rows'] = duplicate_count
     
-    return validation_report
+    return validation_reportimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, threshold=1.5):
+    """
+    Detect outliers using Interquartile Range method.
+    
+    Parameters:
+    data (array-like): Input data
+    threshold (float): Multiplier for IQR (default 1.5)
+    
+    Returns:
+    tuple: (lower_bound, upper_bound, outlier_indices)
+    """
+    q1 = np.percentile(data, 25)
+    q3 = np.percentile(data, 75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    outlier_mask = (data < lower_bound) | (data > upper_bound)
+    outlier_indices = np.where(outlier_mask)[0]
+    
+    return lower_bound, upper_bound, outlier_indices
+
+def normalize_minmax(data, feature_range=(0, 1)):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Parameters:
+    data (array-like): Input data
+    feature_range (tuple): Desired range of transformed data
+    
+    Returns:
+    array: Normalized data
+    """
+    data_min = np.min(data)
+    data_max = np.max(data)
+    
+    if data_max == data_min:
+        return np.zeros_like(data)
+    
+    normalized = (data - data_min) / (data_max - data_min)
+    min_val, max_val = feature_range
+    return normalized * (max_val - min_val) + min_val
+
+def remove_outliers_zscore(data, threshold=3):
+    """
+    Remove outliers using Z-score method.
+    
+    Parameters:
+    data (array-like): Input data
+    threshold (float): Z-score threshold (default 3)
+    
+    Returns:
+    array: Data with outliers removed
+    """
+    z_scores = np.abs(stats.zscore(data))
+    filtered_data = data[z_scores < threshold]
+    return filtered_data
+
+def clean_dataframe(df, numeric_columns=None, outlier_method='iqr'):
+    """
+    Clean dataframe by handling outliers in numeric columns.
+    
+    Parameters:
+    df (DataFrame): Input dataframe
+    numeric_columns (list): List of numeric column names
+    outlier_method (str): Method for outlier detection ('iqr' or 'zscore')
+    
+    Returns:
+    DataFrame: Cleaned dataframe
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col not in df.columns:
+            continue
+            
+        col_data = df[col].dropna().values
+        
+        if outlier_method == 'iqr':
+            _, _, outlier_idx = detect_outliers_iqr(col_data)
+        elif outlier_method == 'zscore':
+            z_scores = np.abs(stats.zscore(col_data))
+            outlier_idx = np.where(z_scores > 3)[0]
+        else:
+            raise ValueError(f"Unknown outlier method: {outlier_method}")
+        
+        if len(outlier_idx) > 0:
+            median_val = np.median(col_data)
+            cleaned_df.loc[cleaned_df.index[outlier_idx], col] = median_val
+    
+    return cleaned_df
+
+def create_cleaning_pipeline(steps):
+    """
+    Create a data cleaning pipeline with specified steps.
+    
+    Parameters:
+    steps (list): List of cleaning function names
+    
+    Returns:
+    function: Pipeline function
+    """
+    available_steps = {
+        'remove_outliers': remove_outliers_zscore,
+        'normalize': normalize_minmax,
+        'detect_outliers': detect_outliers_iqr
+    }
+    
+    def pipeline(data, **kwargs):
+        result = data.copy()
+        
+        for step in steps:
+            if step in available_steps:
+                if step == 'remove_outliers':
+                    result = available_steps[step](result, **kwargs.get(step, {}))
+                elif step == 'normalize':
+                    result = available_steps[step](result, **kwargs.get(step, {}))
+                elif step == 'detect_outliers':
+                    bounds = available_steps[step](result, **kwargs.get(step, {}))
+                    print(f"Outlier bounds: {bounds[:2]}")
+        
+        return result
+    
+    return pipeline
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = np.random.normal(0, 1, 100)
+    sample_data[0] = 10  # Add an outlier
+    
+    print("Original data shape:", sample_data.shape)
+    print("Detecting outliers...")
+    lower, upper, outliers = detect_outliers_iqr(sample_data)
+    print(f"Outliers found at indices: {outliers}")
+    
+    cleaned_data = remove_outliers_zscore(sample_data)
+    print("Cleaned data shape:", cleaned_data.shape)
+    
+    normalized_data = normalize_minmax(cleaned_data)
+    print("Normalized data range:", normalized_data.min(), normalized_data.max())
