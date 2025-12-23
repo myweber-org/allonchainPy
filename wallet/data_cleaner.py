@@ -1134,3 +1134,55 @@ if __name__ == "__main__":
     print(cleaned)
     print("\nCleaned validation results:")
     print(validate_dataset(cleaned))
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
+def clean_dataset(input_file, output_file):
+    """
+    Load a dataset, remove duplicate rows, standardize date formats,
+    and handle missing values.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        # Remove duplicate rows
+        initial_count = len(df)
+        df = df.drop_duplicates()
+        removed_count = initial_count - len(df)
+        print(f"Removed {removed_count} duplicate rows.")
+        
+        # Standardize date column if present
+        date_columns = [col for col in df.columns if 'date' in col.lower()]
+        for col in date_columns:
+            try:
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+                print(f"Standardized date format for column: {col}")
+            except Exception as e:
+                print(f"Could not standardize {col}: {e}")
+        
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df[col].isnull().sum() > 0:
+                median_val = df[col].median()
+                df[col].fillna(median_val, inplace=True)
+                print(f"Filled missing values in {col} with median: {median_val}")
+        
+        # Save cleaned dataset
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned dataset saved to {output_file}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: Input file {input_file} not found.")
+        return False
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+
+if __name__ == "__main__":
+    # Example usage
+    input_path = "raw_data.csv"
+    output_path = "cleaned_data.csv"
+    clean_dataset(input_path, output_path)
