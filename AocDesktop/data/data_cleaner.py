@@ -1458,3 +1458,90 @@ if __name__ == "__main__":
     
     print("\nCleaned dataset shape:", cleaned_data.shape)
     print("Cleaned stats:", calculate_summary_stats(cleaned_data, 'value'))
+import pandas as pd
+import numpy as np
+from typing import Optional, Union, List
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_duplicates(self, subset: Optional[List[str]] = None, keep: str = 'first') -> 'DataCleaner':
+        self.df = self.df.drop_duplicates(subset=subset, keep=keep)
+        return self
+        
+    def convert_dtypes(self, column_type_map: dict) -> 'DataCleaner':
+        for column, dtype in column_type_map.items():
+            if column in self.df.columns:
+                if dtype == 'datetime':
+                    self.df[column] = pd.to_datetime(self.df[column], errors='coerce')
+                elif dtype == 'numeric':
+                    self.df[column] = pd.to_numeric(self.df[column], errors='coerce')
+                elif dtype == 'category':
+                    self.df[column] = self.df[column].astype('category')
+        return self
+        
+    def fill_missing(self, strategy: str = 'mean', custom_value: Optional[Union[int, float, str]] = None) -> 'DataCleaner':
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if strategy == 'mean' and len(numeric_cols) > 0:
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mean())
+        elif strategy == 'median' and len(numeric_cols) > 0:
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].median())
+        elif strategy == 'custom' and custom_value is not None:
+            self.df = self.df.fillna(custom_value)
+        elif strategy == 'ffill':
+            self.df = self.df.fillna(method='ffill')
+            
+        return self
+        
+    def remove_outliers(self, column: str, method: str = 'iqr', threshold: float = 1.5) -> 'DataCleaner':
+        if column not in self.df.columns or not pd.api.types.is_numeric_dtype(self.df[column]):
+            return self
+            
+        if method == 'iqr':
+            Q1 = self.df[column].quantile(0.25)
+            Q3 = self.df[column].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            self.df = self.df[(self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)]
+            
+        return self
+        
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df
+        
+    def get_summary(self) -> dict:
+        removed_rows = self.original_shape[0] - self.df.shape[0]
+        removed_cols = self.original_shape[1] - self.df.shape[1]
+        
+        return {
+            'original_shape': self.original_shape,
+            'cleaned_shape': self.df.shape,
+            'removed_rows': removed_rows,
+            'removed_cols': removed_cols,
+            'missing_values': self.df.isnull().sum().to_dict(),
+            'dtypes': self.df.dtypes.to_dict()
+        }
+
+def clean_dataset(df: pd.DataFrame, 
+                  remove_dups: bool = True,
+                  fill_na: bool = True,
+                  outlier_columns: Optional[List[str]] = None) -> pd.DataFrame:
+    
+    cleaner = DataCleaner(df)
+    
+    if remove_dups:
+        cleaner.remove_duplicates()
+    
+    if fill_na:
+        cleaner.fill_missing(strategy='mean')
+    
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in df.columns:
+                cleaner.remove_outliers(col)
+    
+    return cleaner.get_cleaned_data()
