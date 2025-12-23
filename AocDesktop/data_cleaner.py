@@ -199,4 +199,104 @@ def clean_dataset(df, columns_to_clean=None):
             removed_count = original_count - len(cleaned_df)
             print(f"Removed {removed_count} outliers from column '{column}'")
     
+    return cleaned_dfimport pandas as pd
+
+def clean_dataset(df, columns_to_check=None, fill_missing=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    columns_to_check (list, optional): Columns to check for duplicates. If None, checks all columns.
+    fill_missing (bool): Whether to fill missing values.
+    fill_value: Value to use for filling missing data.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if columns_to_check is None:
+        columns_to_check = cleaned_df.columns.tolist()
+    
+    cleaned_df = cleaned_df.drop_duplicates(subset=columns_to_check, keep='first')
+    
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
+    
     return cleaned_df
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to process.
+    multiplier (float): IQR multiplier for outlier detection.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def standardize_columns(df, columns_to_standardize):
+    """
+    Standardize specified columns to have zero mean and unit variance.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns_to_standardize (list): List of column names to standardize.
+    
+    Returns:
+    pd.DataFrame: DataFrame with standardized columns.
+    """
+    standardized_df = df.copy()
+    
+    for col in columns_to_standardize:
+        if col in standardized_df.columns:
+            mean = standardized_df[col].mean()
+            std = standardized_df[col].std()
+            
+            if std != 0:
+                standardized_df[col] = (standardized_df[col] - mean) / std
+    
+    return standardized_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 3, 4, 5, 5, 6],
+        'value': [10, 20, None, 40, 50, 50, 1000],
+        'category': ['A', 'B', 'C', 'A', 'B', 'B', 'C']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned = clean_dataset(df, columns_to_check=['id'], fill_missing=True)
+    print("After cleaning:")
+    print(cleaned)
+    print("\n")
+    
+    no_outliers = remove_outliers_iqr(cleaned, 'value')
+    print("After removing outliers from 'value' column:")
+    print(no_outliers)
+    print("\n")
+    
+    standardized = standardize_columns(no_outliers, ['value'])
+    print("After standardizing 'value' column:")
+    print(standardized)
