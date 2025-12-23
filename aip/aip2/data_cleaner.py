@@ -240,4 +240,73 @@ if __name__ == "__main__":
     
     print("\nCleaned data shape:", cleaned.shape)
     print("Cleaned data stats:")
-    print(cleaned[['value_normalized', 'score_normalized']].describe())
+    print(cleaned[['value_normalized', 'score_normalized']].describe())import pandas as pd
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing=False, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    fill_missing (bool): Whether to fill missing values. Default is False.
+    fill_value: Value to use for filling missing values. Default is 0.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
+    
+    return cleaned_df
+
+def calculate_statistics(df, column):
+    """
+    Calculate basic statistics for a specified column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name for which to calculate statistics.
+    
+    Returns:
+    dict: Dictionary containing mean, median, and standard deviation.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std()
+    }
+    
+    return stats
+
+def filter_dataframe(df, column, threshold, keep_above=True):
+    """
+    Filter DataFrame based on a threshold value in a specified column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to filter on.
+    threshold: Threshold value for filtering.
+    keep_above (bool): If True, keep rows where column value >= threshold.
+                       If False, keep rows where column value <= threshold.
+    
+    Returns:
+    pd.DataFrame: Filtered DataFrame.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if keep_above:
+        filtered_df = df[df[column] >= threshold]
+    else:
+        filtered_df = df[df[column] <= threshold]
+    
+    return filtered_df
