@@ -81,3 +81,131 @@ def process_dataset(file_path, column_to_clean):
     except Exception as e:
         print(f"Error processing dataset: {str(e)}")
         return None, None
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        factor: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def zscore_normalize(data, column):
+    """
+    Normalize data using Z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    data_copy = data.copy()
+    mean_val = data_copy[column].mean()
+    std_val = data_copy[column].std()
+    
+    if std_val == 0:
+        data_copy[f'{column}_normalized'] = 0
+    else:
+        data_copy[f'{column}_normalized'] = (data_copy[column] - mean_val) / std_val
+    
+    return data_copy
+
+def minmax_normalize(data, column, feature_range=(0, 1)):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+        feature_range: tuple of (min, max) for output range
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    data_copy = data.copy()
+    min_val = data_copy[column].min()
+    max_val = data_copy[column].max()
+    
+    if max_val == min_val:
+        data_copy[f'{column}_normalized'] = feature_range[0]
+    else:
+        scaled = (data_copy[column] - min_val) / (max_val - min_val)
+        data_copy[f'{column}_normalized'] = scaled * (feature_range[1] - feature_range[0]) + feature_range[0]
+    
+    return data_copy
+
+def detect_skewed_columns(data, threshold=0.5):
+    """
+    Detect columns with skewed distributions.
+    
+    Args:
+        data: pandas DataFrame
+        threshold: absolute skewness threshold (default 0.5)
+    
+    Returns:
+        List of column names with skewness above threshold
+    """
+    skewed_cols = []
+    
+    for column in data.select_dtypes(include=[np.number]).columns:
+        skewness = data[column].skew()
+        if abs(skewness) > threshold:
+            skewed_cols.append((column, skewness))
+    
+    return sorted(skewed_cols, key=lambda x: abs(x[1]), reverse=True)
+
+def log_transform(data, column):
+    """
+    Apply log transformation to reduce skewness.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to transform
+    
+    Returns:
+        DataFrame with transformed column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    data_copy = data.copy()
+    
+    if (data_copy[column] <= 0).any():
+        min_val = data_copy[column].min()
+        if min_val <= 0:
+            shift = abs(min_val) + 1
+            data_copy[f'{column}_log'] = np.log(data_copy[column] + shift)
+        else:
+            data_copy[f'{column}_log'] = np.log(data_copy[column])
+    else:
+        data_copy[f'{column}_log'] = np.log(data_copy[column])
+    
+    return data_copy
