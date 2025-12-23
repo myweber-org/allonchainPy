@@ -138,3 +138,80 @@ if __name__ == "__main__":
     print(cleaned_df)
     
     save_cleaned_data(cleaned_df, 'cleaned_data.csv')
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        drop_duplicates (bool): Whether to remove duplicate rows
+        fill_missing (bool): Whether to fill missing values with column mean
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_missing:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if cleaned_df[col].isnull().any():
+                mean_val = cleaned_df[col].mean()
+                cleaned_df[col] = cleaned_df[col].fillna(mean_val)
+                print(f"Filled missing values in column '{col}' with mean: {mean_val:.2f}")
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None):
+    """
+    Validate dataset structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+    
+    Returns:
+        dict: Validation results
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum()
+    }
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        validation_results['missing_required_columns'] = missing_cols
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 3, 3, 4, 5],
+        'value': [10.5, 20.3, np.nan, 30.1, 40.0, np.nan],
+        'category': ['A', 'B', 'C', 'C', 'A', 'B']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original dataset:")
+    print(df)
+    print("\n" + "="*50)
+    
+    cleaned_df = clean_dataset(df)
+    print("\nCleaned dataset:")
+    print(cleaned_df)
+    
+    validation = validate_dataset(cleaned_df, required_columns=['id', 'value'])
+    print("\nValidation results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
