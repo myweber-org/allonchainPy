@@ -100,3 +100,41 @@ if __name__ == "__main__":
     print("\nCleaned DataFrame shape:", cleaned_df.shape)
     print("\nCleaned summary for column 'A':")
     print(calculate_summary_stats(cleaned_df, 'A'))
+import pandas as pd
+import re
+
+def clean_dataframe(df, text_column):
+    """
+    Clean a DataFrame by removing duplicates and normalizing text in a specified column.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates().reset_index(drop=True)
+    
+    # Normalize text: lowercase and remove extra whitespace
+    if text_column in df_cleaned.columns:
+        df_cleaned[text_column] = df_cleaned[text_column].apply(
+            lambda x: re.sub(r'\s+', ' ', str(x).strip().lower())
+        )
+    
+    return df_cleaned
+
+def save_cleaned_data(df, output_path):
+    """
+    Save the cleaned DataFrame to a CSV file.
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 3, 4, 4],
+        'text': ['Hello World', 'HELLO WORLD', '  Python  ', 'python', 'Python']
+    }
+    df = pd.DataFrame(sample_data)
+    
+    cleaned_df = clean_dataframe(df, 'text')
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    
+    save_cleaned_data(cleaned_df, 'cleaned_data.csv')
