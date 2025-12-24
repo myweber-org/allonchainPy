@@ -378,4 +378,34 @@ def validate_data(df, required_columns=None, min_rows=1):
         if missing_cols:
             return False, f"Missing required columns: {missing_cols}"
     
-    return True, "Data validation passed"
+    return True, "Data validation passed"import pandas as pd
+
+def remove_duplicates(input_file, output_file, subset=None):
+    """
+    Read a CSV file, remove duplicate rows, and save the cleaned data.
+    
+    Args:
+        input_file (str): Path to the input CSV file.
+        output_file (str): Path to save the cleaned CSV file.
+        subset (list, optional): Column names to consider for identifying duplicates.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original data shape: {df.shape}")
+        
+        cleaned_df = df.drop_duplicates(subset=subset, keep='first')
+        print(f"Cleaned data shape: {cleaned_df.shape}")
+        print(f"Removed {len(df) - len(cleaned_df)} duplicate rows.")
+        
+        cleaned_df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to: {output_file}")
+        
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+    except pd.errors.EmptyDataError:
+        print(f"Error: File '{input_file}' is empty.")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+
+if __name__ == "__main__":
+    remove_duplicates('raw_data.csv', 'cleaned_data.csv', subset=['id', 'email'])
