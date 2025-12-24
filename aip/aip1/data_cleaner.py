@@ -147,3 +147,175 @@ def clean_dataset(input_path, output_path):
 
 if __name__ == "__main__":
     clean_dataset('raw_data.csv', 'cleaned_data.csv')
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, multiplier=1.5):
+    """
+    Remove outliers from a DataFrame column using IQR method.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    multiplier (float): IQR multiplier for outlier detection
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df.copy()
+
+def normalize_minmax(dataframe, columns=None):
+    """
+    Normalize specified columns using min-max scaling.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to normalize. If None, normalize all numeric columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns
+    """
+    df_copy = dataframe.copy()
+    
+    if columns is None:
+        numeric_cols = df_copy.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    for col in columns:
+        if col not in df_copy.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame")
+        
+        if not np.issubdtype(df_copy[col].dtype, np.number):
+            raise ValueError(f"Column '{col}' is not numeric")
+        
+        col_min = df_copy[col].min()
+        col_max = df_copy[col].max()
+        
+        if col_max == col_min:
+            df_copy[col] = 0.0
+        else:
+            df_copy[col] = (df_copy[col] - col_min) / (col_max - col_min)
+    
+    return df_copy
+
+def zscore_normalize(dataframe, columns=None):
+    """
+    Normalize specified columns using z-score normalization.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to normalize. If None, normalize all numeric columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with z-score normalized columns
+    """
+    df_copy = dataframe.copy()
+    
+    if columns is None:
+        numeric_cols = df_copy.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    for col in columns:
+        if col not in df_copy.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame")
+        
+        if not np.issubdtype(df_copy[col].dtype, np.number):
+            raise ValueError(f"Column '{col}' is not numeric")
+        
+        mean_val = df_copy[col].mean()
+        std_val = df_copy[col].std()
+        
+        if std_val == 0:
+            df_copy[col] = 0.0
+        else:
+            df_copy[col] = (df_copy[col] - mean_val) / std_val
+    
+    return df_copy
+
+def handle_missing_values(dataframe, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
+    columns (list): List of column names to process. If None, process all columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    df_copy = dataframe.copy()
+    
+    if columns is None:
+        columns = df_copy.columns
+    
+    for col in columns:
+        if col not in df_copy.columns:
+            continue
+        
+        if df_copy[col].isnull().sum() == 0:
+            continue
+        
+        if strategy == 'drop':
+            df_copy = df_copy.dropna(subset=[col])
+        elif strategy == 'mean':
+            if np.issubdtype(df_copy[col].dtype, np.number):
+                df_copy[col] = df_copy[col].fillna(df_copy[col].mean())
+        elif strategy == 'median':
+            if np.issubdtype(df_copy[col].dtype, np.number):
+                df_copy[col] = df_copy[col].fillna(df_copy[col].median())
+        elif strategy == 'mode':
+            mode_val = df_copy[col].mode()
+            if not mode_val.empty:
+                df_copy[col] = df_copy[col].fillna(mode_val.iloc[0])
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+    
+    return df_copy
+
+def clean_dataset(dataframe, numeric_columns=None, outlier_multiplier=1.5, 
+                  normalize_method='minmax', missing_strategy='mean'):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    numeric_columns (list): List of numeric columns to process
+    outlier_multiplier (float): IQR multiplier for outlier detection
+    normalize_method (str): Normalization method ('minmax', 'zscore', or None)
+    missing_strategy (str): Strategy for handling missing values
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    df_copy = dataframe.copy()
+    
+    if numeric_columns is None:
+        numeric_columns = df_copy.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_copy = handle_missing_values(df_copy, strategy=missing_strategy, columns=numeric_columns)
+    
+    for col in numeric_columns:
+        if col in df_copy.columns:
+            df_copy = remove_outliers_iqr(df_copy, col, multiplier=outlier_multiplier)
+    
+    if normalize_method == 'minmax':
+        df_copy = normalize_minmax(df_copy, columns=numeric_columns)
+    elif normalize_method == 'zscore':
+        df_copy = zscore_normalize(df_copy, columns=numeric_columns)
+    
+    return df_copy.reset_index(drop=True)
