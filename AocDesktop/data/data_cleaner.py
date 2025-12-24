@@ -1896,3 +1896,14 @@ def remove_duplicates(sequence):
             seen.add(item)
             result.append(item)
     return result
+def filter_none_values(data):
+    """
+    Filter out None values from a list.
+    
+    Args:
+        data: A list containing any values.
+    
+    Returns:
+        A new list with all None values removed.
+    """
+    return [item for item in data if item is not None]
