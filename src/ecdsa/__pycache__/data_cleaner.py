@@ -1,110 +1,101 @@
-
-def remove_duplicates(data_list):
-    """
-    Remove duplicate entries from a list while preserving order.
-    Returns a new list with unique elements.
-    """
-    seen = set()
-    unique_list = []
-    for item in data_list:
-        if item not in seen:
-            seen.add(item)
-            unique_list.append(item)
-    return unique_list
-
-def clean_numeric_data(values, default=0):
-    """
-    Clean numeric data by converting non-numeric values to default.
-    Returns a list of cleaned numeric values.
-    """
-    cleaned = []
-    for value in values:
-        try:
-            cleaned.append(float(value))
-        except (ValueError, TypeError):
-            cleaned.append(default)
-    return cleaned
-
-def filter_by_threshold(data, threshold, key=None):
-    """
-    Filter data based on a threshold value.
-    If key is provided, it should be a function to extract comparison value.
-    """
-    if key is None:
-        key = lambda x: x
-    
-    return [item for item in data if key(item) >= threshold]
-import pandas as pd
 import numpy as np
+import pandas as pd
+from scipy import stats
 
-def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+def remove_outliers_iqr(df, columns, factor=1.5):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to drop duplicate rows.
-    fill_missing (str): Method to fill missing values: 'mean', 'median', 'mode', or 'drop'.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
+    Remove outliers using the Interquartile Range method.
     """
-    cleaned_df = df.copy()
-    
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-    
-    if fill_missing == 'drop':
-        cleaned_df = cleaned_df.dropna()
-    else:
-        for column in cleaned_df.select_dtypes(include=[np.number]).columns:
-            if cleaned_df[column].isnull().any():
-                if fill_missing == 'mean':
-                    cleaned_df[column].fillna(cleaned_df[column].mean(), inplace=True)
-                elif fill_missing == 'median':
-                    cleaned_df[column].fillna(cleaned_df[column].median(), inplace=True)
-                elif fill_missing == 'mode':
-                    cleaned_df[column].fillna(cleaned_df[column].mode()[0], inplace=True)
-    
-    return cleaned_df
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - factor * IQR
+            upper_bound = Q3 + factor * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean.reset_index(drop=True)
 
-def validate_dataframe(df, required_columns=None):
+def remove_outliers_zscore(df, columns, threshold=3):
     """
-    Validate DataFrame structure and content.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of column names that must be present.
-    
-    Returns:
-    tuple: (is_valid, error_message)
+    Remove outliers using Z-score method.
     """
-    if not isinstance(df, pd.DataFrame):
-        return False, "Input is not a pandas DataFrame"
-    
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
-    
-    return True, "DataFrame is valid"
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            z_scores = np.abs(stats.zscore(df[col].dropna()))
+            df_clean = df_clean[(z_scores < threshold) | (df[col].isna())]
+    return df_clean.reset_index(drop=True)
 
-if __name__ == "__main__":
-    sample_data = {
-        'A': [1, 2, 2, 4, 5, np.nan],
-        'B': [10, 20, 20, 40, 50, 60],
-        'C': [100, 200, 300, np.nan, 500, 600]
-    }
+def normalize_minmax(df, columns):
+    """
+    Normalize data using Min-Max scaling.
+    """
+    df_norm = df.copy()
+    for col in columns:
+        if col in df.columns:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val > min_val:
+                df_norm[col] = (df[col] - min_val) / (max_val - min_val)
+    return df_norm
+
+def normalize_zscore(df, columns):
+    """
+    Normalize data using Z-score standardization.
+    """
+    df_norm = df.copy()
+    for col in columns:
+        if col in df.columns:
+            mean_val = df[col].mean()
+            std_val = df[col].std()
+            if std_val > 0:
+                df_norm[col] = (df[col] - mean_val) / std_val
+    return df_norm
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values with specified strategy.
+    """
+    df_filled = df.copy()
+    if columns is None:
+        columns = df.columns
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\nCleaned DataFrame (fill with mean):")
-    cleaned = clean_dataset(df, fill_missing='mean')
-    print(cleaned)
+    for col in columns:
+        if col in df.columns:
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0] if not df[col].mode().empty else 0
+            elif strategy == 'zero':
+                fill_value = 0
+            else:
+                fill_value = df[col].mean()
+            
+            df_filled[col] = df[col].fillna(fill_value)
     
-    is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
-    print(f"\nValidation: {message}")
+    return df_filled
+
+def get_data_summary(df):
+    """
+    Generate comprehensive data summary statistics.
+    """
+    summary = pd.DataFrame({
+        'dtype': df.dtypes,
+        'non_null_count': df.count(),
+        'null_count': df.isnull().sum(),
+        'null_percentage': (df.isnull().sum() / len(df)) * 100,
+        'unique_count': df.nunique(),
+        'mean': df.select_dtypes(include=[np.number]).mean(),
+        'std': df.select_dtypes(include=[np.number]).std(),
+        'min': df.select_dtypes(include=[np.number]).min(),
+        '25%': df.select_dtypes(include=[np.number]).quantile(0.25),
+        '50%': df.select_dtypes(include=[np.number]).quantile(0.50),
+        '75%': df.select_dtypes(include=[np.number]).quantile(0.75),
+        'max': df.select_dtypes(include=[np.number]).max()
+    })
+    
+    return summary
