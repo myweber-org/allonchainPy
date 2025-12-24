@@ -1616,4 +1616,62 @@ def clean_dataframe_strings(df, columns):
     for col in columns:
         if col in df_clean.columns:
             df_clean[col] = df_clean[col].apply(normalize_string)
-    return df_clean
+    return df_cleanimport pandas as pd
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing null values and duplicates.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to be cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Remove duplicate rows
+    df_cleaned = df_cleaned.drop_duplicates()
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def clean_dataset_columns(df, columns_to_keep=None):
+    """
+    Clean dataset by selecting specific columns and removing nulls/duplicates.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        columns_to_keep (list): List of column names to keep. If None, keep all columns.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame with selected columns.
+    """
+    if columns_to_keep:
+        df = df[columns_to_keep]
+    
+    return clean_dataset(df)
+
+def validate_dataframe(df):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+    
+    Returns:
+        dict: Dictionary with validation results.
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'null_count': df.isnull().sum().sum(),
+        'duplicate_count': df.duplicated().sum(),
+        'column_names': list(df.columns),
+        'dtypes': df.dtypes.to_dict()
+    }
+    
+    return validation_results
