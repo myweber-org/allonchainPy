@@ -1936,3 +1936,93 @@ if __name__ == "__main__":
     print(cleaned_df['value'].describe())
     print("\nProcessing statistics:")
     print(stats['value'])
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame containing the data
+        column: string name of the column to clean
+    
+    Returns:
+        Cleaned DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    
+    return filtered_data
+
+def calculate_statistics(data, column):
+    """
+    Calculate basic statistics for a column after outlier removal.
+    
+    Args:
+        data: pandas DataFrame
+        column: string name of the column
+    
+    Returns:
+        Dictionary containing statistics
+    """
+    stats = {
+        'mean': data[column].mean(),
+        'median': data[column].median(),
+        'std': data[column].std(),
+        'min': data[column].min(),
+        'max': data[column].max(),
+        'count': data[column].count()
+    }
+    
+    return stats
+
+def clean_dataset(data, columns_to_clean=None):
+    """
+    Clean multiple columns in a dataset by removing outliers.
+    
+    Args:
+        data: pandas DataFrame
+        columns_to_clean: list of column names to clean (defaults to all numeric columns)
+    
+    Returns:
+        Tuple of (cleaned_data, removal_report)
+    """
+    if columns_to_clean is None:
+        columns_to_clean = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    removal_report = {}
+    
+    original_count = len(cleaned_data)
+    
+    for column in columns_to_clean:
+        if column in cleaned_data.columns and np.issubdtype(cleaned_data[column].dtype, np.number):
+            before_count = len(cleaned_data)
+            cleaned_data = remove_outliers_iqr(cleaned_data, column)
+            after_count = len(cleaned_data)
+            removed = before_count - after_count
+            
+            removal_report[column] = {
+                'removed_count': removed,
+                'removed_percentage': (removed / before_count) * 100 if before_count > 0 else 0,
+                'statistics': calculate_statistics(cleaned_data, column)
+            }
+    
+    total_removed = original_count - len(cleaned_data)
+    removal_report['summary'] = {
+        'original_count': original_count,
+        'final_count': len(cleaned_data),
+        'total_removed': total_removed,
+        'removal_percentage': (total_removed / original_count) * 100 if original_count > 0 else 0
+    }
+    
+    return cleaned_data, removal_report
