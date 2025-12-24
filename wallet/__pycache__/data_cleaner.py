@@ -209,4 +209,125 @@ if __name__ == "__main__":
     # Normalize data
     df_normalized = normalize_data(df_clean, method='minmax')
     print("Normalized data:")
-    print(df_normalized)
+    print(df_normalized)import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, output_path=None, missing_strategy='mean'):
+    """
+    Clean CSV data by handling missing values and removing duplicates.
+    
+    Args:
+        file_path (str): Path to input CSV file
+        output_path (str, optional): Path for cleaned output file
+        missing_strategy (str): Strategy for handling missing values
+                               ('mean', 'median', 'drop', 'zero')
+    
+    Returns:
+        pandas.DataFrame: Cleaned dataframe
+    """
+    
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Loaded data with shape: {df.shape}")
+        
+        original_rows = len(df)
+        
+        df = df.drop_duplicates()
+        print(f"Removed {original_rows - len(df)} duplicate rows")
+        
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        
+        if missing_strategy == 'mean':
+            for col in numeric_cols:
+                if df[col].isnull().any():
+                    df[col].fillna(df[col].mean(), inplace=True)
+        elif missing_strategy == 'median':
+            for col in numeric_cols:
+                if df[col].isnull().any():
+                    df[col].fillna(df[col].median(), inplace=True)
+        elif missing_strategy == 'zero':
+            df.fillna(0, inplace=True)
+        elif missing_strategy == 'drop':
+            df.dropna(inplace=True)
+        
+        missing_count = df.isnull().sum().sum()
+        if missing_count > 0:
+            print(f"Warning: {missing_count} missing values remain")
+        
+        if output_path:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    
+    Args:
+        df (pandas.DataFrame): Dataframe to validate
+        required_columns (list): List of required column names
+    
+    Returns:
+        dict: Validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    if df is None or df.empty:
+        validation_results['is_valid'] = False
+        validation_results['errors'].append('Dataframe is empty or None')
+        return validation_results
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f'Missing required columns: {missing_cols}')
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if df[col].isnull().any():
+            validation_results['warnings'].append(f'Column {col} has missing values')
+    
+    zero_variance_cols = []
+    for col in numeric_cols:
+        if df[col].nunique() <= 1:
+            zero_variance_cols.append(col)
+    
+    if zero_variance_cols:
+        validation_results['warnings'].append(f'Columns with zero variance: {zero_variance_cols}')
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 3, 4, 5, 5],
+        'value1': [10.5, 20.3, np.nan, 40.1, 50.0, 50.0],
+        'value2': [100, 200, 300, np.nan, 500, 500],
+        'category': ['A', 'B', 'A', 'B', 'A', 'A']
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('test_data.csv', 'cleaned_data.csv', 'mean')
+    
+    if cleaned_df is not None:
+        validation = validate_dataframe(cleaned_df, ['id', 'value1', 'value2'])
+        print("Validation results:", validation)
+        
+        import os
+        os.remove('test_data.csv')
+        if os.path.exists('cleaned_data.csv'):
+            os.remove('cleaned_data.csv')
