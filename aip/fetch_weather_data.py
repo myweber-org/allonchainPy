@@ -56,3 +56,58 @@ if __name__ == "__main__":
     
     weather = get_weather(API_KEY, CITY)
     display_weather(weather)
+import requests
+import json
+from datetime import datetime
+
+class WeatherFetcher:
+    def __init__(self, api_key):
+        self.api_key = api_key
+        self.base_url = "http://api.openweathermap.org/data/2.5/weather"
+
+    def get_weather(self, city_name):
+        params = {
+            'q': city_name,
+            'appid': self.api_key,
+            'units': 'metric'
+        }
+        
+        try:
+            response = requests.get(self.base_url, params=params)
+            response.raise_for_status()
+            data = response.json()
+            
+            return {
+                'city': data['name'],
+                'temperature': data['main']['temp'],
+                'humidity': data['main']['humidity'],
+                'description': data['weather'][0]['description'],
+                'wind_speed': data['wind']['speed'],
+                'timestamp': datetime.fromtimestamp(data['dt']).strftime('%Y-%m-%d %H:%M:%S')
+            }
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching weather data: {e}")
+            return None
+
+def save_weather_to_file(weather_data, filename):
+    if weather_data:
+        with open(filename, 'w') as file:
+            json.dump(weather_data, file, indent=4)
+        print(f"Weather data saved to {filename}")
+
+if __name__ == "__main__":
+    API_KEY = "your_api_key_here"
+    CITY = "London"
+    
+    fetcher = WeatherFetcher(API_KEY)
+    weather = fetcher.get_weather(CITY)
+    
+    if weather:
+        print(f"Weather in {weather['city']}:")
+        print(f"Temperature: {weather['temperature']}°C")
+        print(f"Humidity: {weather['humidity']}%")
+        print(f"Conditions: {weather['description']}")
+        print(f"Wind Speed: {weather['wind_speed']} m/s")
+        print(f"Last updated: {weather['timestamp']}")
+        
+        save_weather_to_file(weather, f"{CITY.lower()}_weather.json")
