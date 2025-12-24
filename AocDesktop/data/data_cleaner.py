@@ -1907,3 +1907,75 @@ def filter_none_values(data):
         A new list with all None values removed.
     """
     return [item for item in data if item is not None]
+import pandas as pd
+import hashlib
+
+def remove_duplicates(input_file, output_file, key_columns=None):
+    """
+    Remove duplicate rows from a CSV file based on specified columns.
+    If no columns are specified, use all columns for comparison.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        if key_columns is None:
+            key_columns = df.columns.tolist()
+        
+        initial_count = len(df)
+        
+        df['_hash'] = df[key_columns].apply(
+            lambda row: hashlib.md5(pd.util.hash_pandas_object(row).values.tobytes()).hexdigest(),
+            axis=1
+        )
+        
+        df_clean = df.drop_duplicates(subset=['_hash'], keep='first')
+        df_clean = df_clean.drop(columns=['_hash'])
+        
+        final_count = len(df_clean)
+        duplicates_removed = initial_count - final_count
+        
+        df_clean.to_csv(output_file, index=False)
+        
+        print(f"Processed: {input_file}")
+        print(f"Initial rows: {initial_count}")
+        print(f"Final rows: {final_count}")
+        print(f"Duplicates removed: {duplicates_removed}")
+        print(f"Cleaned data saved to: {output_file}")
+        
+        return df_clean
+        
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error processing file: {str(e)}")
+        return None
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    """
+    if df is None or df.empty:
+        print("Error: DataFrame is empty or None.")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Error: Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+if __name__ == "__main__":
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    cleaned_data = remove_duplicates(input_csv, output_csv)
+    
+    if cleaned_data is not None:
+        is_valid = validate_dataframe(cleaned_data)
+        if is_valid:
+            print("Data validation passed.")
+        else:
+            print("Data validation failed.")
