@@ -1663,4 +1663,84 @@ if __name__ == "__main__":
     result = clean_dataset(sample_data, numeric_cols)
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {result.shape}")
-    print(result.head())
+    print(result.head())import csv
+import os
+
+def load_csv(file_path):
+    """Load data from a CSV file."""
+    data = []
+    if not os.path.exists(file_path):
+        print(f"Error: File {file_path} not found.")
+        return data
+    try:
+        with open(file_path, 'r', newline='', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                data.append(row)
+        print(f"Loaded {len(data)} records from {file_path}")
+    except Exception as e:
+        print(f"Error loading CSV: {e}")
+    return data
+
+def clean_numeric_field(record, field_name, default=0):
+    """Clean a numeric field in a record."""
+    if field_name not in record:
+        record[field_name] = default
+        return record
+    try:
+        value = record[field_name].strip()
+        if value == '':
+            record[field_name] = default
+        else:
+            record[field_name] = float(value)
+    except ValueError:
+        record[field_name] = default
+    return record
+
+def remove_duplicates(data, key_field):
+    """Remove duplicate records based on a key field."""
+    seen = set()
+    unique_data = []
+    for record in data:
+        key = record.get(key_field)
+        if key is None:
+            continue
+        if key not in seen:
+            seen.add(key)
+            unique_data.append(record)
+    print(f"Removed {len(data) - len(unique_data)} duplicate records")
+    return unique_data
+
+def save_csv(data, file_path, fieldnames=None):
+    """Save data to a CSV file."""
+    if not data:
+        print("No data to save.")
+        return False
+    if fieldnames is None:
+        fieldnames = data[0].keys()
+    try:
+        with open(file_path, 'w', newline='', encoding='utf-8') as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+        print(f"Saved {len(data)} records to {file_path}")
+        return True
+    except Exception as e:
+        print(f"Error saving CSV: {e}")
+        return False
+
+def clean_dataset(input_file, output_file, key_field='id'):
+    """Main function to clean a dataset."""
+    print(f"Starting cleaning process for {input_file}")
+    data = load_csv(input_file)
+    if not data:
+        return
+    for record in data:
+        clean_numeric_field(record, 'age', default=0)
+        clean_numeric_field(record, 'score', default=0.0)
+    data = remove_duplicates(data, key_field)
+    save_csv(data, output_file)
+    print("Cleaning process completed.")
+
+if __name__ == "__main__":
+    clean_dataset('raw_data.csv', 'cleaned_data.csv')
