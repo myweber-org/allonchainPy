@@ -388,4 +388,35 @@ if __name__ == "__main__":
     print(f"\nValidation: {message}")
     
     df_no_outliers = remove_outliers(cleaned_df, 'score', method='iqr', threshold=1.5)
-    print(f"\nDataFrame after outlier removal: {len(df_no_outliers)} rows")
+    print(f"\nDataFrame after outlier removal: {len(df_no_outliers)} rows")import pandas as pd
+
+def clean_dataset(input_file, output_file):
+    """
+    Load a dataset, remove rows with null values,
+    drop duplicate rows, and save cleaned data.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original shape: {df.shape}")
+        
+        df_cleaned = df.dropna()
+        print(f"After removing nulls: {df_cleaned.shape}")
+        
+        df_cleaned = df_cleaned.drop_duplicates()
+        print(f"After removing duplicates: {df_cleaned.shape}")
+        
+        df_cleaned.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to: {output_file}")
+        
+        return df_cleaned
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        return None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+
+if __name__ == "__main__":
+    input_path = "raw_data.csv"
+    output_path = "cleaned_data.csv"
+    clean_dataset(input_path, output_path)
