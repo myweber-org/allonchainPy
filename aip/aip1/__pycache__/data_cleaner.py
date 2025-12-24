@@ -1591,4 +1591,29 @@ def process_csv_file(input_path: str, output_path: str) -> None:
         if cleaned_data:
             writer = csv.DictWriter(outfile, fieldnames=cleaned_data[0].keys())
             writer.writeheader()
-            writer.writerows(cleaned_data)
+            writer.writerows(cleaned_data)import re
+
+def normalize_string(text):
+    """
+    Normalize a string by converting to lowercase, removing extra whitespace,
+    and stripping non-alphanumeric characters (except spaces).
+    """
+    if not isinstance(text, str):
+        return text
+    text = text.lower()
+    text = re.sub(r'[^a-z0-9\s]', '', text)
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
+
+def clean_dataframe_strings(df, columns):
+    """
+    Clean string columns in a pandas DataFrame using normalize_string.
+    """
+    import pandas as pd
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("Input must be a pandas DataFrame")
+    df_clean = df.copy()
+    for col in columns:
+        if col in df_clean.columns:
+            df_clean[col] = df_clean[col].apply(normalize_string)
+    return df_clean
