@@ -1780,3 +1780,118 @@ def remove_duplicates_preserve_order(sequence):
             seen.add(item)
             result.append(item)
     return result
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas DataFrame column using the IQR method.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    
+    return filtered_data
+
+def calculate_statistics(data, column):
+    """
+    Calculate basic statistics for a column.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name
+    
+    Returns:
+    dict: Dictionary containing statistics
+    """
+    stats = {
+        'mean': data[column].mean(),
+        'median': data[column].median(),
+        'std': data[column].std(),
+        'min': data[column].min(),
+        'max': data[column].max(),
+        'count': data[column].count()
+    }
+    
+    return stats
+
+def normalize_column(data, column):
+    """
+    Normalize a column using min-max scaling.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to normalize
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val != min_val:
+        data[f'{column}_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    else:
+        data[f'{column}_normalized'] = 0
+    
+    return data
+
+def handle_missing_values(data, column, strategy='mean'):
+    """
+    Handle missing values in a column.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name
+    strategy (str): Strategy to handle missing values ('mean', 'median', 'mode', 'drop')
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    if strategy == 'mean':
+        fill_value = data[column].mean()
+    elif strategy == 'median':
+        fill_value = data[column].median()
+    elif strategy == 'mode':
+        fill_value = data[column].mode()[0]
+    elif strategy == 'drop':
+        return data.dropna(subset=[column])
+    else:
+        raise ValueError("Invalid strategy. Choose from 'mean', 'median', 'mode', or 'drop'")
+    
+    data[column] = data[column].fillna(fill_value)
+    return data
+
+def validate_data(data, column, min_value=None, max_value=None):
+    """
+    Validate data in a column based on constraints.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name
+    min_value: Minimum allowed value
+    max_value: Maximum allowed value
+    
+    Returns:
+    pd.DataFrame: DataFrame with valid rows only
+    """
+    mask = pd.Series(True, index=data.index)
+    
+    if min_value is not None:
+        mask = mask & (data[column] >= min_value)
+    
+    if max_value is not None:
+        mask = mask & (data[column] <= max_value)
+    
+    return data[mask]
