@@ -1536,4 +1536,59 @@ def validate_dataframe(df, required_columns=None):
         if missing_columns:
             return False, f"Missing required columns: {missing_columns}"
     
-    return True, "DataFrame is valid"
+    return True, "DataFrame is valid"import csv
+import re
+from typing import List, Dict, Optional
+
+def remove_duplicates(data: List[Dict]) -> List[Dict]:
+    seen = set()
+    unique_data = []
+    for row in data:
+        row_tuple = tuple(sorted(row.items()))
+        if row_tuple not in seen:
+            seen.add(row_tuple)
+            unique_data.append(row)
+    return unique_data
+
+def normalize_string(value: str) -> str:
+    if not isinstance(value, str):
+        return value
+    value = value.strip()
+    value = re.sub(r'\s+', ' ', value)
+    return value.lower()
+
+def clean_numeric(value: str) -> Optional[float]:
+    try:
+        cleaned = re.sub(r'[^\d.-]', '', value)
+        return float(cleaned)
+    except (ValueError, TypeError):
+        return None
+
+def validate_email(email: str) -> bool:
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def process_csv_file(input_path: str, output_path: str) -> None:
+    with open(input_path, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        data = list(reader)
+    
+    cleaned_data = []
+    for row in data:
+        cleaned_row = {}
+        for key, value in row.items():
+            if key.endswith('_email'):
+                cleaned_row[key] = value if validate_email(value) else ''
+            elif any(num_key in key for num_key in ['price', 'amount', 'quantity']):
+                cleaned_row[key] = clean_numeric(value)
+            else:
+                cleaned_row[key] = normalize_string(value)
+        cleaned_data.append(cleaned_row)
+    
+    cleaned_data = remove_duplicates(cleaned_data)
+    
+    with open(output_path, 'w', newline='', encoding='utf-8') as outfile:
+        if cleaned_data:
+            writer = csv.DictWriter(outfile, fieldnames=cleaned_data[0].keys())
+            writer.writeheader()
+            writer.writerows(cleaned_data)
