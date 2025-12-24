@@ -530,4 +530,88 @@ def validate_data(df, required_columns=None, unique_constraints=None):
             validation_results['is_valid'] = False
             validation_results['issues'].append(f"Column '{col}' contains infinite values")
     
-    return validation_results
+    return validation_resultsimport pandas as pd
+import numpy as np
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if cleaned_df.isnull().sum().any():
+        print("Handling missing values...")
+        if fill_missing == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_missing == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        elif fill_missing == 'mode':
+            for col in cleaned_df.columns:
+                if cleaned_df[col].dtype == 'object':
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'Unknown')
+        elif fill_missing == 'drop':
+            cleaned_df = cleaned_df.dropna()
+        else:
+            raise ValueError("Invalid fill_missing method. Choose from 'mean', 'median', 'mode', or 'drop'")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if len(df) < min_rows:
+        raise ValueError(f"DataFrame must have at least {min_rows} rows")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+def main():
+    """
+    Example usage of the data cleaning functions.
+    """
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'value': [10.5, 20.3, 20.3, np.nan, 40.1, 50.0],
+        'category': ['A', 'B', 'B', 'C', None, 'A']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nDataFrame info:")
+    print(df.info())
+    
+    try:
+        validate_dataframe(df, required_columns=['id', 'value'])
+        
+        cleaned_df = clean_dataframe(
+            df, 
+            drop_duplicates=True, 
+            fill_missing='mean'
+        )
+        
+        print("\nCleaned DataFrame:")
+        print(cleaned_df)
+        
+        print("\nCleaned DataFrame info:")
+        print(cleaned_df.info())
+        
+    except Exception as e:
+        print(f"Error during data cleaning: {e}")
+
+if __name__ == "__main__":
+    main()
