@@ -392,4 +392,56 @@ def validate_dataframe(df, required_columns=None):
         if missing_columns:
             return False, f"Missing required columns: {missing_columns}"
     
-    return True, "DataFrame is valid"
+    return True, "DataFrame is valid"import re
+import pandas as pd
+
+def remove_duplicates(dataframe, subset=None):
+    """
+    Remove duplicate rows from a DataFrame.
+    """
+    return dataframe.drop_duplicates(subset=subset, keep='first')
+
+def validate_email(email):
+    """
+    Validate an email address format.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def clean_column_names(dataframe):
+    """
+    Clean column names by removing whitespace and converting to lowercase.
+    """
+    dataframe.columns = dataframe.columns.str.strip().str.lower()
+    return dataframe
+
+def fill_missing_values(dataframe, column, method='mean'):
+    """
+    Fill missing values in a column with mean, median, or mode.
+    """
+    if method == 'mean':
+        fill_value = dataframe[column].mean()
+    elif method == 'median':
+        fill_value = dataframe[column].median()
+    elif method == 'mode':
+        fill_value = dataframe[column].mode()[0]
+    else:
+        fill_value = 0
+    dataframe[column] = dataframe[column].fillna(fill_value)
+    return dataframe
+
+def convert_to_datetime(dataframe, column, format=None):
+    """
+    Convert a column to datetime format.
+    """
+    if format:
+        dataframe[column] = pd.to_datetime(dataframe[column], format=format)
+    else:
+        dataframe[column] = pd.to_datetime(dataframe[column])
+    return dataframe
+
+def filter_by_range(dataframe, column, min_val, max_val):
+    """
+    Filter rows where column values are within a specified range.
+    """
+    return dataframe[(dataframe[column] >= min_val) & (dataframe[column] <= max_val)]
