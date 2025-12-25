@@ -80,4 +80,83 @@ def save_cleaned_data(df, output_path):
         output_path (str): Path for output CSV file.
     """
     df.to_csv(output_path, index=False)
-    print(f"Cleaned data saved to: {output_path}")
+    print(f"Cleaned data saved to: {output_path}")import csv
+import re
+from typing import List, Dict, Any, Optional
+
+def clean_string(value: str) -> str:
+    """Remove extra whitespace and normalize string."""
+    if not isinstance(value, str):
+        return str(value)
+    cleaned = re.sub(r'\s+', ' ', value.strip())
+    return cleaned
+
+def parse_numeric(value: str) -> Optional[float]:
+    """Attempt to parse string as float, handling common issues."""
+    if value is None:
+        return None
+    cleaned = value.replace(',', '').strip()
+    if cleaned == '':
+        return None
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+def validate_email(email: str) -> bool:
+    """Basic email validation using regex."""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email.strip()))
+
+def clean_csv_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Apply cleaning functions to all values in a CSV row dictionary."""
+    cleaned_row = {}
+    for key, value in row.items():
+        if isinstance(value, str):
+            cleaned_row[key] = clean_string(value)
+        else:
+            cleaned_row[key] = value
+    return cleaned_row
+
+def read_and_clean_csv(filepath: str) -> List[Dict[str, Any]]:
+    """Read CSV file and clean all rows."""
+    cleaned_data = []
+    with open(filepath, 'r', encoding='utf-8') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            cleaned_row = clean_csv_row(row)
+            cleaned_data.append(cleaned_row)
+    return cleaned_data
+
+def write_cleaned_csv(data: List[Dict[str, Any]], output_path: str) -> None:
+    """Write cleaned data to a new CSV file."""
+    if not data:
+        return
+    fieldnames = data[0].keys()
+    with open(output_path, 'w', encoding='utf-8', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(data)
+
+def remove_duplicates(data: List[Dict[str, Any]], key_field: str) -> List[Dict[str, Any]]:
+    """Remove duplicate rows based on a specified key field."""
+    seen = set()
+    unique_data = []
+    for row in data:
+        key_value = row.get(key_field)
+        if key_value not in seen:
+            seen.add(key_value)
+            unique_data.append(row)
+    return unique_data
+
+if __name__ == "__main__":
+    sample_data = [
+        {"id": "1", "name": "  John   Doe  ", "email": "john@example.com", "score": "95.5"},
+        {"id": "2", "name": "Jane Smith", "email": "invalid-email", "score": "88.0"},
+        {"id": "3", "name": "Bob   Johnson", "email": "bob@test.org", "score": "N/A"}
+    ]
+    
+    cleaned = [clean_csv_row(row) for row in sample_data]
+    print("Cleaned sample data:")
+    for row in cleaned:
+        print(row)
