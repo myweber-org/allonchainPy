@@ -563,3 +563,140 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, columns=None):
+    """
+    Remove outliers from DataFrame using Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to process. If None, process all numeric columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        
+        mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+        df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def calculate_summary_statistics(df, columns=None):
+    """
+    Calculate summary statistics for numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to process. If None, process all numeric columns.
+    
+    Returns:
+    pd.DataFrame: Summary statistics
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    stats = pd.DataFrame()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        col_stats = {
+            'mean': df[col].mean(),
+            'median': df[col].median(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            'max': df[col].max(),
+            'q1': df[col].quantile(0.25),
+            'q3': df[col].quantile(0.75),
+            'count': df[col].count(),
+            'missing': df[col].isnull().sum()
+        }
+        
+        stats[col] = pd.Series(col_stats)
+    
+    return stats
+
+def normalize_data(df, columns=None, method='minmax'):
+    """
+    Normalize data using specified method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to process. If None, process all numeric columns.
+    method (str): Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+    pd.DataFrame: Normalized DataFrame
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_norm = df.copy()
+    
+    for col in columns:
+        if col not in df.columns or df[col].std() == 0:
+            continue
+            
+        if method == 'minmax':
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val != min_val:
+                df_norm[col] = (df[col] - min_val) / (max_val - min_val)
+        
+        elif method == 'zscore':
+            df_norm[col] = (df[col] - df[col].mean()) / df[col].std()
+    
+    return df_norm
+
+def handle_missing_values(df, columns=None, strategy='mean'):
+    """
+    Handle missing values in DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to process. If None, process all numeric columns.
+    strategy (str): Imputation strategy ('mean', 'median', 'mode', or 'drop')
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        if strategy == 'mean':
+            fill_value = df[col].mean()
+        elif strategy == 'median':
+            fill_value = df[col].median()
+        elif strategy == 'mode':
+            fill_value = df[col].mode()[0] if not df[col].mode().empty else np.nan
+        elif strategy == 'drop':
+            df_clean = df_clean.dropna(subset=[col])
+            continue
+        
+        df_clean[col] = df_clean[col].fillna(fill_value)
+    
+    return df_clean.reset_index(drop=True)
