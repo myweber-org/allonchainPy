@@ -337,4 +337,128 @@ if __name__ == "__main__":
     # Normalize
     normalized = normalize_data(cleaned, method='minmax')
     print("\nNormalized DataFrame:")
-    print(normalized)
+    print(normalized)import pandas as pd
+import numpy as np
+
+def remove_missing_rows(df, columns=None):
+    """
+    Remove rows with missing values from DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list, optional): Specific columns to check for missing values.
+                                 If None, checks all columns.
+    
+    Returns:
+        pd.DataFrame: DataFrame with rows containing missing values removed
+    """
+    if columns is None:
+        columns = df.columns
+    
+    return df.dropna(subset=columns)
+
+def fill_missing_with_mean(df, columns=None):
+    """
+    Fill missing values with column mean.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list, optional): Specific columns to fill. If None, fills all numeric columns.
+    
+    Returns:
+        pd.DataFrame: DataFrame with missing values filled
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_filled = df.copy()
+    for col in columns:
+        if col in df.columns:
+            df_filled[col] = df[col].fillna(df[col].mean())
+    
+    return df_filled
+
+def remove_outliers_iqr(df, columns=None, multiplier=1.5):
+    """
+    Remove outliers using the Interquartile Range (IQR) method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list, optional): Specific columns to check for outliers.
+                                 If None, checks all numeric columns.
+        multiplier (float): IQR multiplier for outlier detection
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            
+            lower_bound = Q1 - multiplier * IQR
+            upper_bound = Q3 + multiplier * IQR
+            
+            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+            df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize numeric columns to have zero mean and unit variance.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list, optional): Specific columns to standardize.
+                                 If None, standardizes all numeric columns.
+    
+    Returns:
+        pd.DataFrame: DataFrame with standardized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_standardized = df.copy()
+    
+    for col in columns:
+        if col in df.columns:
+            mean = df[col].mean()
+            std = df[col].std()
+            if std > 0:
+                df_standardized[col] = (df[col] - mean) / std
+    
+    return df_standardized
+
+def clean_data_pipeline(df, operations=None):
+    """
+    Apply a series of cleaning operations to the DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        operations (list): List of cleaning operations to apply.
+                          Each operation should be a tuple (function, kwargs)
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    if operations is None:
+        operations = [
+            (remove_missing_rows, {}),
+            (remove_outliers_iqr, {'multiplier': 1.5}),
+            (fill_missing_with_mean, {}),
+            (standardize_columns, {})
+        ]
+    
+    cleaned_df = df.copy()
+    
+    for func, kwargs in operations:
+        cleaned_df = func(cleaned_df, **kwargs)
+    
+    return cleaned_df
