@@ -99,3 +99,35 @@ def get_data_summary(df):
     })
     
     return summary
+import pandas as pd
+import re
+
+def clean_dataframe(df, text_columns=None):
+    """
+    Remove duplicate rows and standardize text in specified columns.
+    """
+    df_clean = df.copy()
+    
+    # Remove duplicates
+    initial_rows = len(df_clean)
+    df_clean = df_clean.drop_duplicates().reset_index(drop=True)
+    removed_duplicates = initial_rows - len(df_clean)
+    
+    # Standardize text in specified columns
+    if text_columns:
+        for col in text_columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].apply(_standardize_text)
+    
+    return df_clean, removed_duplicates
+
+def _standardize_text(text):
+    """
+    Helper function to standardize text: lowercase, remove extra spaces.
+    """
+    if pd.isna(text):
+        return text
+    text = str(text)
+    text = text.lower()
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
