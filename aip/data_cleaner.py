@@ -134,4 +134,88 @@ if __name__ == "__main__":
     stats = calculate_basic_stats(cleaned_data, 'values')
     print(f"\nStatistics for cleaned 'values' column:")
     for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+        print(f"{key}: {value:.2f}")import pandas as pd
+
+def remove_duplicates(dataframe, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a pandas DataFrame.
+    
+    Args:
+        dataframe: pandas DataFrame to process
+        subset: column label or sequence of labels to consider for duplicates
+        keep: determines which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+        Cleaned DataFrame with duplicates removed
+    """
+    if dataframe.empty:
+        return dataframe
+    
+    cleaned_df = dataframe.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(dataframe) - len(cleaned_df)
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate rows")
+    
+    return cleaned_df
+
+def clean_numeric_columns(dataframe, columns):
+    """
+    Clean numeric columns by removing non-numeric values and converting to float.
+    
+    Args:
+        dataframe: pandas DataFrame to process
+        columns: list of column names to clean
+    
+    Returns:
+        DataFrame with cleaned numeric columns
+    """
+    for column in columns:
+        if column in dataframe.columns:
+            dataframe[column] = pd.to_numeric(dataframe[column], errors='coerce')
+    
+    return dataframe
+
+def validate_dataframe(dataframe, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        dataframe: pandas DataFrame to validate
+        required_columns: list of required column names
+    
+    Returns:
+        Boolean indicating if DataFrame is valid
+    """
+    if dataframe.empty:
+        print("Warning: DataFrame is empty")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in dataframe.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+def get_cleaning_summary(dataframe):
+    """
+    Generate a summary of data cleaning statistics.
+    
+    Args:
+        dataframe: pandas DataFrame to analyze
+    
+    Returns:
+        Dictionary with cleaning statistics
+    """
+    summary = {
+        'total_rows': len(dataframe),
+        'total_columns': len(dataframe.columns),
+        'missing_values': dataframe.isnull().sum().sum(),
+        'duplicate_rows': dataframe.duplicated().sum(),
+        'numeric_columns': len(dataframe.select_dtypes(include=['number']).columns),
+        'object_columns': len(dataframe.select_dtypes(include=['object']).columns)
+    }
+    
+    return summary
