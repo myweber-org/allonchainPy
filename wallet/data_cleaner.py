@@ -1895,3 +1895,103 @@ def validate_data(data, column, min_value=None, max_value=None):
         mask = mask & (data[column] <= max_value)
     
     return data[mask]
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, missing_strategy='mean', remove_duplicates=True):
+    """
+    Clean a pandas DataFrame by handling missing values and removing duplicates.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    missing_strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
+    remove_duplicates (bool): Whether to remove duplicate rows
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    
+    df_clean = df.copy()
+    
+    # Handle missing values
+    if missing_strategy == 'mean':
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df_clean[col].fillna(df_clean[col].mean(), inplace=True)
+    
+    elif missing_strategy == 'median':
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df_clean[col].fillna(df_clean[col].median(), inplace=True)
+    
+    elif missing_strategy == 'mode':
+        for col in df_clean.columns:
+            if df_clean[col].dtype == 'object':
+                df_clean[col].fillna(df_clean[col].mode()[0] if not df_clean[col].mode().empty else '', inplace=True)
+            else:
+                df_clean[col].fillna(df_clean[col].mode()[0] if not df_clean[col].mode().empty else 0, inplace=True)
+    
+    elif missing_strategy == 'drop':
+        df_clean.dropna(inplace=True)
+    
+    # Remove duplicates
+    if remove_duplicates:
+        initial_rows = len(df_clean)
+        df_clean.drop_duplicates(inplace=True)
+        duplicates_removed = initial_rows - len(df_clean)
+        print(f"Removed {duplicates_removed} duplicate rows")
+    
+    # Reset index after cleaning
+    df_clean.reset_index(drop=True, inplace=True)
+    
+    return df_clean
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate basic data structure and requirements.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, message)
+    """
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Data validation passed"
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data with missing values and duplicates
+    sample_data = {
+        'id': [1, 2, 3, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Charlie', 'Charlie', None, 'Eve'],
+        'age': [25, 30, None, 35, 28, 32],
+        'score': [85.5, 92.0, 78.5, 78.5, None, 88.0]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned_df = clean_dataset(df, missing_strategy='mean', remove_duplicates=True)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    
+    # Validate the cleaned data
+    is_valid, message = validate_data(cleaned_df, required_columns=['id', 'name', 'age', 'score'], min_rows=1)
+    print(f"\nValidation: {message}")
