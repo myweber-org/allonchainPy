@@ -62,3 +62,51 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B', 'C'])
     print(f"\nData validation result: {is_valid}")
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_file, output_file):
+    """
+    Clean CSV data by handling missing values and converting data types.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        # Fill missing numeric values with column mean
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if df[col].isnull().any():
+                df[col] = df[col].fillna(df[col].mode()[0])
+        
+        # Convert date columns if present
+        date_columns = [col for col in df.columns if 'date' in col.lower()]
+        for col in date_columns:
+            df[col] = pd.to_datetime(df[col], errors='coerce')
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Data cleaning completed. Cleaned file saved as {output_file}")
+        
+        return df.shape
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    result = clean_csv_data(input_csv, output_csv)
+    if result:
+        print(f"Cleaned data shape: {result}")
