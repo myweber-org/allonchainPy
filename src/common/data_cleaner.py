@@ -32,4 +32,151 @@ def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
         for col in cleaned_df.columns:
             cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None, inplace=True)
 
-    return cleaned_df
+    return cleaned_dfimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        data: pandas DataFrame
+        column: Column name to process
+        multiplier: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def z_score_normalize(data, column):
+    """
+    Normalize a column using z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: Column name to normalize
+    
+    Returns:
+        Series with normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return pd.Series([0] * len(data), index=data.index)
+    
+    normalized = (data[column] - mean_val) / std_val
+    return normalized
+
+def min_max_normalize(data, column, feature_range=(0, 1)):
+    """
+    Normalize a column using min-max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: Column name to normalize
+        feature_range: Desired range of transformed data
+    
+    Returns:
+        Series with normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return pd.Series([feature_range[0]] * len(data), index=data.index)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    normalized = normalized * (feature_range[1] - feature_range[0]) + feature_range[0]
+    return normalized
+
+def detect_skewed_columns(data, threshold=0.5):
+    """
+    Identify columns with skewed distributions.
+    
+    Args:
+        data: pandas DataFrame
+        threshold: Absolute skewness threshold for detection
+    
+    Returns:
+        Dictionary with column names and their skewness values
+    """
+    skewed_cols = {}
+    
+    for col in data.select_dtypes(include=[np.number]).columns:
+        skewness = stats.skew(data[col].dropna())
+        if abs(skewness) > threshold:
+            skewed_cols[col] = skewness
+    
+    return skewed_cols
+
+def log_transform(data, column):
+    """
+    Apply log transformation to reduce skewness.
+    
+    Args:
+        data: pandas DataFrame
+        column: Column name to transform
+    
+    Returns:
+        Series with log-transformed values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if (data[column] <= 0).any():
+        transformed = np.log1p(data[column] - data[column].min() + 1)
+    else:
+        transformed = np.log(data[column])
+    
+    return transformed
+
+def clean_dataset(data, numeric_columns=None, outlier_multiplier=1.5, normalize_method='zscore'):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        data: Input DataFrame
+        numeric_columns: List of numeric columns to process
+        outlier_multiplier: Multiplier for IQR outlier detection
+        normalize_method: 'zscore' or 'minmax' normalization
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_data.columns:
+            # Remove outliers
+            cleaned_data = remove_outliers_iqr(cleaned_data, col, outlier_multiplier)
+            
+            # Normalize
+            if normalize_method == 'zscore':
+                cleaned_data[f'{col}_normalized'] = z_score_normalize(cleaned_data, col)
+            elif normalize_method == 'minmax':
+                cleaned_data[f'{col}_normalized'] = min_max_normalize(cleaned_data, col)
+    
+    return cleaned_data
