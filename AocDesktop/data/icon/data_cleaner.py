@@ -168,3 +168,84 @@ def sample_dataframe(df, sample_size=1000, random_state=42):
         return df
     
     return df.sample(n=sample_size, random_state=random_state)
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+
+    def remove_duplicates(self, subset: Optional[List[str]] = None) -> 'DataCleaner':
+        self.df = self.df.drop_duplicates(subset=subset, keep='first')
+        return self
+
+    def normalize_column(self, column_name: str, method: str = 'minmax') -> 'DataCleaner':
+        if column_name not in self.df.columns:
+            raise ValueError(f"Column '{column_name}' not found in DataFrame")
+
+        if method == 'minmax':
+            col_min = self.df[column_name].min()
+            col_max = self.df[column_name].max()
+            if col_max != col_min:
+                self.df[column_name] = (self.df[column_name] - col_min) / (col_max - col_min)
+        elif method == 'zscore':
+            col_mean = self.df[column_name].mean()
+            col_std = self.df[column_name].std()
+            if col_std > 0:
+                self.df[column_name] = (self.df[column_name] - col_mean) / col_std
+        else:
+            raise ValueError(f"Unknown normalization method: {method}")
+
+        return self
+
+    def fill_missing(self, column_name: str, strategy: str = 'mean') -> 'DataCleaner':
+        if column_name not in self.df.columns:
+            raise ValueError(f"Column '{column_name}' not found in DataFrame")
+
+        if strategy == 'mean':
+            fill_value = self.df[column_name].mean()
+        elif strategy == 'median':
+            fill_value = self.df[column_name].median()
+        elif strategy == 'mode':
+            fill_value = self.df[column_name].mode().iloc[0] if not self.df[column_name].mode().empty else np.nan
+        elif strategy == 'zero':
+            fill_value = 0
+        else:
+            raise ValueError(f"Unknown fill strategy: {strategy}")
+
+        self.df[column_name] = self.df[column_name].fillna(fill_value)
+        return self
+
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df.copy()
+
+    def get_stats(self) -> dict:
+        cleaned_shape = self.df.shape
+        return {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': cleaned_shape[0],
+            'cleaned_columns': cleaned_shape[1],
+            'rows_removed': self.original_shape[0] - cleaned_shape[0]
+        }
+
+def clean_dataset(df: pd.DataFrame, 
+                  duplicate_columns: Optional[List[str]] = None,
+                  normalize_columns: Optional[List[str]] = None,
+                  fill_columns: Optional[List[str]] = None) -> pd.DataFrame:
+    cleaner = DataCleaner(df)
+    
+    if duplicate_columns:
+        cleaner.remove_duplicates(duplicate_columns)
+    
+    if normalize_columns:
+        for col in normalize_columns:
+            cleaner.normalize_column(col)
+    
+    if fill_columns:
+        for col in fill_columns:
+            cleaner.fill_missing(col)
+    
+    return cleaner.get_cleaned_data()
