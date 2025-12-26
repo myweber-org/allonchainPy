@@ -1,125 +1,85 @@
-def remove_duplicates(input_list):
-    seen = set()
-    result = []
-    for item in input_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
 
-def clean_data_with_order(input_list, key=None):
-    if key is None:
-        key = lambda x: x
-    seen = set()
-    result = []
-    for item in input_list:
-        identifier = key(item)
-        if identifier not in seen:
-            seen.add(identifier)
-            result.append(item)
-    return result
-
-if __name__ == "__main__":
-    sample = [1, 2, 2, 3, 4, 4, 5]
-    print(remove_duplicates(sample))
-    
-    sample_dicts = [{"id": 1}, {"id": 2}, {"id": 1}, {"id": 3}]
-    print(clean_data_with_order(sample_dicts, key=lambda x: x["id"]))
 import pandas as pd
-import numpy as np
 
-def remove_outliers_iqr(df, column):
+def remove_duplicates(df, subset=None, keep='first'):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Remove duplicate rows from a DataFrame.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
+    subset (list, optional): Columns to consider for duplicates
+    keep (str, optional): Which duplicates to keep ('first', 'last', False)
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    pd.DataFrame: DataFrame with duplicates removed
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if df.empty:
+        return df
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    removed_count = len(df) - len(cleaned_df)
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate rows")
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
+    return cleaned_df.reset_index(drop=True)
 
-def calculate_summary_statistics(df, column):
+def clean_numeric_columns(df, columns):
     """
-    Calculate summary statistics for a column after outlier removal.
+    Clean numeric columns by converting to appropriate types.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    columns (list): List of column names to clean
+    
+    Returns:
+    pd.DataFrame: DataFrame with cleaned numeric columns
+    """
+    for col in columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    
+    return df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list, optional): Required column names
+    
+    Returns:
+    bool: True if validation passes, False otherwise
+    """
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Missing required columns: {missing_cols}")
+            return False
+    
+    return True
+
+def get_data_summary(df):
+    """
+    Generate summary statistics for DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
     
     Returns:
     dict: Dictionary containing summary statistics
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
+    summary = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'data_types': df.dtypes.to_dict()
     }
     
-    return stats
-
-def clean_dataset(df, columns_to_clean=None):
-    """
-    Clean multiple columns in a DataFrame by removing outliers.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    columns_to_clean (list): List of column names to clean. If None, clean all numeric columns.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    """
-    if columns_to_clean is None:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns
-        columns_to_clean = list(numeric_cols)
-    
-    cleaned_df = df.copy()
-    
-    for column in columns_to_clean:
-        if column in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[column]):
-            original_count = len(cleaned_df)
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            removed_count = original_count - len(cleaned_df)
-            print(f"Removed {removed_count} outliers from column '{column}'")
-    
-    return cleaned_df
-
-if __name__ == "__main__":
-    sample_data = {
-        'A': np.random.normal(100, 15, 1000),
-        'B': np.random.exponential(50, 1000),
-        'C': np.random.uniform(0, 200, 1000)
-    }
-    
-    df = pd.DataFrame(sample_data)
-    df.loc[::100, 'A'] = 500
-    
-    print("Original dataset shape:", df.shape)
-    print("Original statistics for column 'A':")
-    print(calculate_summary_statistics(df, 'A'))
-    
-    cleaned_df = clean_dataset(df, ['A'])
-    
-    print("\nCleaned dataset shape:", cleaned_df.shape)
-    print("Cleaned statistics for column 'A':")
-    print(calculate_summary_statistics(cleaned_df, 'A'))
+    return summary
