@@ -260,3 +260,131 @@ if __name__ == "__main__":
         print(f"\n{col}:")
         for stat_name, stat_value in col_stats.items():
             print(f"  {stat_name}: {stat_value:.2f}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, columns_to_check=None, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    columns_to_check (list): List of column names to check for duplicates (None for all columns)
+    drop_duplicates (bool): Whether to drop duplicate rows
+    fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop')
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    df_clean = df.copy()
+    
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates(subset=columns_to_check, keep='first')
+    
+    if fill_missing == 'drop':
+        df_clean = df_clean.dropna()
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                df_clean[col] = df_clean[col].fillna(df_clean[col].mean())
+            elif fill_missing == 'median':
+                df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+    elif fill_missing == 'mode':
+        for col in df_clean.columns:
+            mode_val = df_clean[col].mode()
+            if not mode_val.empty:
+                df_clean[col] = df_clean[col].fillna(mode_val.iloc[0])
+    
+    return df_clean
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Data validation passed"
+
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Remove outliers from a specific column using specified method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to check for outliers
+    method (str): Method to detect outliers ('iqr' or 'zscore')
+    threshold (float): Threshold value for outlier detection
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_clean = df.copy()
+    
+    if method == 'iqr':
+        Q1 = df_clean[column].quantile(0.25)
+        Q3 = df_clean[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        df_clean = df_clean[(df_clean[column] >= lower_bound) & (df_clean[column] <= upper_bound)]
+    
+    elif method == 'zscore':
+        from scipy import stats
+        z_scores = np.abs(stats.zscore(df_clean[column].dropna()))
+        mask = z_scores < threshold
+        df_clean = df_clean.iloc[mask]
+    
+    return df_clean
+
+def normalize_columns(df, columns=None, method='minmax'):
+    """
+    Normalize specified columns in DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to normalize (None for all numeric columns)
+    method (str): Normalization method ('minmax' or 'standard')
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns
+    """
+    df_norm = df.copy()
+    
+    if columns is None:
+        columns = df_norm.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in df_norm.columns and pd.api.types.is_numeric_dtype(df_norm[col]):
+            if method == 'minmax':
+                min_val = df_norm[col].min()
+                max_val = df_norm[col].max()
+                if max_val != min_val:
+                    df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+            elif method == 'standard':
+                mean_val = df_norm[col].mean()
+                std_val = df_norm[col].std()
+                if std_val != 0:
+                    df_norm[col] = (df_norm[col] - mean_val) / std_val
+    
+    return df_norm
