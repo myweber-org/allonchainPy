@@ -215,3 +215,33 @@ if __name__ == "__main__":
     if cleaned_df is not None:
         print("Data cleaning completed successfully")
         print(cleaned_df.head())
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_names):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and normalizing
+    specified string columns (strip whitespace, lowercase).
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates().reset_index(drop=True)
+    
+    # Normalize specified string columns
+    for col in column_names:
+        if col in df_cleaned.columns:
+            if df_cleaned[col].dtype == 'object':
+                df_cleaned[col] = df_cleaned[col].apply(
+                    lambda x: re.sub(r'\s+', ' ', str(x).strip().lower()) 
+                    if pd.notnull(x) else x
+                )
+    
+    return df_cleaned
+
+def validate_email(email):
+    """
+    Validate email format using regex.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if pd.isna(email):
+        return False
+    return bool(re.match(pattern, str(email)))
