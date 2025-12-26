@@ -179,4 +179,32 @@ def clean_dataset(data, numeric_columns=None, outlier_multiplier=1.5, normalize_
             elif normalize_method == 'minmax':
                 cleaned_data[f'{col}_normalized'] = min_max_normalize(cleaned_data, col)
     
-    return cleaned_data
+    return cleaned_dataimport pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def fill_missing_with_mean(df, column):
+    mean_value = df[column].mean()
+    df[column] = df[column].fillna(mean_value)
+    return df
+
+def standardize_column(df, column):
+    mean = df[column].mean()
+    std = df[column].std()
+    df[column] = (df[column] - mean) / std
+    return df
+
+def clean_dataset(df, numeric_columns):
+    for col in numeric_columns:
+        if col in df.columns:
+            df = remove_outliers_iqr(df, col)
+            df = fill_missing_with_mean(df, col)
+            df = standardize_column(df, col)
+    return df.reset_index(drop=True)
