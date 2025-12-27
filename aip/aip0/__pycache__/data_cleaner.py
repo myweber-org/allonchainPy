@@ -1,6 +1,6 @@
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 def remove_outliers_iqr(df, column):
     """
@@ -27,16 +27,16 @@ def remove_outliers_iqr(df, column):
     
     return filtered_df.reset_index(drop=True)
 
-def calculate_basic_stats(df, column):
+def calculate_summary_stats(df, column):
     """
-    Calculate basic statistics for a DataFrame column.
+    Calculate summary statistics for a column.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    column (str): Column name
     
     Returns:
-    dict: Dictionary containing statistical measures
+    dict: Dictionary containing summary statistics
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
@@ -53,117 +53,64 @@ def calculate_basic_stats(df, column):
     
     return stats
 
+def validate_numeric_data(df, columns):
+    """
+    Validate that specified columns contain only numeric data.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to validate
+    
+    Returns:
+    dict: Dictionary with validation results for each column
+    """
+    validation_results = {}
+    
+    for col in columns:
+        if col not in df.columns:
+            validation_results[col] = {'valid': False, 'error': 'Column not found'}
+            continue
+        
+        non_numeric = pd.to_numeric(df[col], errors='coerce').isna().sum()
+        total_rows = len(df)
+        
+        validation_results[col] = {
+            'valid': non_numeric == 0,
+            'non_numeric_count': non_numeric,
+            'non_numeric_percentage': (non_numeric / total_rows * 100) if total_rows > 0 else 0,
+            'total_rows': total_rows
+        }
+    
+    return validation_results
+
 def example_usage():
     """
-    Example usage of the data cleaning functions.
+    Example demonstrating the usage of data cleaning functions.
     """
     np.random.seed(42)
     
     data = {
         'id': range(1, 101),
-        'value': np.random.normal(100, 15, 100)
+        'value': np.random.normal(100, 15, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
     }
     
     df = pd.DataFrame(data)
     
     print("Original DataFrame shape:", df.shape)
-    print("Original statistics:", calculate_basic_stats(df, 'value'))
     
     cleaned_df = remove_outliers_iqr(df, 'value')
+    print("Cleaned DataFrame shape:", cleaned_df.shape)
     
-    print("\nCleaned DataFrame shape:", cleaned_df.shape)
-    print("Cleaned statistics:", calculate_basic_stats(cleaned_df, 'value'))
+    stats = calculate_summary_stats(cleaned_df, 'value')
+    print("\nSummary Statistics:")
+    for key, value in stats.items():
+        print(f"{key}: {value:.2f}")
     
-    return cleaned_df
+    validation = validate_numeric_data(df, ['value', 'id', 'category'])
+    print("\nData Validation Results:")
+    for col, result in validation.items():
+        print(f"{col}: {result}")
 
 if __name__ == "__main__":
-    cleaned_data = example_usage()
-import csv
-import re
-
-def clean_csv(input_file, output_file):
-    cleaned_rows = []
-    
-    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
-        reader = csv.reader(infile)
-        headers = next(reader)
-        cleaned_rows.append(headers)
-        
-        for row in reader:
-            cleaned_row = []
-            for cell in row:
-                cleaned_cell = re.sub(r'\s+', ' ', cell.strip())
-                cleaned_cell = cleaned_cell.replace('"', "'")
-                cleaned_row.append(cleaned_cell)
-            cleaned_rows.append(cleaned_row)
-    
-    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
-        writer = csv.writer(outfile)
-        writer.writerows(cleaned_rows)
-    
-    return len(cleaned_rows) - 1
-
-def validate_email(email):
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return bool(re.match(pattern, email))
-
-def remove_duplicates(input_file, output_file, key_column=0):
-    unique_rows = []
-    seen_keys = set()
-    
-    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
-        reader = csv.reader(infile)
-        headers = next(reader)
-        unique_rows.append(headers)
-        
-        for row in reader:
-            key = row[key_column] if key_column < len(row) else ''
-            if key not in seen_keys:
-                seen_keys.add(key)
-                unique_rows.append(row)
-    
-    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
-        writer = csv.writer(outfile)
-        writer.writerows(unique_rows)
-    
-    return len(unique_rows) - 1
-
-if __name__ == "__main__":
-    sample_data = [
-        ["Name", "Email", "Phone"],
-        ["John Doe", "john@example.com", "123-456-7890"],
-        ["Jane Smith", "jane@example.com", "987-654-3210"],
-        ["John Doe", "john@example.com", "123-456-7890"]
-    ]
-    
-    with open('sample.csv', 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerows(sample_data)
-    
-    clean_count = clean_csv('sample.csv', 'cleaned.csv')
-    unique_count = remove_duplicates('cleaned.csv', 'unique.csv', 0)
-    
-    print(f"Cleaned {clean_count} rows")
-    print(f"Found {unique_count} unique records")
-import numpy as np
-
-def remove_outliers_iqr(data, column):
-    """
-    Remove outliers from a pandas DataFrame column using the IQR method.
-    
-    Parameters:
-    data (pd.DataFrame): The DataFrame containing the data.
-    column (str): The column name to process.
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed from the specified column.
-    """
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    example_usage()
