@@ -655,4 +655,85 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid, msg = validate_dataframe(cleaned, required_columns=['A', 'B'])
-    print(f"\nValidation: {msg}")
+    print(f"\nValidation: {msg}")import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        subset (list, optional): Column labels to consider for duplicates.
+        keep (str, optional): Which duplicates to keep.
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed.
+    """
+    if subset is None:
+        subset = df.columns.tolist()
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    return cleaned_df
+
+def clean_numeric_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Clean numeric outliers using specified method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column (str): Column name to clean.
+        method (str): 'iqr' or 'zscore'.
+        threshold (float): Threshold for outlier detection.
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed.
+    """
+    if method == 'iqr':
+        q1 = df[column].quantile(0.25)
+        q3 = df[column].quantile(0.75)
+        iqr = q3 - q1
+        lower_bound = q1 - threshold * iqr
+        upper_bound = q3 + threshold * iqr
+        mask = (df[column] >= lower_bound) & (df[column] <= upper_bound)
+    elif method == 'zscore':
+        mean = df[column].mean()
+        std = df[column].std()
+        mask = (df[column] - mean).abs() / std <= threshold
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+    
+    return df[mask]
+
+def standardize_column_names(df):
+    """
+    Standardize column names to lowercase with underscores.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+    
+    Returns:
+        pd.DataFrame: DataFrame with standardized column names.
+    """
+    df.columns = df.columns.str.lower().str.replace(' ', '_')
+    return df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        required_columns (list, optional): List of required columns.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
