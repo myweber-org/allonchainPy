@@ -1,18 +1,17 @@
 
 import pandas as pd
-import numpy as np
 
 def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     """
     Clean a pandas DataFrame by removing duplicates and handling missing values.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to drop duplicate rows.
-    fill_missing (str): Strategy to fill missing values ('mean', 'median', 'mode', or 'drop').
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+        fill_missing (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'. Default is 'mean'.
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame.
+        pd.DataFrame: Cleaned DataFrame.
     """
     cleaned_df = df.copy()
     
@@ -22,7 +21,7 @@ def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     if fill_missing == 'drop':
         cleaned_df = cleaned_df.dropna()
     elif fill_missing in ['mean', 'median']:
-        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
         for col in numeric_cols:
             if fill_missing == 'mean':
                 cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
@@ -30,47 +29,50 @@ def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
                 cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
     elif fill_missing == 'mode':
         for col in cleaned_df.columns:
-            mode_value = cleaned_df[col].mode()
-            if not mode_value.empty:
-                cleaned_df[col].fillna(mode_value[0], inplace=True)
+            if cleaned_df[col].dtype == 'object':
+                cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else '', inplace=True)
+            else:
+                cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 0, inplace=True)
     
     return cleaned_df
 
-def validate_dataset(df, required_columns=None):
+def validate_data(df, required_columns=None):
     """
-    Validate a DataFrame for required columns and data types.
+    Validate the DataFrame for required columns and data types.
     
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of required column names.
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
     
     Returns:
-    tuple: (is_valid, error_message)
+        bool: True if validation passes, False otherwise.
     """
     if required_columns:
         missing_cols = [col for col in required_columns if col not in df.columns]
         if missing_cols:
-            return False, f"Missing required columns: {missing_cols}"
+            print(f"Missing required columns: {missing_cols}")
+            return False
     
     if df.empty:
-        return False, "DataFrame is empty"
+        print("DataFrame is empty.")
+        return False
     
-    return True, "Dataset is valid"
+    return True
 
 if __name__ == "__main__":
     sample_data = {
-        'A': [1, 2, 2, 3, None, 4],
-        'B': [5, None, 5, 6, 7, 8],
-        'C': ['x', 'y', 'x', 'y', 'z', None]
+        'A': [1, 2, 2, None, 5],
+        'B': [10, None, 30, 40, 50],
+        'C': ['x', 'y', 'y', 'z', None]
     }
     
     df = pd.DataFrame(sample_data)
     print("Original DataFrame:")
     print(df)
     
-    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
+    cleaned = clean_dataset(df, fill_missing='mean')
     print("\nCleaned DataFrame:")
     print(cleaned)
     
-    is_valid, message = validate_dataset(cleaned, required_columns=['A', 'B'])
-    print(f"\nValidation: {message}")
+    is_valid = validate_data(cleaned, required_columns=['A', 'B'])
+    print(f"\nData validation result: {is_valid}")
