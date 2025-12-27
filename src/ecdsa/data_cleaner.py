@@ -73,3 +73,149 @@ if __name__ == "__main__":
     cleaned_df = clean_numeric_data(df, ['A', 'B'])
     print(f"Cleaned shape: {cleaned_df.shape}")
     print(f"Sample statistics:\n{cleaned_df.describe()}")
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        data: pandas DataFrame
+        column: Column name to process
+        factor: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data.copy()
+
+def normalize_minmax(data, columns=None):
+    """
+    Normalize specified columns using min-max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        columns: List of column names to normalize (default: all numeric columns)
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    normalized_data = data.copy()
+    
+    for col in columns:
+        if col not in data.columns:
+            continue
+            
+        col_min = normalized_data[col].min()
+        col_max = normalized_data[col].max()
+        
+        if col_max - col_min > 0:
+            normalized_data[col] = (normalized_data[col] - col_min) / (col_max - col_min)
+        else:
+            normalized_data[col] = 0
+    
+    return normalized_data
+
+def standardize_zscore(data, columns=None):
+    """
+    Standardize specified columns using z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        columns: List of column names to standardize (default: all numeric columns)
+    
+    Returns:
+        DataFrame with standardized columns
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    standardized_data = data.copy()
+    
+    for col in columns:
+        if col not in data.columns:
+            continue
+            
+        col_mean = standardized_data[col].mean()
+        col_std = standardized_data[col].std()
+        
+        if col_std > 0:
+            standardized_data[col] = (standardized_data[col] - col_mean) / col_std
+        else:
+            standardized_data[col] = 0
+    
+    return standardized_data
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns.
+    
+    Args:
+        data: pandas DataFrame
+        strategy: 'mean', 'median', 'mode', or 'drop'
+        columns: List of column names to process (default: all columns)
+    
+    Returns:
+        DataFrame with missing values handled
+    """
+    if columns is None:
+        columns = data.columns.tolist()
+    
+    processed_data = data.copy()
+    
+    for col in columns:
+        if col not in data.columns:
+            continue
+            
+        if strategy == 'drop':
+            processed_data = processed_data.dropna(subset=[col])
+        elif strategy == 'mean':
+            processed_data[col] = processed_data[col].fillna(processed_data[col].mean())
+        elif strategy == 'median':
+            processed_data[col] = processed_data[col].fillna(processed_data[col].median())
+        elif strategy == 'mode':
+            processed_data[col] = processed_data[col].fillna(processed_data[col].mode()[0])
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+    
+    return processed_data
+
+def create_data_summary(data):
+    """
+    Create a summary statistics DataFrame.
+    
+    Args:
+        data: pandas DataFrame
+    
+    Returns:
+        DataFrame with summary statistics
+    """
+    summary = pd.DataFrame({
+        'dtype': data.dtypes,
+        'non_null_count': data.count(),
+        'null_count': data.isnull().sum(),
+        'null_percentage': (data.isnull().sum() / len(data)) * 100,
+        'unique_count': data.nunique()
+    })
+    
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) > 0:
+        numeric_stats = data[numeric_cols].describe().T
+        summary = summary.join(numeric_stats, how='left')
+    
+    return summary
