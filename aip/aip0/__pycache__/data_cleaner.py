@@ -78,3 +78,70 @@ def example_usage():
 
 if __name__ == "__main__":
     cleaned_data = example_usage()
+import csv
+import re
+
+def clean_csv(input_file, output_file):
+    cleaned_rows = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.reader(infile)
+        headers = next(reader)
+        cleaned_rows.append(headers)
+        
+        for row in reader:
+            cleaned_row = []
+            for cell in row:
+                cleaned_cell = re.sub(r'\s+', ' ', cell.strip())
+                cleaned_cell = cleaned_cell.replace('"', "'")
+                cleaned_row.append(cleaned_cell)
+            cleaned_rows.append(cleaned_row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.writer(outfile)
+        writer.writerows(cleaned_rows)
+    
+    return len(cleaned_rows) - 1
+
+def validate_email(email):
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def remove_duplicates(input_file, output_file, key_column=0):
+    unique_rows = []
+    seen_keys = set()
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.reader(infile)
+        headers = next(reader)
+        unique_rows.append(headers)
+        
+        for row in reader:
+            key = row[key_column] if key_column < len(row) else ''
+            if key not in seen_keys:
+                seen_keys.add(key)
+                unique_rows.append(row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.writer(outfile)
+        writer.writerows(unique_rows)
+    
+    return len(unique_rows) - 1
+
+if __name__ == "__main__":
+    sample_data = [
+        ["Name", "Email", "Phone"],
+        ["John Doe", "john@example.com", "123-456-7890"],
+        ["Jane Smith", "jane@example.com", "987-654-3210"],
+        ["John Doe", "john@example.com", "123-456-7890"]
+    ]
+    
+    with open('sample.csv', 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerows(sample_data)
+    
+    clean_count = clean_csv('sample.csv', 'cleaned.csv')
+    unique_count = remove_duplicates('cleaned.csv', 'unique.csv', 0)
+    
+    print(f"Cleaned {clean_count} rows")
+    print(f"Found {unique_count} unique records")
