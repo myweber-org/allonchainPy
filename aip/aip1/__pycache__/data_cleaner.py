@@ -1,97 +1,145 @@
 
 import pandas as pd
 import numpy as np
+from pathlib import Path
 
-def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a specified column in a DataFrame using the IQR method.
+class DataCleaner:
+    def __init__(self, file_path):
+        self.file_path = Path(file_path)
+        self.df = None
+        
+    def load_data(self):
+        if not self.file_path.exists():
+            raise FileNotFoundError(f"File not found: {self.file_path}")
+        
+        if self.file_path.suffix == '.csv':
+            self.df = pd.read_csv(self.file_path)
+        elif self.file_path.suffix in ['.xlsx', '.xls']:
+            self.df = pd.read_excel(self.file_path)
+        else:
+            raise ValueError("Unsupported file format")
+        
+        print(f"Loaded data with shape: {self.df.shape}")
+        return self
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    def remove_duplicates(self):
+        if self.df is None:
+            raise ValueError("Data not loaded. Call load_data() first.")
+        
+        initial_rows = len(self.df)
+        self.df = self.df.drop_duplicates()
+        removed = initial_rows - len(self.df)
+        print(f"Removed {removed} duplicate rows")
+        return self
     
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    def handle_missing_values(self, strategy='mean', columns=None):
+        if self.df is None:
+            raise ValueError("Data not loaded. Call load_data() first.")
+        
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns:
+                missing_count = self.df[col].isnull().sum()
+                if missing_count > 0:
+                    if strategy == 'mean':
+                        fill_value = self.df[col].mean()
+                    elif strategy == 'median':
+                        fill_value = self.df[col].median()
+                    elif strategy == 'mode':
+                        fill_value = self.df[col].mode()[0]
+                    elif strategy == 'drop':
+                        self.df = self.df.dropna(subset=[col])
+                        print(f"Dropped rows with missing values in column: {col}")
+                        continue
+                    else:
+                        fill_value = strategy
+                    
+                    self.df[col] = self.df[col].fillna(fill_value)
+                    print(f"Filled {missing_count} missing values in column '{col}' with {fill_value}")
+        
+        return self
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    def remove_outliers(self, columns=None, threshold=3):
+        if self.df is None:
+            raise ValueError("Data not loaded. Call load_data() first.")
+        
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        initial_rows = len(self.df)
+        
+        for col in columns:
+            if col in self.df.columns:
+                z_scores = np.abs((self.df[col] - self.df[col].mean()) / self.df[col].std())
+                self.df = self.df[z_scores < threshold]
+        
+        removed = initial_rows - len(self.df)
+        print(f"Removed {removed} outlier rows")
+        return self
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    def save_cleaned_data(self, output_path=None):
+        if self.df is None:
+            raise ValueError("No data to save. Perform cleaning operations first.")
+        
+        if output_path is None:
+            output_path = self.file_path.parent / f"cleaned_{self.file_path.name}"
+        
+        if output_path.suffix == '.csv':
+            self.df.to_csv(output_path, index=False)
+        elif output_path.suffix in ['.xlsx', '.xls']:
+            self.df.to_excel(output_path, index=False)
+        
+        print(f"Saved cleaned data to: {output_path}")
+        return output_path
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    def get_summary(self):
+        if self.df is None:
+            raise ValueError("Data not loaded. Call load_data() first.")
+        
+        summary = {
+            'rows': len(self.df),
+            'columns': len(self.df.columns),
+            'missing_values': self.df.isnull().sum().sum(),
+            'duplicates': self.df.duplicated().sum(),
+            'data_types': self.df.dtypes.to_dict()
+        }
+        
+        return summary
 
-def calculate_basic_stats(df, column):
-    """
-    Calculate basic statistics for a column.
+def clean_csv_file(input_file, output_file=None):
+    cleaner = DataCleaner(input_file)
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name
-    
-    Returns:
-    dict: Dictionary containing statistics
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
-    }
-    
-    return stats
-
-def clean_dataset(df, numeric_columns=None):
-    """
-    Clean dataset by removing outliers from all numeric columns.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    numeric_columns (list): List of numeric column names. If None, uses all numeric columns.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    """
-    if numeric_columns is None:
-        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
-    
-    cleaned_df = df.copy()
-    
-    for col in numeric_columns:
-        if col in df.columns:
-            try:
-                cleaned_df = remove_outliers_iqr(cleaned_df, col)
-            except Exception as e:
-                print(f"Warning: Could not process column '{col}': {e}")
-    
-    return cleaned_df
+    try:
+        cleaner.load_data()
+        cleaner.remove_duplicates()
+        cleaner.handle_missing_values(strategy='mean')
+        cleaner.remove_outliers(threshold=3)
+        
+        if output_file:
+            cleaner.save_cleaned_data(output_file)
+        else:
+            cleaner.save_cleaned_data()
+        
+        summary = cleaner.get_summary()
+        print(f"Cleaning complete. Final shape: {summary['rows']} rows, {summary['columns']} columns")
+        
+        return cleaner.df
+        
+    except Exception as e:
+        print(f"Error during cleaning: {e}")
+        raise
 
 if __name__ == "__main__":
     sample_data = {
-        'A': np.random.normal(100, 15, 1000),
-        'B': np.random.exponential(50, 1000),
-        'C': np.random.randint(1, 100, 1000)
+        'A': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        'B': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+        'C': [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
     }
     
-    df = pd.DataFrame(sample_data)
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
     
-    print("Original dataset shape:", df.shape)
-    print("\nOriginal statistics for column 'A':")
-    print(calculate_basic_stats(df, 'A'))
-    
-    cleaned_df = clean_dataset(df, ['A', 'B'])
-    
-    print("\nCleaned dataset shape:", cleaned_df.shape)
-    print("\nCleaned statistics for column 'A':")
-    print(calculate_basic_stats(cleaned_df, 'A'))
+    cleaned_df = clean_csv_file('test_data.csv', 'cleaned_test_data.csv')
+    print("Sample cleaning completed successfully")
