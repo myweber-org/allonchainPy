@@ -824,3 +824,94 @@ if __name__ == "__main__":
     print(cleaned)
     print("\nValidation Results after cleaning:")
     print(validate_dataset(cleaned))
+import pandas as pd
+
+def clean_dataset(df, column_mapping=None, drop_duplicates=True, standardize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and standardizing text columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    column_mapping (dict): Optional dictionary to rename columns.
+    drop_duplicates (bool): Whether to remove duplicate rows.
+    standardize_text (bool): Whether to standardize text columns (lowercase, strip).
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    
+    df_clean = df.copy()
+    
+    if column_mapping:
+        df_clean = df_clean.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        initial_rows = len(df_clean)
+        df_clean = df_clean.drop_duplicates()
+        removed = initial_rows - len(df_clean)
+        print(f"Removed {removed} duplicate rows.")
+    
+    if standardize_text:
+        text_columns = df_clean.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            df_clean[col] = df_clean[col].astype(str).str.lower().str.strip()
+        print(f"Standardized {len(text_columns)} text columns.")
+    
+    return df_clean
+
+def validate_data(df, required_columns=None, check_missing=True):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
+    check_missing (bool): Whether to check for missing values.
+    
+    Returns:
+    dict: Dictionary with validation results.
+    """
+    
+    validation_result = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': None,
+        'missing_columns': None
+    }
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        validation_result['missing_columns'] = missing_cols
+    
+    if check_missing:
+        missing_counts = df.isnull().sum()
+        missing_total = missing_counts.sum()
+        validation_result['missing_values'] = {
+            'total_missing': int(missing_total),
+            'columns_with_missing': missing_counts[missing_counts > 0].to_dict()
+        }
+    
+    return validation_result
+
+if __name__ == "__main__":
+    sample_data = {
+        'Name': ['John Doe', 'Jane Smith', 'John Doe', ' Bob Johnson '],
+        'Email': ['john@example.com', 'jane@example.com', 'john@example.com', 'bob@example.com'],
+        'Age': [25, 30, 25, 35],
+        'City': ['New York', 'Los Angeles', 'New York', ' Chicago ']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataset(df, drop_duplicates=True, standardize_text=True)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print("\n" + "="*50 + "\n")
+    
+    validation = validate_data(cleaned_df, required_columns=['Name', 'Email', 'Age'])
+    print("Validation Results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
