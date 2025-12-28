@@ -322,3 +322,104 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas DataFrame column using the IQR method.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    
+    return filtered_data
+
+def calculate_statistics(data, column):
+    """
+    Calculate basic statistics for a column after outlier removal.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing statistical measures
+    """
+    stats = {
+        'mean': data[column].mean(),
+        'median': data[column].median(),
+        'std': data[column].std(),
+        'min': data[column].min(),
+        'max': data[column].max(),
+        'count': len(data)
+    }
+    
+    return stats
+
+def clean_dataset(data, columns_to_clean):
+    """
+    Clean multiple columns in a dataset by removing outliers.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    columns_to_clean (list): List of column names to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    dict: Dictionary of statistics for each cleaned column
+    """
+    cleaned_data = data.copy()
+    all_stats = {}
+    
+    for column in columns_to_clean:
+        if column in cleaned_data.columns:
+            original_count = len(cleaned_data)
+            cleaned_data = remove_outliers_iqr(cleaned_data, column)
+            removed_count = original_count - len(cleaned_data)
+            
+            stats = calculate_statistics(cleaned_data, column)
+            stats['outliers_removed'] = removed_count
+            all_stats[column] = stats
+    
+    return cleaned_data, all_stats
+
+if __name__ == "__main__":
+    # Example usage
+    import pandas as pd
+    
+    # Create sample data
+    np.random.seed(42)
+    sample_data = pd.DataFrame({
+        'temperature': np.random.normal(25, 5, 100),
+        'humidity': np.random.normal(60, 15, 100),
+        'pressure': np.random.normal(1013, 10, 100)
+    })
+    
+    # Add some outliers
+    sample_data.loc[95:99, 'temperature'] = [100, -10, 150, 200, -50]
+    
+    print("Original dataset shape:", sample_data.shape)
+    
+    # Clean the dataset
+    columns_to_process = ['temperature', 'humidity', 'pressure']
+    cleaned_df, statistics = clean_dataset(sample_data, columns_to_process)
+    
+    print("\nCleaned dataset shape:", cleaned_df.shape)
+    print("\nStatistics for temperature:")
+    for key, value in statistics['temperature'].items():
+        print(f"{key}: {value:.2f}")
