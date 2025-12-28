@@ -1,180 +1,106 @@
 import numpy as np
 import pandas as pd
-from scipy import stats
 
-def remove_outliers_iqr(df, columns=None, factor=1.5):
+def remove_outliers_iqr(df, columns, factor=1.5):
     """
     Remove outliers using the Interquartile Range method.
     
     Parameters:
     df (pd.DataFrame): Input dataframe
-    columns (list): List of columns to process, if None processes all numeric columns
+    columns (list): List of column names to process
     factor (float): Multiplier for IQR (default 1.5)
     
     Returns:
     pd.DataFrame: Dataframe with outliers removed
     """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
     df_clean = df.copy()
     for col in columns:
-        if col in df.columns:
-            Q1 = df[col].quantile(0.25)
-            Q3 = df[col].quantile(0.75)
+        if col in df_clean.columns:
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
             IQR = Q3 - Q1
             lower_bound = Q1 - factor * IQR
             upper_bound = Q3 + factor * IQR
-            
-            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+            mask = (df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)
             df_clean = df_clean[mask]
-    
     return df_clean.reset_index(drop=True)
 
-def remove_outliers_zscore(df, columns=None, threshold=3):
+def normalize_minmax(df, columns):
     """
-    Remove outliers using Z-score method.
+    Normalize columns using Min-Max scaling.
     
     Parameters:
     df (pd.DataFrame): Input dataframe
-    columns (list): List of columns to process
-    threshold (float): Z-score threshold (default 3)
+    columns (list): List of column names to normalize
     
     Returns:
-    pd.DataFrame: Dataframe with outliers removed
+    pd.DataFrame: Dataframe with normalized columns
     """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
-    df_clean = df.copy()
-    for col in columns:
-        if col in df.columns:
-            z_scores = np.abs(stats.zscore(df[col].dropna()))
-            mask = z_scores < threshold
-            df_clean = df_clean[mask]
-    
-    return df_clean.reset_index(drop=True)
-
-def normalize_minmax(df, columns=None, feature_range=(0, 1)):
-    """
-    Normalize data using Min-Max scaling.
-    
-    Parameters:
-    df (pd.DataFrame): Input dataframe
-    columns (list): List of columns to normalize
-    feature_range (tuple): Desired range of transformed data
-    
-    Returns:
-    pd.DataFrame: Normalized dataframe
-    """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
     df_norm = df.copy()
-    min_val, max_val = feature_range
-    
     for col in columns:
-        if col in df.columns:
-            col_min = df[col].min()
-            col_max = df[col].max()
-            
-            if col_max - col_min != 0:
-                df_norm[col] = (df[col] - col_min) / (col_max - col_min)
-                df_norm[col] = df_norm[col] * (max_val - min_val) + min_val
-    
+        if col in df_norm.columns:
+            min_val = df_norm[col].min()
+            max_val = df_norm[col].max()
+            if max_val > min_val:
+                df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
     return df_norm
-
-def normalize_zscore(df, columns=None):
-    """
-    Normalize data using Z-score standardization.
-    
-    Parameters:
-    df (pd.DataFrame): Input dataframe
-    columns (list): List of columns to normalize
-    
-    Returns:
-    pd.DataFrame: Standardized dataframe
-    """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
-    df_std = df.copy()
-    
-    for col in columns:
-        if col in df.columns:
-            mean_val = df[col].mean()
-            std_val = df[col].std()
-            
-            if std_val != 0:
-                df_std[col] = (df[col] - mean_val) / std_val
-    
-    return df_std
 
 def handle_missing_values(df, strategy='mean', columns=None):
     """
-    Handle missing values in dataframe.
+    Handle missing values in dataframe columns.
     
     Parameters:
     df (pd.DataFrame): Input dataframe
     strategy (str): Imputation strategy ('mean', 'median', 'mode', 'drop')
-    columns (list): List of columns to process
+    columns (list): List of columns to process (None for all numeric columns)
     
     Returns:
     pd.DataFrame: Dataframe with handled missing values
     """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
     df_processed = df.copy()
     
-    if strategy == 'drop':
-        return df_processed.dropna(subset=columns)
+    if columns is None:
+        columns = df_processed.select_dtypes(include=[np.number]).columns.tolist()
     
     for col in columns:
-        if col in df.columns:
+        if col in df_processed.columns:
             if strategy == 'mean':
-                fill_value = df[col].mean()
+                df_processed[col].fillna(df_processed[col].mean(), inplace=True)
             elif strategy == 'median':
-                fill_value = df[col].median()
+                df_processed[col].fillna(df_processed[col].median(), inplace=True)
             elif strategy == 'mode':
-                fill_value = df[col].mode()[0] if not df[col].mode().empty else 0
-            else:
-                fill_value = 0
-            
-            df_processed[col] = df[col].fillna(fill_value)
+                df_processed[col].fillna(df_processed[col].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                df_processed = df_processed.dropna(subset=[col])
     
-    return df_processed
+    return df_processed.reset_index(drop=True) if strategy == 'drop' else df_processed
 
-def clean_data_pipeline(df, outlier_method='iqr', normalize_method='minmax', 
-                       missing_strategy='mean', outlier_threshold=3):
+def clean_dataset(df, numeric_columns, outlier_factor=1.5, normalize=True, missing_strategy='mean'):
     """
     Complete data cleaning pipeline.
     
     Parameters:
     df (pd.DataFrame): Input dataframe
-    outlier_method (str): Outlier removal method ('iqr', 'zscore', or None)
-    normalize_method (str): Normalization method ('minmax', 'zscore', or None)
-    missing_strategy (str): Missing value strategy
-    outlier_threshold (float): Threshold for outlier detection
+    numeric_columns (list): List of numeric column names to process
+    outlier_factor (float): IQR factor for outlier removal
+    normalize (bool): Whether to apply min-max normalization
+    missing_strategy (str): Strategy for handling missing values
     
     Returns:
     pd.DataFrame: Cleaned dataframe
     """
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("Input must be a pandas DataFrame")
+    
+    if not numeric_columns:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
     df_clean = df.copy()
     
-    # Handle missing values first
-    df_clean = handle_missing_values(df_clean, strategy=missing_strategy)
+    df_clean = handle_missing_values(df_clean, strategy=missing_strategy, columns=numeric_columns)
+    df_clean = remove_outliers_iqr(df_clean, numeric_columns, factor=outlier_factor)
     
-    # Remove outliers if specified
-    if outlier_method == 'iqr':
-        df_clean = remove_outliers_iqr(df_clean)
-    elif outlier_method == 'zscore':
-        df_clean = remove_outliers_zscore(df_clean, threshold=outlier_threshold)
-    
-    # Normalize data if specified
-    if normalize_method == 'minmax':
-        df_clean = normalize_minmax(df_clean)
-    elif normalize_method == 'zscore':
-        df_clean = normalize_zscore(df_clean)
+    if normalize:
+        df_clean = normalize_minmax(df_clean, numeric_columns)
     
     return df_clean
