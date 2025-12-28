@@ -1,124 +1,163 @@
 
-import pandas as pd
 import numpy as np
+import pandas as pd
+from scipy import stats
 
-def remove_outliers_iqr(df, column):
+def remove_outliers_iqr(data, column, multiplier=1.5):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Remove outliers using IQR method.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        multiplier: IQR multiplier (default 1.5)
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+        DataFrame with outliers removed
     """
-    if column not in df.columns:
+    if column not in data.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
 
-def calculate_summary_statistics(df):
+def remove_outliers_zscore(data, column, threshold=3):
     """
-    Calculate summary statistics for numeric columns in DataFrame.
+    Remove outliers using Z-score method.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        threshold: Z-score threshold (default 3)
     
     Returns:
-    pd.DataFrame: Summary statistics
+        DataFrame with outliers removed
     """
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    summary = df[numeric_cols].agg(['count', 'mean', 'std', 'min', 'max'])
-    return summary
-
-def clean_missing_values(df, strategy='mean'):
-    """
-    Handle missing values in numeric columns.
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    strategy (str): Strategy for handling missing values ('mean', 'median', 'drop')
+    z_scores = np.abs(stats.zscore(data[column].dropna()))
+    mask = z_scores < threshold
+    
+    return data[mask]
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
     
     Returns:
-    pd.DataFrame: DataFrame with handled missing values
+        Series with normalized values
     """
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if strategy == 'mean':
-        df_cleaned = df.copy()
-        for col in numeric_cols:
-            df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].mean())
-    elif strategy == 'median':
-        df_cleaned = df.copy()
-        for col in numeric_cols:
-            df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].median())
-    elif strategy == 'drop':
-        df_cleaned = df.dropna(subset=numeric_cols)
-    else:
-        raise ValueError("Strategy must be 'mean', 'median', or 'drop'")
+    min_val = data[column].min()
+    max_val = data[column].max()
     
-    return df_cleaned
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    return (data[column] - min_val) / (max_val - min_val)
 
-def normalize_data(df, columns=None):
+def normalize_zscore(data, column):
     """
-    Normalize specified columns using min-max scaling.
+    Normalize data using Z-score standardization.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    columns (list): List of column names to normalize
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
     
     Returns:
-    pd.DataFrame: DataFrame with normalized columns
+        Series with standardized values
     """
-    df_normalized = df.copy()
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
+    mean_val = data[column].mean()
+    std_val = data[column].std()
     
-    for col in columns:
-        if col in df.columns and np.issubdtype(df[col].dtype, np.number):
-            col_min = df[col].min()
-            col_max = df[col].max()
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    return (data[column] - mean_val) / std_val
+
+def clean_dataset(data, numeric_columns=None, outlier_method='iqr', normalize_method='minmax'):
+    """
+    Clean dataset by removing outliers and normalizing numeric columns.
+    
+    Args:
+        data: pandas DataFrame
+        numeric_columns: list of numeric column names (default: all numeric columns)
+        outlier_method: 'iqr' or 'zscore' (default: 'iqr')
+        normalize_method: 'minmax' or 'zscore' (default: 'minmax')
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column not in cleaned_data.columns:
+            continue
             
-            if col_max != col_min:
-                df_normalized[col] = (df[col] - col_min) / (col_max - col_min)
-            else:
-                df_normalized[col] = 0
+        if outlier_method == 'iqr':
+            cleaned_data = remove_outliers_iqr(cleaned_data, column)
+        elif outlier_method == 'zscore':
+            cleaned_data = remove_outliers_zscore(cleaned_data, column)
+        else:
+            raise ValueError(f"Unknown outlier method: {outlier_method}")
+        
+        if normalize_method == 'minmax':
+            cleaned_data[f"{column}_normalized"] = normalize_minmax(cleaned_data, column)
+        elif normalize_method == 'zscore':
+            cleaned_data[f"{column}_normalized"] = normalize_zscore(cleaned_data, column)
+        else:
+            raise ValueError(f"Unknown normalize method: {normalize_method}")
     
-    return df_normalized
+    return cleaned_data
 
-if __name__ == "__main__":
-    sample_data = {
-        'A': [1, 2, 3, 4, 5, 100],
-        'B': [10, 20, 30, 40, 50, 60],
-        'C': [100, 200, 300, 400, 500, 600]
-    }
+def validate_data(data, required_columns=None, check_missing=True, check_duplicates=True):
+    """
+    Validate dataset for common issues.
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print()
+    Args:
+        data: pandas DataFrame
+        required_columns: list of required column names
+        check_missing: check for missing values
+        check_duplicates: check for duplicate rows
     
-    cleaned_df = remove_outliers_iqr(df, 'A')
-    print("DataFrame after removing outliers from column 'A':")
-    print(cleaned_df)
-    print()
+    Returns:
+        Dictionary with validation results
+    """
+    validation_results = {}
     
-    stats = calculate_summary_statistics(df)
-    print("Summary statistics:")
-    print(stats)
-    print()
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in data.columns]
+        validation_results['missing_columns'] = missing_columns
     
-    normalized_df = normalize_data(df, ['A', 'B', 'C'])
-    print("Normalized DataFrame:")
-    print(normalized_df)
+    if check_missing:
+        missing_counts = data.isnull().sum()
+        missing_columns = missing_counts[missing_counts > 0].to_dict()
+        validation_results['missing_values'] = missing_columns
+    
+    if check_duplicates:
+        duplicate_count = data.duplicated().sum()
+        validation_results['duplicate_rows'] = duplicate_count
+    
+    validation_results['total_rows'] = len(data)
+    validation_results['total_columns'] = len(data.columns)
+    
+    return validation_results
