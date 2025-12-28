@@ -182,4 +182,77 @@ def validate_dataframe(df: pd.DataFrame, required_columns: List[str]) -> bool:
         print("DataFrame is empty")
         return False
     
-    return True
+    return Trueimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns):
+    """
+    Remove outliers using the Interquartile Range method.
+    Returns a cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    for col in columns:
+        if col in df_clean.columns:
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean.reset_index(drop=True)
+
+def normalize_minmax(df, columns):
+    """
+    Normalize specified columns using Min-Max scaling.
+    Returns DataFrame with normalized columns.
+    """
+    df_norm = df.copy()
+    for col in columns:
+        if col in df_norm.columns:
+            min_val = df_norm[col].min()
+            max_val = df_norm[col].max()
+            if max_val > min_val:
+                df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+    return df_norm
+
+def z_score_normalize(df, columns):
+    """
+    Normalize specified columns using Z-score normalization.
+    Returns DataFrame with normalized columns.
+    """
+    df_z = df.copy()
+    for col in columns:
+        if col in df_z.columns:
+            mean_val = df_z[col].mean()
+            std_val = df_z[col].std()
+            if std_val > 0:
+                df_z[col] = (df_z[col] - mean_val) / std_val
+    return df_z
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns.
+    Strategies: 'mean', 'median', 'mode', 'drop'
+    """
+    df_handled = df.copy()
+    if columns is None:
+        columns = df_handled.columns
+    
+    for col in columns:
+        if col in df_handled.columns:
+            if strategy == 'mean':
+                fill_value = df_handled[col].mean()
+            elif strategy == 'median':
+                fill_value = df_handled[col].median()
+            elif strategy == 'mode':
+                fill_value = df_handled[col].mode()[0] if not df_handled[col].mode().empty else 0
+            elif strategy == 'drop':
+                df_handled = df_handled.dropna(subset=[col])
+                continue
+            else:
+                raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+            
+            df_handled[col] = df_handled[col].fillna(fill_value)
+    
+    return df_handled.reset_index(drop=True)
