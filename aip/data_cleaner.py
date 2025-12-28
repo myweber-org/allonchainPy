@@ -737,3 +737,90 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_strategy='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_missing (bool): Whether to fill missing values.
+    fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', or 'zero').
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows.")
+    
+    if fill_missing:
+        for column in cleaned_df.select_dtypes(include=[np.number]).columns:
+            if cleaned_df[column].isnull().any():
+                if fill_strategy == 'mean':
+                    fill_value = cleaned_df[column].mean()
+                elif fill_strategy == 'median':
+                    fill_value = cleaned_df[column].median()
+                elif fill_strategy == 'mode':
+                    fill_value = cleaned_df[column].mode()[0]
+                elif fill_strategy == 'zero':
+                    fill_value = 0
+                else:
+                    raise ValueError("Invalid fill_strategy. Choose from 'mean', 'median', 'mode', or 'zero'.")
+                
+                cleaned_df[column].fillna(fill_value, inplace=True)
+                print(f"Filled missing values in column '{column}' using {fill_strategy} strategy.")
+    
+    return cleaned_df
+
+def validate_dataset(df, check_missing=True, check_duplicates=True):
+    """
+    Validate a pandas DataFrame by checking for missing values and duplicates.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to validate.
+    check_missing (bool): Whether to check for missing values.
+    check_duplicates (bool): Whether to check for duplicate rows.
+    
+    Returns:
+    dict: Dictionary containing validation results.
+    """
+    validation_results = {}
+    
+    if check_missing:
+        missing_counts = df.isnull().sum()
+        missing_columns = missing_counts[missing_counts > 0].to_dict()
+        validation_results['missing_values'] = missing_columns
+        validation_results['total_missing'] = missing_counts.sum()
+    
+    if check_duplicates:
+        duplicate_count = df.duplicated().sum()
+        validation_results['duplicate_rows'] = duplicate_count
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, 5, np.nan],
+        'B': [10, 20, 20, 40, 50, 60],
+        'C': [100, 200, 200, np.nan, 500, 600]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nValidation Results:")
+    print(validate_dataset(df))
+    
+    cleaned = clean_dataset(df, fill_strategy='median')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    print("\nValidation Results after cleaning:")
+    print(validate_dataset(cleaned))
