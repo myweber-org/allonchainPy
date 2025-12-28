@@ -117,4 +117,128 @@ if __name__ == "__main__":
     print("Cleaned data shape:", cleaned.shape)
     
     stats = calculate_statistics(cleaned[:, 0])
-    print("Statistics for first column:", stats)
+    print("Statistics for first column:", stats)import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    if subset:
+        return df.drop_duplicates(subset=subset, keep='first')
+    else:
+        return df.drop_duplicates(keep='first')
+
+def convert_column_types(df, column_type_map):
+    """
+    Convert specified columns to given data types.
+    """
+    for column, dtype in column_type_map.items():
+        if column in df.columns:
+            df[column] = df[column].astype(dtype)
+    return df
+
+def handle_missing_values(df, strategy='drop', fill_value=None):
+    """
+    Handle missing values in DataFrame.
+    """
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill':
+        if fill_value is not None:
+            return df.fillna(fill_value)
+        else:
+            return df.fillna(df.mean())
+    else:
+        return df
+
+def normalize_column(df, column):
+    """
+    Normalize a column to range [0, 1].
+    """
+    if column in df.columns:
+        col_min = df[column].min()
+        col_max = df[column].max()
+        if col_max != col_min:
+            df[column] = (df[column] - col_min) / (col_max - col_min)
+    return df
+
+def clean_dataframe(df, operations):
+    """
+    Apply multiple cleaning operations to DataFrame.
+    """
+    for operation in operations:
+        if operation['type'] == 'remove_duplicates':
+            df = remove_duplicates(df, operation.get('subset'))
+        elif operation['type'] == 'convert_types':
+            df = convert_column_types(df, operation['column_type_map'])
+        elif operation['type'] == 'handle_missing':
+            df = handle_missing_values(df, 
+                                      operation.get('strategy', 'drop'),
+                                      operation.get('fill_value'))
+        elif operation['type'] == 'normalize':
+            df = normalize_column(df, operation['column'])
+    return df
+
+def validate_dataframe(df, rules):
+    """
+    Validate DataFrame against given rules.
+    """
+    violations = []
+    for rule in rules:
+        column = rule['column']
+        rule_type = rule['type']
+        
+        if column not in df.columns:
+            violations.append(f"Column '{column}' not found")
+            continue
+            
+        if rule_type == 'not_null':
+            null_count = df[column].isnull().sum()
+            if null_count > 0:
+                violations.append(f"Column '{column}' has {null_count} null values")
+                
+        elif rule_type == 'unique':
+            duplicate_count = df[column].duplicated().sum()
+            if duplicate_count > 0:
+                violations.append(f"Column '{column}' has {duplicate_count} duplicate values")
+                
+        elif rule_type == 'range':
+            min_val = rule.get('min')
+            max_val = rule.get('max')
+            if min_val is not None:
+                below_min = (df[column] < min_val).sum()
+                if below_min > 0:
+                    violations.append(f"Column '{column}' has {below_min} values below {min_val}")
+            if max_val is not None:
+                above_max = (df[column] > max_val).sum()
+                if above_max > 0:
+                    violations.append(f"Column '{column}' has {above_max} values above {max_val}")
+    
+    return violations
+
+def get_dataframe_stats(df):
+    """
+    Get basic statistics of DataFrame.
+    """
+    stats = {
+        'shape': df.shape,
+        'columns': list(df.columns),
+        'dtypes': df.dtypes.to_dict(),
+        'missing_values': df.isnull().sum().to_dict(),
+        'unique_counts': {col: df[col].nunique() for col in df.columns}
+    }
+    return stats
+
+def save_cleaned_data(df, filepath, format='csv'):
+    """
+    Save cleaned DataFrame to file.
+    """
+    if format == 'csv':
+        df.to_csv(filepath, index=False)
+    elif format == 'excel':
+        df.to_excel(filepath, index=False)
+    elif format == 'json':
+        df.to_json(filepath, orient='records')
+    else:
+        raise ValueError(f"Unsupported format: {format}")
