@@ -1,30 +1,43 @@
 import requests
 import sys
+from datetime import datetime, timedelta
 
-def fetch_issues(owner, repo, count=5):
+def fetch_recent_issues(owner, repo, days=7):
+    """
+    Fetch open issues created in the last N days from a GitHub repository.
+    """
     url = f"https://api.github.com/repos/{owner}/{repo}/issues"
-    params = {'state': 'open', 'per_page': count}
+    since_date = (datetime.now() - timedelta(days=days)).isoformat()
+    params = {
+        'state': 'open',
+        'since': since_date,
+        'per_page': 50
+    }
     headers = {'Accept': 'application/vnd.github.v3+json'}
 
     try:
         response = requests.get(url, params=params, headers=headers)
         response.raise_for_status()
         issues = response.json()
-        return issues
+        return [issue for issue in issues if 'pull_request' not in issue]
     except requests.exceptions.RequestException as e:
         print(f"Error fetching issues: {e}", file=sys.stderr)
         return []
 
 def display_issues(issues):
+    """
+    Display issue details in a simple formatted way.
+    """
     if not issues:
-        print("No issues found.")
+        print("No recent open issues found.")
         return
 
-    for issue in issues:
-        print(f"#{issue['number']}: {issue['title']}")
-        print(f"    State: {issue['state']}")
-        print(f"    Created: {issue['created_at']}")
-        print(f"    URL: {issue['html_url']}")
+    print(f"Found {len(issues)} recent open issue(s):\n")
+    for idx, issue in enumerate(issues, 1):
+        print(f"{idx}. #{issue['number']}: {issue['title']}")
+        print(f"   Created: {issue['created_at']}")
+        print(f"   URL: {issue['html_url']}")
+        print(f"   Author: {issue['user']['login']}")
         print()
 
 if __name__ == "__main__":
@@ -34,8 +47,5 @@ if __name__ == "__main__":
 
     owner = sys.argv[1]
     repo = sys.argv[2]
-    issues = fetch_issues(owner, repo)
-
-    if issues:
-        print(f"Recent open issues for {owner}/{repo}:\n")
-        display_issues(issues)
+    issues = fetch_recent_issues(owner, repo)
+    display_issues(issues)
