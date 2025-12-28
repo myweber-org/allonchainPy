@@ -111,4 +111,37 @@ def clean_dataframe(df: pd.DataFrame,
             if col in cleaned_df.columns:
                 cleaned_df = normalize_column(cleaned_df, col)
     
-    return cleaned_df
+    return cleaned_dfimport pandas as pd
+import numpy as np
+
+def load_data(filepath):
+    """Load data from a CSV file."""
+    return pd.read_csv(filepath)
+
+def remove_outliers(df, column, threshold=3):
+    """Remove outliers using the Z-score method."""
+    mean = df[column].mean()
+    std = df[column].std()
+    z_scores = np.abs((df[column] - mean) / std)
+    return df[z_scores < threshold]
+
+def normalize_column(df, column):
+    """Normalize a column using min-max scaling."""
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def clean_data(df, numeric_columns):
+    """Main cleaning function."""
+    for col in numeric_columns:
+        df = remove_outliers(df, col)
+        df = normalize_column(df, col)
+    return df.dropna()
+
+if __name__ == "__main__":
+    data = load_data("raw_data.csv")
+    numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
+    cleaned_data = clean_data(data, numeric_cols)
+    cleaned_data.to_csv("cleaned_data.csv", index=False)
+    print(f"Data cleaned. Original rows: {len(data)}, Cleaned rows: {len(cleaned_data)}")
