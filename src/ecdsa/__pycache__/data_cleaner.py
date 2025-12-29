@@ -1,56 +1,106 @@
-import pandas as pd
+
 import numpy as np
-import sys
+import pandas as pd
+from scipy import stats
 
-def clean_data(input_file, output_file):
+def remove_outliers_iqr(data, column, threshold=1.5):
     """
-    Read a CSV file, perform basic cleaning operations,
-    and save the cleaned data to a new CSV file.
+    Remove outliers using IQR method
     """
-    try:
-        df = pd.read_csv(input_file)
-        print(f"Original data shape: {df.shape}")
-        
-        # Remove duplicate rows
-        df = df.drop_duplicates()
-        print(f"After removing duplicates: {df.shape}")
-        
-        # Fill missing numeric values with column median
-        numeric_cols = df.select_dtypes(include=[np.number]).columns
-        for col in numeric_cols:
-            if df[col].isnull().sum() > 0:
-                df[col] = df[col].fillna(df[col].median())
-        
-        # Fill missing categorical values with mode
-        categorical_cols = df.select_dtypes(include=['object']).columns
-        for col in categorical_cols:
-            if df[col].isnull().sum() > 0:
-                df[col] = df[col].fillna(df[col].mode()[0])
-        
-        # Remove columns with more than 50% missing values
-        threshold = len(df) * 0.5
-        df = df.dropna(thresh=threshold, axis=1)
-        print(f"After removing high-missing columns: {df.shape}")
-        
-        # Save cleaned data
-        df.to_csv(output_file, index=False)
-        print(f"Cleaned data saved to: {output_file}")
-        return True
-        
-    except FileNotFoundError:
-        print(f"Error: Input file '{input_file}' not found.")
-        return False
-    except Exception as e:
-        print(f"Error during data cleaning: {str(e)}")
-        return False
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data.copy()
 
-if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python data_cleaner.py <input_file.csv> <output_file.csv>")
-        sys.exit(1)
+def normalize_minmax(data, columns=None):
+    """
+    Normalize data using min-max scaling
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
     
-    input_file = sys.argv[1]
-    output_file = sys.argv[2]
+    normalized_data = data.copy()
+    for col in columns:
+        if col in data.columns and np.issubdtype(data[col].dtype, np.number):
+            col_min = data[col].min()
+            col_max = data[col].max()
+            if col_max != col_min:
+                normalized_data[col] = (data[col] - col_min) / (col_max - col_min)
     
-    success = clean_data(input_file, output_file)
-    sys.exit(0 if success else 1)
+    return normalized_data
+
+def standardize_zscore(data, columns=None):
+    """
+    Standardize data using z-score normalization
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    standardized_data = data.copy()
+    for col in columns:
+        if col in data.columns and np.issubdtype(data[col].dtype, np.number):
+            col_mean = data[col].mean()
+            col_std = data[col].std()
+            if col_std > 0:
+                standardized_data[col] = (data[col] - col_mean) / col_std
+    
+    return standardized_data
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values using specified strategy
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    cleaned_data = data.copy()
+    
+    for col in columns:
+        if col in data.columns and data[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = data[col].mean()
+            elif strategy == 'median':
+                fill_value = data[col].median()
+            elif strategy == 'mode':
+                fill_value = data[col].mode()[0]
+            elif strategy == 'drop':
+                cleaned_data = cleaned_data.dropna(subset=[col])
+                continue
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            cleaned_data[col] = cleaned_data[col].fillna(fill_value)
+    
+    return cleaned_data
+
+def clean_dataset(data, outlier_columns=None, normalize=True, standardize=False, missing_strategy='mean'):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    cleaned_data = data.copy()
+    
+    # Handle missing values
+    cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy)
+    
+    # Remove outliers if specified
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in cleaned_data.columns:
+                cleaned_data = remove_outliers_iqr(cleaned_data, col)
+    
+    # Apply normalization if requested
+    if normalize:
+        cleaned_data = normalize_minmax(cleaned_data)
+    
+    # Apply standardization if requested
+    if standardize:
+        cleaned_data = standardize_zscore(cleaned_data)
+    
+    return cleaned_data
