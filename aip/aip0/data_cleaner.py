@@ -631,3 +631,103 @@ def remove_duplicates_preserve_order(input_list):
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def clean_numeric_data(df, columns=None):
+    """
+    Clean numeric data by removing outliers from specified columns.
+    If no columns specified, clean all numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    cleaned_df = df.copy()
+    
+    for col in columns:
+        if col in cleaned_df.columns:
+            try:
+                cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            except Exception as e:
+                print(f"Warning: Could not clean column '{col}': {e}")
+    
+    return cleaned_df
+
+def get_data_summary(df):
+    """
+    Generate summary statistics for a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
+    summary = {
+        'original_rows': len(df),
+        'cleaned_rows': None,
+        'removed_rows': None,
+        'columns': list(df.columns),
+        'dtypes': df.dtypes.to_dict(),
+        'missing_values': df.isnull().sum().to_dict()
+    }
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) > 0:
+        summary['numeric_stats'] = df[numeric_cols].describe().to_dict()
+    
+    return summary
+
+def process_dataframe(df, clean_columns=None):
+    """
+    Main function to process and clean a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    clean_columns (list): List of columns to clean
+    
+    Returns:
+    tuple: (cleaned_df, summary_dict)
+    """
+    original_summary = get_data_summary(df)
+    
+    cleaned_df = clean_numeric_data(df, clean_columns)
+    
+    final_summary = get_data_summary(cleaned_df)
+    final_summary['original_rows'] = original_summary['original_rows']
+    final_summary['removed_rows'] = original_summary['original_rows'] - final_summary['cleaned_rows']
+    
+    return cleaned_df, final_summary
