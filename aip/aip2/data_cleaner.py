@@ -556,4 +556,79 @@ if __name__ == "__main__":
     
     print("\nCleaned DataFrame shape:", cleaned_df.shape)
     print("\nCleaned statistics for column 'A':")
-    print(calculate_basic_stats(cleaned_df, 'A'))
+    print(calculate_basic_stats(cleaned_df, 'A'))import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_and_clean_data(filepath):
+    """
+    Load a CSV file and perform basic data cleaning operations.
+    """
+    try:
+        df = pd.read_csv(filepath)
+        print(f"Data loaded successfully. Shape: {df.shape}")
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+    except Exception as e:
+        print(f"Error loading file: {e}")
+        return None
+
+    # Remove duplicate rows
+    initial_count = len(df)
+    df.drop_duplicates(inplace=True)
+    removed_duplicates = initial_count - len(df)
+    if removed_duplicates > 0:
+        print(f"Removed {removed_duplicates} duplicate rows.")
+
+    # Handle missing values: drop rows where all values are NaN
+    df.dropna(how='all', inplace=True)
+    # For numeric columns, fill remaining NaNs with column median
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if df[col].isnull().sum() > 0:
+            df[col].fillna(df[col].median(), inplace=True)
+
+    # Remove outliers using Z-score for numeric columns
+    # Consider values with |Z| > 3 as outliers
+    z_scores = np.abs(stats.zscore(df[numeric_cols], nan_policy='omit'))
+    outlier_mask = (z_scores < 3).all(axis=1)
+    df = df[outlier_mask]
+    removed_outliers = len(z_scores) - len(df)
+    if removed_outliers > 0:
+        print(f"Removed {removed_outliers} rows based on outlier detection (|Z| > 3).")
+
+    # Normalize numeric columns to range [0, 1]
+    for col in numeric_cols:
+        if df[col].nunique() > 1:  # Avoid normalizing constant columns
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val != min_val:
+                df[col] = (df[col] - min_val) / (max_val - min_val)
+            else:
+                df[col] = 0.5  # Assign a middle value if all values are identical
+
+    print(f"Final data shape: {df.shape}")
+    return df
+
+def save_cleaned_data(df, output_path):
+    """
+    Save the cleaned DataFrame to a CSV file.
+    """
+    if df is not None:
+        try:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to {output_path}")
+        except Exception as e:
+            print(f"Error saving file: {e}")
+    else:
+        print("No data to save.")
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+
+    cleaned_df = load_and_clean_data(input_file)
+    if cleaned_df is not None:
+        save_cleaned_data(cleaned_df, output_file)
