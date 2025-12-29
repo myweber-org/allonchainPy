@@ -339,4 +339,98 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid = validate_dataframe(cleaned, required_columns=['A', 'B'])
-    print(f"\nDataFrame validation: {is_valid}")
+    print(f"\nDataFrame validation: {is_valid}")import numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, threshold=1.5):
+    """
+    Detect outliers using the Interquartile Range method.
+    Returns boolean mask where True indicates an outlier.
+    """
+    q1 = np.percentile(data, 25)
+    q3 = np.percentile(data, 75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    return (data < lower_bound) | (data > upper_bound)
+
+def remove_outliers(df, columns, method='iqr', **kwargs):
+    """
+    Remove outliers from specified columns in DataFrame.
+    Supports 'iqr' and 'zscore' methods.
+    """
+    df_clean = df.copy()
+    
+    for col in columns:
+        if method == 'iqr':
+            outliers = detect_outliers_iqr(df[col], **kwargs)
+        elif method == 'zscore':
+            z_scores = np.abs(stats.zscore(df[col].dropna()))
+            outliers = z_scores > kwargs.get('threshold', 3)
+        else:
+            raise ValueError(f"Unsupported method: {method}")
+        
+        df_clean = df_clean[~outliers]
+    
+    return df_clean.reset_index(drop=True)
+
+def normalize_data(df, columns, method='minmax'):
+    """
+    Normalize specified columns using different methods.
+    Supports 'minmax' and 'standard' normalization.
+    """
+    df_norm = df.copy()
+    
+    for col in columns:
+        if method == 'minmax':
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val > min_val:
+                df_norm[col] = (df[col] - min_val) / (max_val - min_val)
+        elif method == 'standard':
+            mean_val = df[col].mean()
+            std_val = df[col].std()
+            if std_val > 0:
+                df_norm[col] = (df[col] - mean_val) / std_val
+        else:
+            raise ValueError(f"Unsupported method: {method}")
+    
+    return df_norm
+
+def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize_method=None):
+    """
+    Complete data cleaning pipeline: remove outliers and optionally normalize.
+    """
+    # Remove outliers
+    df_clean = remove_outliers(df, numeric_columns, method=outlier_method)
+    
+    # Normalize if requested
+    if normalize_method:
+        df_clean = normalize_data(df_clean, numeric_columns, method=normalize_method)
+    
+    return df_clean
+
+def validate_data(df, required_columns, allow_nan_ratio=0.1):
+    """
+    Validate dataset structure and data quality.
+    """
+    validation_results = {
+        'missing_columns': [],
+        'high_nan_columns': [],
+        'is_valid': True
+    }
+    
+    # Check for required columns
+    for col in required_columns:
+        if col not in df.columns:
+            validation_results['missing_columns'].append(col)
+            validation_results['is_valid'] = False
+    
+    # Check for excessive NaN values
+    for col in df.columns:
+        nan_ratio = df[col].isna().mean()
+        if nan_ratio > allow_nan_ratio:
+            validation_results['high_nan_columns'].append((col, nan_ratio))
+    
+    return validation_results
