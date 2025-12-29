@@ -453,4 +453,164 @@ def process_dataset(filepath, outlier_threshold=1.5):
         
     except Exception as e:
         print(f"Error processing dataset: {e}")
-        return None, None
+        return None, Noneimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns=None, factor=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    columns (list): List of column names to process, None for all numeric columns
+    factor (float): Multiplier for IQR
+    
+    Returns:
+    pd.DataFrame: Dataframe with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    for col in columns:
+        Q1 = df_clean[col].quantile(0.25)
+        Q3 = df_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - factor * IQR
+        upper_bound = Q3 + factor * IQR
+        
+        mask = (df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)
+        df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def normalize_minmax(df, columns=None, feature_range=(0, 1)):
+    """
+    Normalize data using min-max scaling.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    columns (list): List of column names to normalize, None for all numeric columns
+    feature_range (tuple): Desired range of transformed data
+    
+    Returns:
+    pd.DataFrame: Dataframe with normalized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_norm = df.copy()
+    min_val, max_val = feature_range
+    
+    for col in columns:
+        col_min = df_norm[col].min()
+        col_max = df_norm[col].max()
+        
+        if col_max - col_min == 0:
+            df_norm[col] = min_val
+        else:
+            df_norm[col] = (df_norm[col] - col_min) / (col_max - col_min)
+            df_norm[col] = df_norm[col] * (max_val - min_val) + min_val
+    
+    return df_norm
+
+def zscore_normalize(df, columns=None, threshold=3):
+    """
+    Normalize data using z-score and optionally cap extreme values.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    columns (list): List of column names to normalize
+    threshold (float): Z-score threshold for capping
+    
+    Returns:
+    pd.DataFrame: Dataframe with z-score normalized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_z = df.copy()
+    
+    for col in columns:
+        mean_val = df_z[col].mean()
+        std_val = df_z[col].std()
+        
+        if std_val == 0:
+            df_z[col] = 0
+        else:
+            z_scores = (df_z[col] - mean_val) / std_val
+            df_z[col] = np.clip(z_scores, -threshold, threshold)
+    
+    return df_z
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in dataframe.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    strategy (str): Imputation strategy ('mean', 'median', 'mode', 'constant')
+    columns (list): List of column names to process
+    
+    Returns:
+    pd.DataFrame: Dataframe with imputed values
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_imputed = df.copy()
+    
+    for col in columns:
+        if df_imputed[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df_imputed[col].mean()
+            elif strategy == 'median':
+                fill_value = df_imputed[col].median()
+            elif strategy == 'mode':
+                fill_value = df_imputed[col].mode()[0]
+            elif strategy == 'constant':
+                fill_value = 0
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            df_imputed[col] = df_imputed[col].fillna(fill_value)
+    
+    return df_imputed
+
+def create_sample_data():
+    """Create sample dataframe for testing."""
+    np.random.seed(42)
+    data = {
+        'feature1': np.random.normal(100, 15, 100),
+        'feature2': np.random.exponential(50, 100),
+        'feature3': np.random.uniform(0, 1, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    df.loc[np.random.choice(100, 5), 'feature1'] = np.nan
+    df.loc[np.random.choice(100, 3), 'feature2'] = np.nan
+    
+    df.loc[10, 'feature1'] = 500
+    df.loc[20, 'feature2'] = 300
+    
+    return df
+
+if __name__ == "__main__":
+    df = create_sample_data()
+    print("Original data shape:", df.shape)
+    print("\nMissing values per column:")
+    print(df.isnull().sum())
+    
+    df_clean = remove_outliers_iqr(df, ['feature1', 'feature2'])
+    print("\nAfter outlier removal shape:", df_clean.shape)
+    
+    df_imputed = handle_missing_values(df_clean, strategy='mean')
+    print("\nAfter imputation missing values:")
+    print(df_imputed.isnull().sum())
+    
+    df_normalized = normalize_minmax(df_imputed, ['feature1', 'feature2', 'feature3'])
+    print("\nNormalized data sample:")
+    print(df_normalized[['feature1', 'feature2', 'feature3']].head())
