@@ -1,56 +1,74 @@
-
 import pandas as pd
 import numpy as np
-from scipy import stats
-
-def load_data(filepath):
-    return pd.read_csv(filepath)
 
 def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
     Q1 = df[column].quantile(0.25)
     Q3 = df[column].quantile(0.75)
     IQR = Q3 - Q1
+    
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-
-def remove_outliers_zscore(df, column, threshold=3):
-    z_scores = np.abs(stats.zscore(df[column]))
-    return df[z_scores < threshold]
-
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
-    return df
-
-def normalize_zscore(df, column):
-    mean_val = df[column].mean()
-    std_val = df[column].std()
-    df[column + '_standardized'] = (df[column] - mean_val) / std_val
-    return df
-
-def clean_dataset(input_file, output_file, outlier_method='iqr', normalize_method='minmax'):
-    df = load_data(input_file)
     
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
+
+def calculate_summary_statistics(df):
+    """
+    Calculate summary statistics for numeric columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+        pd.DataFrame: Summary statistics
+    """
     numeric_cols = df.select_dtypes(include=[np.number]).columns
     
-    for col in numeric_cols:
-        if outlier_method == 'iqr':
-            df = remove_outliers_iqr(df, col)
-        elif outlier_method == 'zscore':
-            df = remove_outliers_zscore(df, col)
+    if len(numeric_cols) == 0:
+        return pd.DataFrame()
     
-    for col in numeric_cols:
-        if col in df.columns:
-            if normalize_method == 'minmax':
-                df = normalize_minmax(df, col)
-            elif normalize_method == 'zscore':
-                df = normalize_zscore(df, col)
+    stats = df[numeric_cols].agg(['mean', 'median', 'std', 'min', 'max'])
+    return stats.T
+
+def main():
+    # Example usage
+    np.random.seed(42)
+    sample_data = {
+        'id': range(100),
+        'value': np.random.normal(100, 15, 100)
+    }
     
-    df.to_csv(output_file, index=False)
-    print(f"Cleaned data saved to {output_file}")
-    print(f"Original shape: {load_data(input_file).shape}, Cleaned shape: {df.shape}")
+    # Add some outliers
+    sample_data['value'][95] = 500
+    sample_data['value'][96] = -200
+    
+    df = pd.DataFrame(sample_data)
+    
+    print("Original DataFrame shape:", df.shape)
+    print("\nOriginal summary statistics:")
+    print(calculate_summary_statistics(df))
+    
+    cleaned_df = remove_outliers_iqr(df, 'value')
+    
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("\nCleaned summary statistics:")
+    print(calculate_summary_statistics(cleaned_df))
+    
+    return cleaned_df
 
 if __name__ == "__main__":
-    clean_dataset('raw_data.csv', 'cleaned_data.csv')
+    cleaned_data = main()
