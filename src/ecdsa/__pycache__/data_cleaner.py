@@ -1,106 +1,72 @@
-
-import numpy as np
 import pandas as pd
-from scipy import stats
 
-def remove_outliers_iqr(data, column, threshold=1.5):
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     """
-    Remove outliers using IQR method
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+        fill_missing (str): Strategy to fill missing values. 
+                           Options: 'mean', 'median', 'mode', or 'drop'. Default is 'mean'.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
     """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    cleaned_df = df.copy()
     
-    q1 = data[column].quantile(0.25)
-    q3 = data[column].quantile(0.75)
-    iqr = q3 - q1
-    lower_bound = q1 - threshold * iqr
-    upper_bound = q3 + threshold * iqr
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
     
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data.copy()
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif fill_missing in ['mean', 'median', 'mode']:
+        for column in cleaned_df.select_dtypes(include=['number']).columns:
+            if cleaned_df[column].isnull().any():
+                if fill_missing == 'mean':
+                    cleaned_df[column].fillna(cleaned_df[column].mean(), inplace=True)
+                elif fill_missing == 'median':
+                    cleaned_df[column].fillna(cleaned_df[column].median(), inplace=True)
+                elif fill_missing == 'mode':
+                    cleaned_df[column].fillna(cleaned_df[column].mode()[0], inplace=True)
+    
+    return cleaned_df
 
-def normalize_minmax(data, columns=None):
+def validate_dataframe(df):
     """
-    Normalize data using min-max scaling
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+    
+    Returns:
+        dict: Dictionary with validation results.
     """
-    if columns is None:
-        columns = data.select_dtypes(include=[np.number]).columns
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().to_dict(),
+        'duplicate_rows': df.duplicated().sum(),
+        'data_types': df.dtypes.to_dict()
+    }
     
-    normalized_data = data.copy()
-    for col in columns:
-        if col in data.columns and np.issubdtype(data[col].dtype, np.number):
-            col_min = data[col].min()
-            col_max = data[col].max()
-            if col_max != col_min:
-                normalized_data[col] = (data[col] - col_min) / (col_max - col_min)
-    
-    return normalized_data
+    return validation_results
 
-def standardize_zscore(data, columns=None):
-    """
-    Standardize data using z-score normalization
-    """
-    if columns is None:
-        columns = data.select_dtypes(include=[np.number]).columns
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, None, 6],
+        'B': [10, None, 30, 40, 50, 60],
+        'C': ['x', 'y', 'y', 'z', 'z', None]
+    }
     
-    standardized_data = data.copy()
-    for col in columns:
-        if col in data.columns and np.issubdtype(data[col].dtype, np.number):
-            col_mean = data[col].mean()
-            col_std = data[col].std()
-            if col_std > 0:
-                standardized_data[col] = (data[col] - col_mean) / col_std
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nValidation Results:")
+    print(validate_dataframe(df))
     
-    return standardized_data
-
-def handle_missing_values(data, strategy='mean', columns=None):
-    """
-    Handle missing values using specified strategy
-    """
-    if columns is None:
-        columns = data.select_dtypes(include=[np.number]).columns
-    
-    cleaned_data = data.copy()
-    
-    for col in columns:
-        if col in data.columns and data[col].isnull().any():
-            if strategy == 'mean':
-                fill_value = data[col].mean()
-            elif strategy == 'median':
-                fill_value = data[col].median()
-            elif strategy == 'mode':
-                fill_value = data[col].mode()[0]
-            elif strategy == 'drop':
-                cleaned_data = cleaned_data.dropna(subset=[col])
-                continue
-            else:
-                raise ValueError(f"Unknown strategy: {strategy}")
-            
-            cleaned_data[col] = cleaned_data[col].fillna(fill_value)
-    
-    return cleaned_data
-
-def clean_dataset(data, outlier_columns=None, normalize=True, standardize=False, missing_strategy='mean'):
-    """
-    Comprehensive data cleaning pipeline
-    """
-    cleaned_data = data.copy()
-    
-    # Handle missing values
-    cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy)
-    
-    # Remove outliers if specified
-    if outlier_columns:
-        for col in outlier_columns:
-            if col in cleaned_data.columns:
-                cleaned_data = remove_outliers_iqr(cleaned_data, col)
-    
-    # Apply normalization if requested
-    if normalize:
-        cleaned_data = normalize_minmax(cleaned_data)
-    
-    # Apply standardization if requested
-    if standardize:
-        cleaned_data = standardize_zscore(cleaned_data)
-    
-    return cleaned_data
+    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    print("\nCleaned Validation Results:")
+    print(validate_dataframe(cleaned))
