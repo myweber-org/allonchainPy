@@ -1,74 +1,56 @@
 import pandas as pd
 import numpy as np
+import sys
 
-def remove_outliers_iqr(df, column):
+def clean_data(input_file, output_file):
     """
-    Remove outliers from a DataFrame column using the IQR method.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to process
-    
-    Returns:
-        pd.DataFrame: DataFrame with outliers removed
+    Read a CSV file, perform basic cleaning operations,
+    and save the cleaned data to a new CSV file.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
-
-def calculate_summary_statistics(df):
-    """
-    Calculate summary statistics for numeric columns.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-    
-    Returns:
-        pd.DataFrame: Summary statistics
-    """
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    
-    if len(numeric_cols) == 0:
-        return pd.DataFrame()
-    
-    stats = df[numeric_cols].agg(['mean', 'median', 'std', 'min', 'max'])
-    return stats.T
-
-def main():
-    # Example usage
-    np.random.seed(42)
-    sample_data = {
-        'id': range(100),
-        'value': np.random.normal(100, 15, 100)
-    }
-    
-    # Add some outliers
-    sample_data['value'][95] = 500
-    sample_data['value'][96] = -200
-    
-    df = pd.DataFrame(sample_data)
-    
-    print("Original DataFrame shape:", df.shape)
-    print("\nOriginal summary statistics:")
-    print(calculate_summary_statistics(df))
-    
-    cleaned_df = remove_outliers_iqr(df, 'value')
-    
-    print("\nCleaned DataFrame shape:", cleaned_df.shape)
-    print("\nCleaned summary statistics:")
-    print(calculate_summary_statistics(cleaned_df))
-    
-    return cleaned_df
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original data shape: {df.shape}")
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        print(f"After removing duplicates: {df.shape}")
+        
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df[col].isnull().sum() > 0:
+                df[col] = df[col].fillna(df[col].median())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if df[col].isnull().sum() > 0:
+                df[col] = df[col].fillna(df[col].mode()[0])
+        
+        # Remove columns with more than 50% missing values
+        threshold = len(df) * 0.5
+        df = df.dropna(thresh=threshold, axis=1)
+        print(f"After removing high-missing columns: {df.shape}")
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to: {output_file}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return False
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return False
 
 if __name__ == "__main__":
-    cleaned_data = main()
+    if len(sys.argv) != 3:
+        print("Usage: python data_cleaner.py <input_file.csv> <output_file.csv>")
+        sys.exit(1)
+    
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    
+    success = clean_data(input_file, output_file)
+    sys.exit(0 if success else 1)
