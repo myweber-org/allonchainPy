@@ -167,3 +167,116 @@ def clean_dataset(file_path):
 if __name__ == "__main__":
     cleaned_df = clean_dataset('data.csv')
     cleaned_df.to_csv('cleaned_data.csv', index=False)
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, threshold=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using Z-score normalization.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(df, numeric_columns, outlier_threshold=1.5, normalize=True, standardize=False):
+    """
+    Comprehensive data cleaning pipeline.
+    """
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col not in cleaned_df.columns:
+            continue
+            
+        cleaned_df = remove_outliers_iqr(cleaned_df, col, outlier_threshold)
+        
+        if normalize:
+            cleaned_df[f'{col}_normalized'] = normalize_minmax(cleaned_df, col)
+        
+        if standardize:
+            cleaned_df[f'{col}_standardized'] = standardize_zscore(cleaned_df, col)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns, min_rows=10):
+    """
+    Validate dataset structure and content.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    if len(df) < min_rows:
+        raise ValueError(f"Dataset has only {len(df)} rows, minimum required is {min_rows}")
+    
+    if df.isnull().sum().sum() > 0:
+        print("Warning: Dataset contains missing values")
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature1': np.random.normal(100, 15, 1000),
+        'feature2': np.random.exponential(50, 1000),
+        'feature3': np.random.uniform(0, 1, 1000)
+    })
+    
+    print("Original dataset shape:", sample_data.shape)
+    
+    numeric_cols = ['feature1', 'feature2', 'feature3']
+    
+    try:
+        validate_data(sample_data, numeric_cols)
+        cleaned_data = clean_dataset(
+            sample_data, 
+            numeric_cols, 
+            outlier_threshold=1.5,
+            normalize=True,
+            standardize=True
+        )
+        print("Cleaned dataset shape:", cleaned_data.shape)
+        print("Cleaning completed successfully")
+    except ValueError as e:
+        print(f"Data validation failed: {e}")
