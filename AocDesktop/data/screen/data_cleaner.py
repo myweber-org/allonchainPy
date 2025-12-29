@@ -495,3 +495,125 @@ def load_and_clean_csv(filepath: str,
         cleaner.remove_outliers_iqr()
         
     return cleaner.get_cleaned_data()
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, fill_method='mean', output_path=None):
+    """
+    Load and clean CSV data by handling missing values.
+    
+    Parameters:
+    file_path (str): Path to input CSV file
+    fill_method (str): Method for filling missing values ('mean', 'median', 'mode', 'zero')
+    output_path (str): Optional path for cleaned CSV output
+    
+    Returns:
+    pandas.DataFrame: Cleaned dataframe
+    """
+    
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Loaded data with shape: {df.shape}")
+        
+        missing_count = df.isnull().sum().sum()
+        if missing_count > 0:
+            print(f"Found {missing_count} missing values")
+            
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            
+            if fill_method == 'mean':
+                df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+            elif fill_method == 'median':
+                df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+            elif fill_method == 'mode':
+                df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mode().iloc[0])
+            elif fill_method == 'zero':
+                df[numeric_cols] = df[numeric_cols].fillna(0)
+            else:
+                raise ValueError(f"Unknown fill method: {fill_method}")
+            
+            print(f"Missing values filled using {fill_method} method")
+        
+        if output_path:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def detect_outliers_iqr(df, column, threshold=1.5):
+    """
+    Detect outliers using IQR method.
+    
+    Parameters:
+    df (pandas.DataFrame): Input dataframe
+    column (str): Column name to check for outliers
+    threshold (float): IQR multiplier threshold
+    
+    Returns:
+    list: Indices of outlier rows
+    """
+    if column not in df.columns:
+        print(f"Column {column} not found in dataframe")
+        return []
+    
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        print(f"Column {column} is not numeric")
+        return []
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)].index.tolist()
+    
+    return outliers
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from dataframe.
+    
+    Parameters:
+    df (pandas.DataFrame): Input dataframe
+    subset (list): Columns to consider for duplicates
+    keep (str): Which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+    pandas.DataFrame: Dataframe with duplicates removed
+    """
+    initial_rows = len(df)
+    df_clean = df.drop_duplicates(subset=subset, keep=keep)
+    removed = initial_rows - len(df_clean)
+    
+    if removed > 0:
+        print(f"Removed {removed} duplicate rows")
+    
+    return df_clean
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 3, 4, 5, 6],
+        'value': [10.5, None, 15.2, 12.8, None, 18.9],
+        'category': ['A', 'B', 'A', 'C', 'B', 'A']
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('test_data.csv', fill_method='mean', output_path='cleaned_data.csv')
+    
+    if cleaned_df is not None:
+        outliers = detect_outliers_iqr(cleaned_df, 'value')
+        print(f"Outlier indices: {outliers}")
+        
+        final_df = remove_duplicates(cleaned_df)
+        print(f"Final dataframe shape: {final_df.shape}")
