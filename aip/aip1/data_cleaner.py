@@ -1,73 +1,57 @@
-
 import pandas as pd
-import numpy as np
-from scipy import stats
 
-def remove_outliers_iqr(dataframe, columns):
-    cleaned_df = dataframe.copy()
-    for col in columns:
-        if col in cleaned_df.columns:
-            Q1 = cleaned_df[col].quantile(0.25)
-            Q3 = cleaned_df[col].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - 1.5 * IQR
-            upper_bound = Q3 + 1.5 * IQR
-            cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
+def clean_dataset(df, drop_duplicates=True, fill_missing=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to remove duplicate rows. Default is True.
+        fill_missing (str or dict): Method to fill missing values. 
+            Options: 'mean', 'median', 'mode', or a dictionary of column:value pairs.
+            If None, missing values are not filled. Default is None.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing is not None:
+        if isinstance(fill_missing, dict):
+            cleaned_df = cleaned_df.fillna(fill_missing)
+        elif fill_missing == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_missing == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        elif fill_missing == 'mode':
+            for col in cleaned_df.columns:
+                if cleaned_df[col].dtype == 'object':
+                    mode_val = cleaned_df[col].mode()
+                    if not mode_val.empty:
+                        cleaned_df[col] = cleaned_df[col].fillna(mode_val.iloc[0])
+    
     return cleaned_df
 
-def normalize_minmax(dataframe, columns):
-    normalized_df = dataframe.copy()
-    for col in columns:
-        if col in normalized_df.columns:
-            min_val = normalized_df[col].min()
-            max_val = normalized_df[col].max()
-            if max_val != min_val:
-                normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
-    return normalized_df
-
-def handle_missing_values(dataframe, strategy='mean'):
-    processed_df = dataframe.copy()
-    for col in processed_df.columns:
-        if processed_df[col].isnull().any():
-            if strategy == 'mean':
-                fill_value = processed_df[col].mean()
-            elif strategy == 'median':
-                fill_value = processed_df[col].median()
-            elif strategy == 'mode':
-                fill_value = processed_df[col].mode()[0]
-            else:
-                fill_value = 0
-            processed_df[col].fillna(fill_value, inplace=True)
-    return processed_df
-
-def calculate_statistics(dataframe):
-    stats_dict = {}
-    for col in dataframe.select_dtypes(include=[np.number]).columns:
-        stats_dict[col] = {
-            'mean': dataframe[col].mean(),
-            'std': dataframe[col].std(),
-            'median': dataframe[col].median(),
-            'min': dataframe[col].min(),
-            'max': dataframe[col].max()
-        }
-    return stats_dict
-
-def process_dataset(file_path, outlier_columns=None, normalize_columns=None):
-    try:
-        df = pd.read_csv(file_path)
-        print(f"Loaded dataset with shape: {df.shape}")
-        
-        if outlier_columns:
-            df = remove_outliers_iqr(df, outlier_columns)
-            print(f"After outlier removal: {df.shape}")
-        
-        df = handle_missing_values(df)
-        
-        if normalize_columns:
-            df = normalize_minmax(df, normalize_columns)
-        
-        stats = calculate_statistics(df)
-        return df, stats
-    except Exception as e:
-        print(f"Error processing dataset: {e}")
-        return None, None
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate a DataFrame for basic integrity checks.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
