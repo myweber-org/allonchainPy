@@ -1,88 +1,113 @@
 
 import pandas as pd
 import numpy as np
-from scipy import stats
 
-def normalize_data(df, columns=None, method='zscore'):
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
-    df_normalized = df.copy()
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default True.
+    fill_missing (str): Method to fill missing values. 
+                        Options: 'mean', 'median', 'mode', or 'drop'. Default 'mean'.
     
-    for col in columns:
-        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
-            if method == 'zscore':
-                df_normalized[col] = (df[col] - df[col].mean()) / df[col].std()
-            elif method == 'minmax':
-                df_normalized[col] = (df[col] - df[col].min()) / (df[col].max() - df[col].min())
-            elif method == 'robust':
-                median = df[col].median()
-                iqr = df[col].quantile(0.75) - df[col].quantile(0.25)
-                df_normalized[col] = (df[col] - median) / iqr if iqr != 0 else 0
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
     
-    return df_normalized
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+            else:
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    elif fill_missing == 'mode':
+        for col in cleaned_df.columns:
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None)
+    
+    return cleaned_df
 
-def remove_outliers(df, columns=None, method='iqr', threshold=1.5):
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
     
-    df_clean = df.copy()
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
     
-    for col in columns:
-        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
-            if method == 'iqr':
-                Q1 = df[col].quantile(0.25)
-                Q3 = df[col].quantile(0.75)
-                IQR = Q3 - Q1
-                lower_bound = Q1 - threshold * IQR
-                upper_bound = Q3 + threshold * IQR
-                mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
-            elif method == 'zscore':
-                z_scores = np.abs(stats.zscore(df[col].dropna()))
-                mask = z_scores < threshold
-                mask = mask.reindex(df.index, fill_value=True)
-            elif method == 'percentile':
-                lower_bound = df[col].quantile(0.01)
-                upper_bound = df[col].quantile(0.99)
-                mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
-            
-            df_clean = df_clean[mask]
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
     
-    return df_clean.reset_index(drop=True)
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
 
-def handle_missing_values(df, columns=None, strategy='mean'):
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Remove outliers from a specific column using specified method.
     
-    df_filled = df.copy()
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to process.
+    method (str): Outlier detection method. Options: 'iqr' or 'zscore'. Default 'iqr'.
+    threshold (float): Threshold for outlier detection. Default 1.5 for IQR, 3 for z-score.
     
-    for col in columns:
-        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
-            if strategy == 'mean':
-                fill_value = df[col].mean()
-            elif strategy == 'median':
-                fill_value = df[col].median()
-            elif strategy == 'mode':
-                fill_value = df[col].mode()[0] if not df[col].mode().empty else 0
-            elif strategy == 'ffill':
-                df_filled[col] = df[col].ffill()
-                continue
-            elif strategy == 'bfill':
-                df_filled[col] = df[col].bfill()
-                continue
-            
-            df_filled[col] = df[col].fillna(fill_value)
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    return df_filled
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        mask = (df[column] >= lower_bound) & (df[column] <= upper_bound)
+    elif method == 'zscore':
+        from scipy import stats
+        z_scores = np.abs(stats.zscore(df[column].dropna()))
+        mask = z_scores < threshold
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+    
+    return df[mask].reset_index(drop=True)
 
-def clean_dataset(df, normalize_cols=None, outlier_cols=None, missing_cols=None, 
-                  normalize_method='zscore', outlier_method='iqr', 
-                  outlier_threshold=1.5, missing_strategy='mean'):
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, 5, None, 7, 8, 9, 100],
+        'B': [10, 20, 20, 40, 50, 60, 70, 80, 90, 1000],
+        'C': ['a', 'b', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i']
+    }
     
-    df_processed = df.copy()
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned = clean_dataset(df, fill_missing='median')
+    print(cleaned)
     
-    df_processed = handle_missing_values(df_processed, missing_cols, missing_strategy)
-    df_processed = remove_outliers(df_processed, outlier_cols, outlier_method, outlier_threshold)
-    df_processed = normalize_data(df_processed, normalize_cols, normalize_method)
+    is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B'])
+    print(f"\nValidation: {message}")
     
-    return df_processed
+    print("\nRemoving outliers from column 'B':")
+    no_outliers = remove_outliers(cleaned, 'B', method='iqr')
+    print(no_outliers)
