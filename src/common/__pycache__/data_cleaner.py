@@ -133,4 +133,142 @@ def clean_dataset(df, numeric_columns):
     for col in numeric_columns:
         if col in df.columns:
             df = remove_outliers_iqr(df, col)
-    return df.reset_index(drop=True)
+    return df.reset_index(drop=True)import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        drop_duplicates (bool): Whether to remove duplicate rows
+        fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop')
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if cleaned_df.isnull().sum().any():
+        print("Handling missing values...")
+        
+        if fill_missing == 'drop':
+            cleaned_df = cleaned_df.dropna()
+            print("Dropped rows with missing values")
+        else:
+            for column in cleaned_df.select_dtypes(include=[np.number]).columns:
+                if cleaned_df[column].isnull().any():
+                    if fill_missing == 'mean':
+                        fill_value = cleaned_df[column].mean()
+                    elif fill_missing == 'median':
+                        fill_value = cleaned_df[column].median()
+                    elif fill_missing == 'mode':
+                        fill_value = cleaned_df[column].mode()[0]
+                    else:
+                        raise ValueError("fill_missing must be 'mean', 'median', 'mode', or 'drop'")
+                    
+                    cleaned_df[column] = cleaned_df[column].fillna(fill_value)
+                    print(f"Filled missing values in '{column}' with {fill_missing}: {fill_value}")
+    
+    categorical_cols = cleaned_df.select_dtypes(include=['object']).columns
+    for column in categorical_cols:
+        if cleaned_df[column].isnull().any():
+            most_frequent = cleaned_df[column].mode()[0]
+            cleaned_df[column] = cleaned_df[column].fillna(most_frequent)
+            print(f"Filled missing categorical values in '{column}' with mode: '{most_frequent}'")
+    
+    print(f"Cleaning complete. Final shape: {cleaned_df.shape}")
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None, min_rows=1):
+    """
+    Validate dataset structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of column names that must be present
+        min_rows (int): Minimum number of rows required
+    
+    Returns:
+        tuple: (is_valid, message)
+    """
+    if len(df) < min_rows:
+        return False, f"Dataset must have at least {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    if df.isnull().all().any():
+        empty_cols = df.columns[df.isnull().all()].tolist()
+        return False, f"Columns with all missing values: {empty_cols}"
+    
+    return True, "Dataset validation passed"
+
+def get_dataset_stats(df):
+    """
+    Generate basic statistics for the dataset.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+        dict: Dictionary containing dataset statistics
+    """
+    stats = {
+        'rows': len(df),
+        'columns': len(df.columns),
+        'missing_values': int(df.isnull().sum().sum()),
+        'duplicate_rows': df.duplicated().sum(),
+        'numeric_columns': len(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': len(df.select_dtypes(include=['object']).columns),
+        'memory_usage_mb': round(df.memory_usage(deep=True).sum() / 1024**2, 2)
+    }
+    
+    numeric_stats = {}
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        numeric_stats[col] = {
+            'mean': round(df[col].mean(), 4),
+            'std': round(df[col].std(), 4),
+            'min': round(df[col].min(), 4),
+            'max': round(df[col].max(), 4)
+        }
+    
+    stats['numeric_statistics'] = numeric_stats
+    return stats
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'value': [10.5, 20.3, 20.3, None, 40.1, 50.0],
+        'category': ['A', 'B', 'B', 'C', None, 'A'],
+        'score': [85, 92, 92, 78, 88, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original dataset:")
+    print(df)
+    print("\n" + "="*50)
+    
+    stats = get_dataset_stats(df)
+    print("Dataset statistics:")
+    for key, value in stats.items():
+        if key != 'numeric_statistics':
+            print(f"{key}: {value}")
+    
+    print("\n" + "="*50)
+    cleaned_df = clean_dataset(df, fill_missing='mean')
+    print("\nCleaned dataset:")
+    print(cleaned_df)
+    
+    is_valid, message = validate_dataset(cleaned_df, required_columns=['id', 'value', 'category'])
+    print(f"\nValidation: {message}")
