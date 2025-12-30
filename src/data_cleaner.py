@@ -162,4 +162,82 @@ def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
         for col in cleaned_df.columns:
             cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None, inplace=True)
     
-    return cleaned_df
+    return cleaned_dfimport pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, drop_na=True, fill_strategy='mean'):
+    """
+    Clean a CSV file by handling missing values and removing duplicates.
+    
+    Args:
+        filepath (str): Path to the CSV file.
+        drop_na (bool): If True, drop rows with missing values. 
+                       If False, fill missing values using fill_strategy.
+        fill_strategy (str): Strategy to fill missing values ('mean', 'median', 'mode').
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(filepath)
+        print(f"Loaded data with shape: {df.shape}")
+        
+        # Remove duplicate rows
+        initial_rows = df.shape[0]
+        df = df.drop_duplicates()
+        duplicates_removed = initial_rows - df.shape[0]
+        print(f"Removed {duplicates_removed} duplicate rows.")
+        
+        # Handle missing values
+        missing_before = df.isnull().sum().sum()
+        
+        if drop_na:
+            df = df.dropna()
+            print(f"Dropped rows with missing values. {missing_before} missing values removed.")
+        else:
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            
+            if fill_strategy == 'mean':
+                df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+            elif fill_strategy == 'median':
+                df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+            elif fill_strategy == 'mode':
+                for col in numeric_cols:
+                    df[col] = df[col].fillna(df[col].mode()[0])
+            
+            print(f"Filled {missing_before} missing values using {fill_strategy} strategy.")
+        
+        # Reset index after cleaning
+        df = df.reset_index(drop=True)
+        print(f"Final data shape: {df.shape}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to a new CSV file.
+    
+    Args:
+        df (pd.DataFrame): Cleaned DataFrame.
+        output_path (str): Path to save the cleaned CSV file.
+    """
+    if df is not None:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to {output_path}")
+    else:
+        print("No data to save.")
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_file, drop_na=False, fill_strategy='median')
+    save_cleaned_data(cleaned_df, output_file)
