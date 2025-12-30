@@ -92,3 +92,11 @@ if __name__ == "__main__":
     for col in cleaned_data.columns:
         stats = calculate_statistics(cleaned_data, col)
         print(f"{col}: {stats}")
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
