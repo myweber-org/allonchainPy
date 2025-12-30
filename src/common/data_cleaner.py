@@ -136,3 +136,30 @@ def clean_dataset(df: pd.DataFrame,
                 cleaned_df = cleaned_df.drop(indices)
     
     return cleaned_df
+import pandas as pd
+import re
+
+def clean_dataset(df, column_names):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing specified string columns.
+    """
+    # Remove duplicate rows
+    df_clean = df.drop_duplicates().reset_index(drop=True)
+    
+    # Normalize string columns: trim whitespace and convert to lowercase
+    for col in column_names:
+        if col in df_clean.columns and df_clean[col].dtype == 'object':
+            df_clean[col] = df_clean[col].astype(str).apply(lambda x: re.sub(r'\s+', ' ', x.strip().lower()))
+    
+    return df_clean
+
+def validate_email_column(df, email_column):
+    """
+    Validate email addresses in a specified column and return a boolean mask.
+    """
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+    
+    # Simple email regex pattern
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return df[email_column].astype(str).str.match(email_pattern)
