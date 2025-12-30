@@ -646,3 +646,123 @@ def validate_data(df, required_columns):
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
     return True
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates, handling missing values,
+    and normalizing text columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column_mapping (dict): Optional column renaming dictionary
+    drop_duplicates (bool): Whether to remove duplicate rows
+    normalize_text (bool): Whether to normalize text columns
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Rename columns if mapping provided
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    # Remove duplicate rows
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    # Handle missing values
+    for col in cleaned_df.columns:
+        if cleaned_df[col].dtype == 'object':
+            # Fill text columns with empty string
+            cleaned_df[col] = cleaned_df[col].fillna('')
+        else:
+            # Fill numeric columns with median
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    
+    # Normalize text columns
+    if normalize_text:
+        text_columns = cleaned_df.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            cleaned_df[col] = cleaned_df[col].str.strip().str.lower()
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None, unique_constraints=None):
+    """
+    Validate DataFrame structure and constraints.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    unique_constraints (list): List of columns that should be unique
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    # Check required columns
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f"Missing required columns: {missing_columns}")
+    
+    # Check unique constraints
+    if unique_constraints:
+        for column in unique_constraints:
+            if column in df.columns:
+                duplicates = df[column].duplicated().sum()
+                if duplicates > 0:
+                    validation_results['warnings'].append(
+                        f"Column '{column}' has {duplicates} duplicate values"
+                    )
+    
+    # Check for empty DataFrame
+    if len(df) == 0:
+        validation_results['warnings'].append("DataFrame is empty")
+    
+    return validation_results
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     # Create sample data
+#     sample_data = {
+#         'Name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson', None],
+#         'Age': [25, 30, 25, 35, 40],
+#         'Email': ['john@example.com', 'jane@example.com', 'john@example.com', 'bob@example.com', '']
+#     }
+#     
+#     df = pd.DataFrame(sample_data)
+#     print("Original DataFrame:")
+#     print(df)
+#     print("\n" + "="*50 + "\n")
+#     
+#     # Clean the data
+#     cleaned = clean_dataset(df)
+#     print("Cleaned DataFrame:")
+#     print(cleaned)
+#     
+#     # Validate the cleaned data
+#     validation = validate_data(
+#         cleaned,
+#         required_columns=['Name', 'Age', 'Email'],
+#         unique_constraints=['Email']
+#     )
+#     print("\nValidation Results:")
+#     print(validation)
