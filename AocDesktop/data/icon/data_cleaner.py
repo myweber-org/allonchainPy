@@ -126,3 +126,42 @@ def main():
 
 if __name__ == "__main__":
     main()
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column):
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
+
+def normalize_column(dataframe, column):
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    dataframe[column] = (dataframe[column] - min_val) / (max_val - min_val)
+    return dataframe
+
+def clean_dataset(file_path, output_path):
+    df = pd.read_csv(file_path)
+    
+    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_columns:
+        df = remove_outliers_iqr(df, col)
+    
+    for col in numeric_columns:
+        df = normalize_column(df, col)
+    
+    df.to_csv(output_path, index=False)
+    return df
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    cleaned_df = clean_dataset(input_file, output_file)
+    print(f"Data cleaning completed. Saved to {output_file}")
+    print(f"Original shape: {pd.read_csv(input_file).shape}")
+    print(f"Cleaned shape: {cleaned_df.shape}")
