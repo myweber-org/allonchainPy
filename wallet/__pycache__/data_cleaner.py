@@ -704,3 +704,11 @@ def detect_skewed_columns(data, threshold=0.5):
             skewed_cols.append((col, skewness))
     
     return sorted(skewed_cols, key=lambda x: abs(x[1]), reverse=True)
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
