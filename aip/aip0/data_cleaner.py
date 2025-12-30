@@ -1,82 +1,80 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 
-def clean_dataframe(df, missing_strategy='mean', outlier_threshold=3):
-    """
-    Clean a pandas DataFrame by handling missing values and outliers.
-    
-    Args:
-        df: Input pandas DataFrame
-        missing_strategy: Strategy for handling missing values ('mean', 'median', 'drop')
-        outlier_threshold: Z-score threshold for outlier detection
-    
-    Returns:
-        Cleaned pandas DataFrame
-    """
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    if max_val - min_val == 0:
+        return df[column].apply(lambda x: 0.0)
+    return (df[column] - min_val) / (max_val - min_val)
+
+def standardize_zscore(df, column):
+    mean_val = df[column].mean()
+    std_val = df[column].std()
+    if std_val == 0:
+        return df[column].apply(lambda x: 0.0)
+    return (df[column] - mean_val) / std_val
+
+def clean_dataset(df, numeric_columns):
     cleaned_df = df.copy()
-    
-    # Handle missing values
-    if missing_strategy == 'mean':
-        cleaned_df = cleaned_df.fillna(cleaned_df.mean())
-    elif missing_strategy == 'median':
-        cleaned_df = cleaned_df.fillna(cleaned_df.median())
-    elif missing_strategy == 'drop':
-        cleaned_df = cleaned_df.dropna()
-    
-    # Remove outliers using Z-score method
-    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
-    z_scores = np.abs((cleaned_df[numeric_cols] - cleaned_df[numeric_cols].mean()) / cleaned_df[numeric_cols].std())
-    cleaned_df = cleaned_df[(z_scores < outlier_threshold).all(axis=1)]
-    
-    # Reset index after cleaning
-    cleaned_df = cleaned_df.reset_index(drop=True)
-    
-    return cleaned_df
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+    return cleaned_df.reset_index(drop=True)
 
-def validate_dataframe(df, required_columns=None, min_rows=1):
-    """
-    Validate DataFrame structure and content.
-    
-    Args:
-        df: Input pandas DataFrame
-        required_columns: List of required column names
-        min_rows: Minimum number of rows required
-    
-    Returns:
-        Boolean indicating if DataFrame is valid
-    """
-    if df.empty:
-        return False
-    
-    if len(df) < min_rows:
-        return False
-    
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            return False
-    
-    return True
+def process_features(df, numeric_columns, method='standardize'):
+    processed_df = df.copy()
+    for col in numeric_columns:
+        if col in processed_df.columns:
+            if method == 'normalize':
+                processed_df[col] = normalize_minmax(processed_df, col)
+            elif method == 'standardize':
+                processed_df[col] = standardize_zscore(processed_df, col)
+            else:
+                raise ValueError("Method must be 'normalize' or 'standardize'")
+    return processed_df
 
-def get_data_summary(df):
-    """
-    Generate summary statistics for DataFrame.
-    
-    Args:
-        df: Input pandas DataFrame
-    
-    Returns:
-        Dictionary with summary statistics
-    """
-    summary = {
-        'rows': len(df),
-        'columns': len(df.columns),
-        'missing_values': df.isnull().sum().sum(),
-        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
-        'categorical_columns': list(df.select_dtypes(include=['object']).columns)
+def get_summary_statistics(df, numeric_columns):
+    summary = {}
+    for col in numeric_columns:
+        if col in df.columns:
+            summary[col] = {
+                'mean': df[col].mean(),
+                'median': df[col].median(),
+                'std': df[col].std(),
+                'min': df[col].min(),
+                'max': df[col].max(),
+                'count': df[col].count(),
+                'missing': df[col].isnull().sum()
+            }
+    return pd.DataFrame(summary).T
+
+if __name__ == "__main__":
+    sample_data = {
+        'feature1': [1, 2, 3, 4, 5, 100],
+        'feature2': [10, 20, 30, 40, 50, 60],
+        'category': ['A', 'B', 'A', 'B', 'A', 'B']
     }
+    df = pd.DataFrame(sample_data)
+    numeric_cols = ['feature1', 'feature2']
     
-    if summary['numeric_columns']:
-        summary['numeric_stats'] = df[summary['numeric_columns']].describe().to_dict()
+    print("Original Data:")
+    print(df)
+    print("\nSummary Statistics:")
+    print(get_summary_statistics(df, numeric_cols))
     
-    return summary
+    cleaned_df = clean_dataset(df, numeric_cols)
+    print("\nCleaned Data (outliers removed):")
+    print(cleaned_df)
+    
+    standardized_df = process_features(cleaned_df, numeric_cols, 'standardize')
+    print("\nStandardized Data:")
+    print(standardized_df)
