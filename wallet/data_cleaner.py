@@ -1,67 +1,89 @@
-
-import pandas as pd
 import numpy as np
+import pandas as pd
 
-def clean_csv_data(file_path, strategy='mean', columns=None):
+def remove_outliers_iqr(df, column):
     """
-    Clean missing values in a CSV file using specified strategy.
+    Remove outliers from a DataFrame column using the IQR method.
     
-    Args:
-        file_path (str): Path to the CSV file
-        strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
-        columns (list): List of column names to clean, if None cleans all columns
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
     
     Returns:
-        pandas.DataFrame: Cleaned dataframe
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
+
+def calculate_summary_statistics(df, column):
+    """
+    Calculate summary statistics for a column after outlier removal.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': len(df[column])
+    }
+    
+    return stats
+
+def process_dataset(file_path, column_name):
+    """
+    Load and process a dataset by removing outliers from specified column.
+    
+    Parameters:
+    file_path (str): Path to CSV file
+    column_name (str): Column to clean
+    
+    Returns:
+    tuple: (cleaned DataFrame, original stats, cleaned stats)
     """
     try:
         df = pd.read_csv(file_path)
-        
-        if columns is None:
-            columns = df.columns
-        
-        for column in columns:
-            if column in df.columns:
-                if strategy == 'mean':
-                    df[column].fillna(df[column].mean(), inplace=True)
-                elif strategy == 'median':
-                    df[column].fillna(df[column].median(), inplace=True)
-                elif strategy == 'mode':
-                    df[column].fillna(df[column].mode()[0], inplace=True)
-                elif strategy == 'drop':
-                    df.dropna(subset=[column], inplace=True)
-                else:
-                    raise ValueError(f"Unknown strategy: {strategy}")
-        
-        return df
-        
     except FileNotFoundError:
-        print(f"Error: File not found at {file_path}")
-        return None
-    except Exception as e:
-        print(f"Error during data cleaning: {str(e)}")
-        return None
-
-def save_cleaned_data(df, output_path):
-    """
-    Save cleaned dataframe to CSV file.
+        raise FileNotFoundError(f"File not found: {file_path}")
     
-    Args:
-        df (pandas.DataFrame): Dataframe to save
-        output_path (str): Path for output CSV file
-    """
-    if df is not None:
-        df.to_csv(output_path, index=False)
-        print(f"Cleaned data saved to {output_path}")
+    original_stats = calculate_summary_statistics(df, column_name)
+    cleaned_df = remove_outliers_iqr(df, column_name)
+    cleaned_stats = calculate_summary_statistics(cleaned_df, column_name)
+    
+    return cleaned_df, original_stats, cleaned_stats
 
 if __name__ == "__main__":
-    input_file = "raw_data.csv"
-    output_file = "cleaned_data.csv"
+    sample_data = pd.DataFrame({
+        'values': np.concatenate([
+            np.random.normal(100, 10, 90),
+            np.random.normal(300, 10, 10)
+        ])
+    })
     
-    cleaned_df = clean_csv_data(input_file, strategy='mean')
+    print("Original data shape:", sample_data.shape)
+    print("Original statistics:", calculate_summary_statistics(sample_data, 'values'))
     
-    if cleaned_df is not None:
-        save_cleaned_data(cleaned_df, output_file)
-        print(f"Original shape: {pd.read_csv(input_file).shape}")
-        print(f"Cleaned shape: {cleaned_df.shape}")
-        print("Data cleaning completed successfully")
+    cleaned_data = remove_outliers_iqr(sample_data, 'values')
+    print("\nCleaned data shape:", cleaned_data.shape)
+    print("Cleaned statistics:", calculate_summary_statistics(cleaned_data, 'values'))
