@@ -1,35 +1,40 @@
 
-def remove_duplicates_preserve_order(input_list):
-    seen = set()
-    result = []
-    for item in input_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
+import pandas as pd
 import numpy as np
+from scipy import stats
 
-def remove_outliers_iqr(data, column):
-    """
-    Remove outliers from a specified column using the IQR method.
-    Returns a cleaned DataFrame.
-    """
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    cleaned_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return cleaned_data
+def remove_outliers_iqr(df, columns):
+    df_clean = df.copy()
+    for col in columns:
+        Q1 = df_clean[col].quantile(0.25)
+        Q3 = df_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean
 
-def calculate_summary_statistics(data, column):
-    """
-    Calculate summary statistics for a specified column.
-    Returns a dictionary with mean, median, and standard deviation.
-    """
-    stats = {
-        'mean': np.mean(data[column]),
-        'median': np.median(data[column]),
-        'std': np.std(data[column])
-    }
-    return stats
+def normalize_minmax(df, columns):
+    df_norm = df.copy()
+    for col in columns:
+        min_val = df_norm[col].min()
+        max_val = df_norm[col].max()
+        if max_val != min_val:
+            df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+    return df_norm
+
+def clean_dataset(file_path, numeric_columns):
+    try:
+        df = pd.read_csv(file_path)
+        df_clean = remove_outliers_iqr(df, numeric_columns)
+        df_normalized = normalize_minmax(df_clean, numeric_columns)
+        return df_normalized
+    except Exception as e:
+        print(f"Error processing dataset: {e}")
+        return None
+
+if __name__ == "__main__":
+    cleaned_data = clean_dataset('sample_data.csv', ['age', 'income', 'score'])
+    if cleaned_data is not None:
+        cleaned_data.to_csv('cleaned_data.csv', index=False)
+        print("Data cleaning completed successfully.")
