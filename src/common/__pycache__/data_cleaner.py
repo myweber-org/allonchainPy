@@ -226,4 +226,123 @@ if __name__ == "__main__":
     # Normalize data
     df_norm = normalize_data(df_clean, method='minmax')
     print("\nNormalized DataFrame:")
-    print(df_norm)
+    print(df_norm)import pandas as pd
+import numpy as np
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): Strategy to handle missing values ('mean', 'median', 'mode', 'drop')
+    columns (list): List of columns to apply the strategy to, if None applies to all numeric columns
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    df_copy = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_copy.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    if strategy == 'drop':
+        return df_copy.dropna(subset=columns)
+    
+    for col in columns:
+        if col in df_copy.columns:
+            if strategy == 'mean':
+                fill_value = df_copy[col].mean()
+            elif strategy == 'median':
+                fill_value = df_copy[col].median()
+            elif strategy == 'mode':
+                fill_value = df_copy[col].mode()[0] if not df_copy[col].mode().empty else np.nan
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            df_copy[col] = df_copy[col].fillna(fill_value)
+    
+    return df_copy
+
+def remove_outliers_iqr(df, columns=None, threshold=1.5):
+    """
+    Remove outliers using the Interquartile Range (IQR) method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of columns to check for outliers, if None checks all numeric columns
+    threshold (float): IQR multiplier for outlier detection
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    df_copy = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_copy.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    outlier_mask = pd.Series([False] * len(df_copy))
+    
+    for col in columns:
+        if col in df_copy.columns:
+            Q1 = df_copy[col].quantile(0.25)
+            Q3 = df_copy[col].quantile(0.75)
+            IQR = Q3 - Q1
+            
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            
+            col_outliers = (df_copy[col] < lower_bound) | (df_copy[col] > upper_bound)
+            outlier_mask = outlier_mask | col_outliers
+    
+    return df_copy[~outlier_mask].reset_index(drop=True)
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize numeric columns to have zero mean and unit variance.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of columns to standardize, if None standardizes all numeric columns
+    
+    Returns:
+    pd.DataFrame: DataFrame with standardized columns
+    """
+    df_copy = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_copy.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    for col in columns:
+        if col in df_copy.columns:
+            mean_val = df_copy[col].mean()
+            std_val = df_copy[col].std()
+            
+            if std_val > 0:
+                df_copy[col] = (df_copy[col] - mean_val) / std_val
+    
+    return df_copy
+
+def clean_dataset(df, missing_strategy='mean', outlier_threshold=1.5, standardize=True):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    missing_strategy (str): Strategy for handling missing values
+    outlier_threshold (float): IQR threshold for outlier removal
+    standardize (bool): Whether to standardize numeric columns
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = handle_missing_values(df, strategy=missing_strategy)
+    cleaned_df = remove_outliers_iqr(cleaned_df, threshold=outlier_threshold)
+    
+    if standardize:
+        cleaned_df = standardize_columns(cleaned_df)
+    
+    return cleaned_df
