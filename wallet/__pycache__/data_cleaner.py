@@ -935,3 +935,108 @@ if __name__ == "__main__":
     if cleaned_df is not None:
         print("Data cleaning completed successfully.")
         print(cleaned_df.head())
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using IQR method.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to check for outliers
+    threshold (float): IQR multiplier threshold
+    
+    Returns:
+    pd.DataFrame: Dataframe with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    outliers_mask = (data[column] < lower_bound) | (data[column] > upper_bound)
+    cleaned_data = data[~outliers_mask].copy()
+    
+    return cleaned_data
+
+def normalize_minmax(data, columns=None):
+    """
+    Normalize data using min-max scaling.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    columns (list): List of columns to normalize. If None, normalize all numeric columns.
+    
+    Returns:
+    pd.DataFrame: Dataframe with normalized columns
+    """
+    if columns is None:
+        numeric_cols = data.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    normalized_data = data.copy()
+    
+    for col in columns:
+        if col not in normalized_data.columns:
+            continue
+            
+        col_min = normalized_data[col].min()
+        col_max = normalized_data[col].max()
+        
+        if col_max != col_min:
+            normalized_data[col] = (normalized_data[col] - col_min) / (col_max - col_min)
+        else:
+            normalized_data[col] = 0
+    
+    return normalized_data
+
+def remove_missing_rows(data, threshold=0.8):
+    """
+    Remove rows with missing values above a threshold.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    threshold (float): Maximum allowed missing value ratio per row (0-1)
+    
+    Returns:
+    pd.DataFrame: Dataframe with rows removed
+    """
+    missing_ratio = data.isnull().mean(axis=1)
+    keep_rows = missing_ratio <= threshold
+    cleaned_data = data[keep_rows].copy()
+    
+    return cleaned_data
+
+def clean_dataset(data, outlier_columns=None, normalize_columns=None, missing_threshold=0.8):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    outlier_columns (list): Columns to check for outliers
+    normalize_columns (list): Columns to normalize
+    missing_threshold (float): Missing value threshold
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    cleaned_data = data.copy()
+    
+    cleaned_data = remove_missing_rows(cleaned_data, missing_threshold)
+    
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in cleaned_data.columns:
+                cleaned_data = detect_outliers_iqr(cleaned_data, col)
+    
+    if normalize_columns:
+        cleaned_data = normalize_minmax(cleaned_data, normalize_columns)
+    
+    return cleaned_data.reset_index(drop=True)
