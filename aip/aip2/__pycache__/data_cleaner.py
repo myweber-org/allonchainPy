@@ -75,3 +75,104 @@ if __name__ == '__main__':
     
     validation = validate_dataframe(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation: {validation['message']}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def detect_outliers_iqr(self, column):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        outliers = self.df[(self.df[column] < lower_bound) | (self.df[column] > upper_bound)]
+        return outliers
+    
+    def remove_outliers_zscore(self, column, threshold=3):
+        z_scores = np.abs(stats.zscore(self.df[column].dropna()))
+        mask = z_scores < threshold
+        self.df = self.df[mask]
+        return self.df
+    
+    def normalize_column(self, column, method='minmax'):
+        if method == 'minmax':
+            min_val = self.df[column].min()
+            max_val = self.df[column].max()
+            self.df[f'{column}_normalized'] = (self.df[column] - min_val) / (max_val - min_val)
+        elif method == 'zscore':
+            mean_val = self.df[column].mean()
+            std_val = self.df[column].std()
+            self.df[f'{column}_normalized'] = (self.df[column] - mean_val) / std_val
+        return self.df
+    
+    def handle_missing_values(self, strategy='mean'):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols:
+            if self.df[col].isnull().any():
+                if strategy == 'mean':
+                    fill_value = self.df[col].mean()
+                elif strategy == 'median':
+                    fill_value = self.df[col].median()
+                elif strategy == 'mode':
+                    fill_value = self.df[col].mode()[0]
+                else:
+                    fill_value = 0
+                
+                self.df[col] = self.df[col].fillna(fill_value)
+        
+        return self.df
+    
+    def get_cleaning_report(self):
+        cleaned_shape = self.df.shape
+        rows_removed = self.original_shape[0] - cleaned_shape[0]
+        cols_added = cleaned_shape[1] - self.original_shape[1]
+        
+        report = {
+            'original_rows': self.original_shape[0],
+            'cleaned_rows': cleaned_shape[0],
+            'rows_removed': rows_removed,
+            'columns_added': cols_added,
+            'missing_values': self.df.isnull().sum().sum()
+        }
+        
+        return report
+    
+    def save_cleaned_data(self, filepath):
+        self.df.to_csv(filepath, index=False)
+        return f"Data saved to {filepath}"
+
+def example_usage():
+    data = {
+        'age': [25, 30, 35, 200, 28, 32, 150, 29, 31, None],
+        'salary': [50000, 60000, 55000, 1000000, 52000, 58000, 900000, 54000, 56000, 51000],
+        'score': [85, 92, 78, 99, 88, 91, 30, 86, 89, 84]
+    }
+    
+    df = pd.DataFrame(data)
+    cleaner = DataCleaner(df)
+    
+    print("Original data:")
+    print(df)
+    print("\nDetecting outliers in 'salary':")
+    print(cleaner.detect_outliers_iqr('salary'))
+    
+    cleaner.remove_outliers_zscore('salary')
+    cleaner.handle_missing_values(strategy='mean')
+    cleaner.normalize_column('score', method='minmax')
+    
+    print("\nCleaned data:")
+    print(cleaner.df)
+    
+    report = cleaner.get_cleaning_report()
+    print("\nCleaning report:")
+    for key, value in report.items():
+        print(f"{key}: {value}")
+
+if __name__ == "__main__":
+    example_usage()
