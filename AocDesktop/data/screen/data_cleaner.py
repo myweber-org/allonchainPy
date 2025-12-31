@@ -1,93 +1,111 @@
-def remove_duplicates(input_list):
-    seen = set()
-    result = []
-    for item in input_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
+import pandas as pd
+import numpy as np
 
-def clean_data_with_order(input_list, key=None):
-    if key is None:
-        key = lambda x: x
-    seen = set()
-    result = []
-    for item in input_list:
-        identifier = key(item)
-        if identifier not in seen:
-            seen.add(identifier)
-            result.append(item)
-    return resultimport pandas as pd
-
-def remove_duplicates(df, subset=None, keep='first'):
+def clean_missing_values(df, strategy='mean', columns=None):
     """
-    Remove duplicate rows from a DataFrame.
+    Handle missing values in a DataFrame.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-        subset (list, optional): Column labels to consider for duplicates.
-        keep (str, optional): Which duplicates to keep.
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    strategy (str): Strategy to handle missing values. 
+                    Options: 'mean', 'median', 'mode', 'drop'.
+    columns (list): List of columns to apply cleaning. If None, applies to all numeric columns.
     
     Returns:
-        pd.DataFrame: DataFrame with duplicates removed.
+    pd.DataFrame: Cleaned DataFrame.
     """
-    if df.empty:
-        return df
+    df_clean = df.copy()
     
-    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
-    return cleaned_df
+    if columns is None:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    if strategy == 'drop':
+        df_clean = df_clean.dropna(subset=columns)
+    else:
+        for col in columns:
+            if df_clean[col].isnull().any():
+                if strategy == 'mean':
+                    fill_value = df_clean[col].mean()
+                elif strategy == 'median':
+                    fill_value = df_clean[col].median()
+                elif strategy == 'mode':
+                    fill_value = df_clean[col].mode()[0]
+                else:
+                    raise ValueError(f"Unsupported strategy: {strategy}")
+                
+                df_clean[col] = df_clean[col].fillna(fill_value)
+    
+    return df_clean
 
-def clean_numeric_columns(df, columns):
+def remove_outliers_iqr(df, columns=None, multiplier=1.5):
     """
-    Clean numeric columns by converting to appropriate types.
+    Remove outliers using the Interquartile Range (IQR) method.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-        columns (list): List of column names to clean.
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns (list): List of columns to check for outliers.
+    multiplier (float): IQR multiplier for outlier detection.
     
     Returns:
-        pd.DataFrame: DataFrame with cleaned numeric columns.
+    pd.DataFrame: DataFrame with outliers removed.
     """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    
     for col in columns:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-    return df
-
-def validate_dataframe(df, required_columns):
-    """
-    Validate DataFrame contains required columns.
+        Q1 = df_clean[col].quantile(0.25)
+        Q3 = df_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        
+        df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
     
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-        required_columns (list): List of required column names.
+    return df_clean
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize numeric columns to have zero mean and unit variance.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns (list): List of columns to standardize.
     
     Returns:
-        bool: True if all required columns are present.
+    pd.DataFrame: DataFrame with standardized columns.
     """
-    missing_columns = [col for col in required_columns if col not in df.columns]
+    from sklearn.preprocessing import StandardScaler
     
-    if missing_columns:
-        print(f"Missing columns: {missing_columns}")
-        return False
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
     
-    return True
+    df_clean = df.copy()
+    scaler = StandardScaler()
+    
+    df_clean[columns] = scaler.fit_transform(df_clean[columns])
+    
+    return df_clean
 
-def get_data_summary(df):
-    """
-    Generate summary statistics for DataFrame.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-    
-    Returns:
-        dict: Dictionary containing summary statistics.
-    """
-    summary = {
-        'rows': len(df),
-        'columns': len(df.columns),
-        'missing_values': df.isnull().sum().sum(),
-        'duplicates': df.duplicated().sum(),
-        'dtypes': df.dtypes.to_dict()
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [10, 20, 30, np.nan, 50],
+        'C': [100, 200, 300, 400, 500],
+        'category': ['X', 'Y', 'X', 'Y', 'Z']
     }
     
-    return summary
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_missing_values(df, strategy='mean')
+    print("\nDataFrame after cleaning missing values:")
+    print(cleaned_df)
+    
+    standardized_df = standardize_columns(cleaned_df, columns=['A', 'B', 'C'])
+    print("\nDataFrame after standardization:")
+    print(standardized_df)
