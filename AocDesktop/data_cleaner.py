@@ -1,102 +1,108 @@
 
+import pandas as pd
 import numpy as np
+from pathlib import Path
 
-def remove_outliers_iqr(data, column):
+def clean_csv_data(input_path, output_path=None, fill_strategy='mean'):
     """
-    Remove outliers from a specific column using the Interquartile Range method.
+    Clean CSV data by handling missing values and removing duplicates.
     
     Parameters:
-    data (pd.DataFrame): Input dataframe
-    column (str): Column name to process
+    input_path (str): Path to input CSV file
+    output_path (str, optional): Path for cleaned output CSV
+    fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', 'zero')
     
     Returns:
-    pd.DataFrame: Dataframe with outliers removed
+    pandas.DataFrame: Cleaned dataframe
     """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in dataframe")
     
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
+    if not Path(input_path).exists():
+        raise FileNotFoundError(f"Input file not found: {input_path}")
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    df = pd.read_csv(input_path)
     
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    original_rows = len(df)
+    original_columns = len(df.columns)
     
-    return filtered_data
+    df = df.drop_duplicates()
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if fill_strategy == 'mean':
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].mean())
+    elif fill_strategy == 'median':
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].median())
+    elif fill_strategy == 'mode':
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 0)
+    elif fill_strategy == 'zero':
+        df[numeric_cols] = df[numeric_cols].fillna(0)
+    else:
+        raise ValueError(f"Unknown fill strategy: {fill_strategy}")
+    
+    string_cols = df.select_dtypes(include=['object']).columns
+    df[string_cols] = df[string_cols].fillna('Unknown')
+    
+    removed_rows = original_rows - len(df)
+    
+    if output_path:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+    
+    print(f"Original data: {original_rows} rows, {original_columns} columns")
+    print(f"Cleaned data: {len(df)} rows, {len(df.columns)} columns")
+    print(f"Removed {removed_rows} duplicate rows")
+    
+    return df
 
-def calculate_statistics(data, column):
+def validate_dataframe(df, required_columns=None):
     """
-    Calculate basic statistics for a column after outlier removal.
+    Validate dataframe structure and content.
     
     Parameters:
-    data (pd.DataFrame): Input dataframe
-    column (str): Column name to analyze
+    df (pandas.DataFrame): Dataframe to validate
+    required_columns (list, optional): List of required column names
     
     Returns:
-    dict: Dictionary containing statistics
+    dict: Validation results
     """
-    stats = {
-        'mean': data[column].mean(),
-        'median': data[column].median(),
-        'std': data[column].std(),
-        'min': data[column].min(),
-        'max': data[column].max(),
-        'count': data[column].count()
+    validation_results = {
+        'is_valid': True,
+        'issues': [],
+        'summary': {}
     }
     
-    return stats
-
-def clean_dataset(data, columns_to_clean):
-    """
-    Clean multiple columns in a dataset by removing outliers.
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['issues'].append(f"Missing required columns: {missing_columns}")
     
-    Parameters:
-    data (pd.DataFrame): Input dataframe
-    columns_to_clean (list): List of column names to clean
+    validation_results['summary']['total_rows'] = len(df)
+    validation_results['summary']['total_columns'] = len(df.columns)
+    validation_results['summary']['numeric_columns'] = len(df.select_dtypes(include=[np.number]).columns)
+    validation_results['summary']['string_columns'] = len(df.select_dtypes(include=['object']).columns)
     
-    Returns:
-    pd.DataFrame: Cleaned dataframe
-    """
-    cleaned_data = data.copy()
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) > 0:
+        validation_results['summary']['has_nulls'] = df[numeric_cols].isnull().any().any()
     
-    for column in columns_to_clean:
-        if column in cleaned_data.columns:
-            original_count = len(cleaned_data)
-            cleaned_data = remove_outliers_iqr(cleaned_data, column)
-            removed_count = original_count - len(cleaned_data)
-            print(f"Removed {removed_count} outliers from column '{column}'")
-    
-    return cleaned_data
+    return validation_results
 
 if __name__ == "__main__":
-    import pandas as pd
+    sample_data = {
+        'id': [1, 2, 3, 4, 5, 5],
+        'value': [10.5, None, 15.2, 20.1, None, 10.5],
+        'category': ['A', 'B', None, 'A', 'C', 'A'],
+        'score': [85, 92, None, 78, 88, 85]
+    }
     
-    sample_data = pd.DataFrame({
-        'temperature': np.random.normal(25, 5, 1000),
-        'humidity': np.random.normal(60, 15, 1000),
-        'pressure': np.random.normal(1013, 10, 1000)
-    })
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
     
-    print("Original dataset shape:", sample_data.shape)
-    print("\nOriginal statistics:")
-    for col in sample_data.columns:
-        stats = calculate_statistics(sample_data, col)
-        print(f"{col}: {stats}")
+    cleaned_df = clean_csv_data('test_data.csv', 'cleaned_data.csv', 'mean')
     
-    cleaned_data = clean_dataset(sample_data, ['temperature', 'humidity', 'pressure'])
-    
-    print("\nCleaned dataset shape:", cleaned_data.shape)
-    print("\nCleaned statistics:")
-    for col in cleaned_data.columns:
-        stats = calculate_statistics(cleaned_data, col)
-        print(f"{col}: {stats}")
-def remove_duplicates(sequence):
-    seen = set()
-    result = []
-    for item in sequence:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
+    validation = validate_dataframe(cleaned_df, ['id', 'value', 'category'])
+    print(f"Validation results: {validation}")
