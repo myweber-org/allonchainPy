@@ -132,4 +132,77 @@ def example_usage():
 
 if __name__ == "__main__":
     result_df = example_usage()
-    print(f"\nSample of cleaned data:\n{result_df.head()}")
+    print(f"\nSample of cleaned data:\n{result_df.head()}")import pandas as pd
+
+def clean_dataset(df, text_columns=None):
+    """
+    Clean a pandas DataFrame by removing rows with null values
+    and standardizing text columns to lowercase.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    text_columns (list): List of column names to standardize as text
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Remove rows with any null values
+    cleaned_df = cleaned_df.dropna()
+    
+    # Standardize text columns if specified
+    if text_columns:
+        for col in text_columns:
+            if col in cleaned_df.columns:
+                cleaned_df[col] = cleaned_df[col].astype(str).str.lower().str.strip()
+    
+    # Reset index after dropping rows
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate that a DataFrame meets basic requirements.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    bool: True if validation passes, False otherwise
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    
+    if df.empty:
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     sample_data = {
+#         'name': ['Alice', 'Bob', None, 'Charlie'],
+#         'age': [25, 30, 35, None],
+#         'email': ['ALICE@example.com', 'bob@test.com', 'charlie@demo.com', 'david@sample.com']
+#     }
+#     
+#     df = pd.DataFrame(sample_data)
+#     print("Original DataFrame:")
+#     print(df)
+#     
+#     cleaned = clean_dataset(df, text_columns=['email'])
+#     print("\nCleaned DataFrame:")
+#     print(cleaned)
+#     
+#     is_valid = validate_dataframe(cleaned, required_columns=['name', 'age', 'email'])
+#     print(f"\nDataFrame is valid: {is_valid}")
