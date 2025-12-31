@@ -1,93 +1,74 @@
 
+import numpy as np
 import pandas as pd
-import re
 
-def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+def remove_outliers_iqr(df, column):
     """
-    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean
-        column_mapping (dict, optional): Dictionary mapping old column names to new ones
-        drop_duplicates (bool): Whether to remove duplicate rows
-        normalize_text (bool): Whether to normalize text columns (strip, lower case)
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame
+    pd.DataFrame: DataFrame with outliers removed
     """
-    cleaned_df = df.copy()
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if column_mapping:
-        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates().reset_index(drop=True)
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    if normalize_text:
-        for col in cleaned_df.select_dtypes(include=['object']).columns:
-            cleaned_df[col] = cleaned_df[col].astype(str).str.strip().str.lower()
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
-    return cleaned_df
+    return filtered_df.reset_index(drop=True)
 
-def remove_special_characters(text, keep_pattern=r'[a-zA-Z0-9\s]'):
+def calculate_summary_stats(df, column):
     """
-    Remove special characters from text, keeping only alphanumeric and spaces by default.
+    Calculate summary statistics for a column.
     
-    Args:
-        text (str): Input text
-        keep_pattern (str): Regex pattern of characters to keep
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name
     
     Returns:
-        str: Cleaned text
+    dict: Dictionary containing summary statistics
     """
-    if pd.isna(text):
-        return text
-    
-    text = str(text)
-    return re.sub(f'[^{keep_pattern}]', '', text)
-
-def validate_email(email):
-    """
-    Validate email format using regex.
-    
-    Args:
-        email (str): Email address to validate
-    
-    Returns:
-        bool: True if email is valid, False otherwise
-    """
-    if pd.isna(email):
-        return False
-    
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return bool(re.match(pattern, str(email).strip()))
-
-def create_data_summary(df):
-    """
-    Create a summary dictionary with key statistics about the DataFrame.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-    
-    Returns:
-        dict: Summary statistics
-    """
-    summary = {
-        'total_rows': len(df),
-        'total_columns': len(df.columns),
-        'missing_values': df.isnull().sum().sum(),
-        'duplicate_rows': df.duplicated().sum(),
-        'column_types': df.dtypes.to_dict(),
-        'numeric_columns': list(df.select_dtypes(include=['number']).columns),
-        'text_columns': list(df.select_dtypes(include=['object']).columns)
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
     }
+    return stats
+
+def example_usage():
+    """
+    Example usage of the data cleaning functions.
+    """
+    np.random.seed(42)
+    data = pd.DataFrame({
+        'values': np.concatenate([
+            np.random.normal(100, 15, 95),
+            np.random.normal(300, 50, 5)
+        ])
+    })
     
-    return summary
-def remove_duplicates_preserve_order(sequence):
-    seen = set()
-    result = []
-    for item in sequence:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
+    print("Original data shape:", data.shape)
+    print("Original summary stats:", calculate_summary_stats(data, 'values'))
+    
+    cleaned_data = remove_outliers_iqr(data, 'values')
+    
+    print("\nCleaned data shape:", cleaned_data.shape)
+    print("Cleaned summary stats:", calculate_summary_stats(cleaned_data, 'values'))
+    
+    return cleaned_data
+
+if __name__ == "__main__":
+    cleaned = example_usage()
