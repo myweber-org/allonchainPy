@@ -1074,3 +1074,68 @@ if __name__ == "__main__":
     input_file = "raw_data.csv"
     output_file = "cleaned_data.csv"
     cleaned_df = clean_dataset(input_file, output_file)
+import pandas as pd
+import numpy as np
+from typing import Optional
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_duplicates(self) -> 'DataCleaner':
+        self.df = self.df.drop_duplicates()
+        return self
+        
+    def handle_missing_values(self, strategy: str = 'mean', fill_value: Optional[float] = None) -> 'DataCleaner':
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if strategy == 'mean':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mean())
+        elif strategy == 'median':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].median())
+        elif strategy == 'mode':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mode().iloc[0])
+        elif strategy == 'constant' and fill_value is not None:
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(fill_value)
+        elif strategy == 'drop':
+            self.df = self.df.dropna(subset=numeric_cols)
+            
+        return self
+        
+    def normalize_numeric(self) -> 'DataCleaner':
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        if len(numeric_cols) > 0:
+            self.df[numeric_cols] = (self.df[numeric_cols] - self.df[numeric_cols].mean()) / self.df[numeric_cols].std()
+        return self
+        
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df
+        
+    def get_summary(self) -> dict:
+        return {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': self.df.shape[0],
+            'cleaned_columns': self.df.shape[1],
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'missing_values': self.df.isnull().sum().sum()
+        }
+
+def load_and_clean_csv(filepath: str, **kwargs) -> pd.DataFrame:
+    df = pd.read_csv(filepath)
+    cleaner = DataCleaner(df)
+    
+    if 'remove_dups' in kwargs and kwargs['remove_dups']:
+        cleaner.remove_duplicates()
+        
+    if 'missing_strategy' in kwargs:
+        cleaner.handle_missing_values(
+            strategy=kwargs.get('missing_strategy', 'mean'),
+            fill_value=kwargs.get('fill_value')
+        )
+        
+    if 'normalize' in kwargs and kwargs['normalize']:
+        cleaner.normalize_numeric()
+        
+    return cleaner.get_cleaned_data()
