@@ -62,4 +62,115 @@ if __name__ == "__main__":
     print(f"Cleaned shape: {cleaned_data.shape}")
     print(f"Removed {len(sample_df) - len(cleaned_data)} outliers")
     print("\nCleaned data statistics:")
-    print(cleaned_data.describe())
+    print(cleaned_data.describe())import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def clean_csv_data(input_path, output_path=None, missing_strategy='drop'):
+    """
+    Clean CSV data by handling missing values and standardizing columns.
+    
+    Parameters:
+    input_path (str): Path to input CSV file
+    output_path (str, optional): Path for cleaned output CSV
+    missing_strategy (str): Strategy for handling missing values
+                           'drop': Remove rows with missing values
+                           'mean': Fill numeric columns with mean
+                           'median': Fill numeric columns with median
+                           'mode': Fill categorical columns with mode
+    
+    Returns:
+    pandas.DataFrame: Cleaned DataFrame
+    """
+    
+    if not Path(input_path).exists():
+        raise FileNotFoundError(f"Input file not found: {input_path}")
+    
+    df = pd.read_csv(input_path)
+    
+    original_shape = df.shape
+    print(f"Original data shape: {original_shape}")
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    categorical_cols = df.select_dtypes(exclude=[np.number]).columns
+    
+    if missing_strategy == 'drop':
+        df_cleaned = df.dropna()
+    elif missing_strategy == 'mean':
+        for col in numeric_cols:
+            if df[col].isnull().any():
+                df[col].fillna(df[col].mean(), inplace=True)
+    elif missing_strategy == 'median':
+        for col in numeric_cols:
+            if df[col].isnull().any():
+                df[col].fillna(df[col].median(), inplace=True)
+    elif missing_strategy == 'mode':
+        for col in categorical_cols:
+            if df[col].isnull().any():
+                df[col].fillna(df[col].mode()[0], inplace=True)
+    else:
+        raise ValueError(f"Unknown missing strategy: {missing_strategy}")
+    
+    cleaned_shape = df.shape
+    rows_removed = original_shape[0] - cleaned_shape[0]
+    print(f"Cleaned data shape: {cleaned_shape}")
+    print(f"Rows affected: {rows_removed}")
+    
+    if output_path:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+    
+    return df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pandas.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    dict: Validation results
+    """
+    
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f"Missing required columns: {missing_columns}")
+    
+    if df.empty:
+        validation_results['is_valid'] = False
+        validation_results['errors'].append("DataFrame is empty")
+    
+    duplicate_rows = df.duplicated().sum()
+    if duplicate_rows > 0:
+        validation_results['warnings'].append(f"Found {duplicate_rows} duplicate rows")
+    
+    null_count = df.isnull().sum().sum()
+    if null_count > 0:
+        validation_results['warnings'].append(f"Found {null_count} missing values")
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 3, 4, 5],
+        'value': [10.5, None, 15.2, 12.8, None],
+        'category': ['A', 'B', None, 'A', 'C']
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('test_data.csv', 'cleaned_data.csv', 'mean')
+    
+    validation = validate_dataframe(cleaned_df, ['id', 'value', 'category'])
+    print(f"Validation results: {validation}")
