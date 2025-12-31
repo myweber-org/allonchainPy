@@ -883,4 +883,55 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B'])
-    print(f"\nValidation: {is_valid} - {message}")
+    print(f"\nValidation: {is_valid} - {message}")import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_path, output_path):
+    """
+    Load a CSV file, clean missing values, and save the cleaned data.
+    """
+    try:
+        df = pd.read_csv(input_path)
+        print(f"Original shape: {df.shape}")
+        
+        # Handle missing values
+        # Fill numeric columns with median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df[col].isnull().sum() > 0:
+                df[col].fillna(df[col].median(), inplace=True)
+        
+        # Fill categorical columns with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if df[col].isnull().sum() > 0:
+                df[col].fillna(df[col].mode()[0], inplace=True)
+        
+        # Remove duplicate rows
+        df.drop_duplicates(inplace=True)
+        
+        print(f"Cleaned shape: {df.shape}")
+        
+        # Save cleaned data
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {input_path}")
+        return None
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_file, output_file)
+    
+    if cleaned_df is not None:
+        print("Data cleaning completed successfully.")
+        print(cleaned_df.head())
