@@ -15,18 +15,16 @@ def organize_files(directory):
             extension = extension.lower()
 
             if extension:
-                folder_name = extension[1:] + "_files"
+                target_folder = os.path.join(directory, extension[1:] + "_files")
             else:
-                folder_name = "no_extension_files"
-
-            target_folder = os.path.join(directory, folder_name)
+                target_folder = os.path.join(directory, "no_extension_files")
 
             if not os.path.exists(target_folder):
                 os.makedirs(target_folder)
 
             try:
                 shutil.move(file_path, os.path.join(target_folder, filename))
-                print(f"Moved: {filename} -> {folder_name}/")
+                print(f"Moved: {filename} -> {target_folder}")
             except Exception as e:
                 print(f"Failed to move {filename}: {e}")
 
