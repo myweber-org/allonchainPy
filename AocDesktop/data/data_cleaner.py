@@ -187,3 +187,125 @@ def process_dataframe(df, columns_to_clean):
             statistics[column] = stats
     
     return cleaned_df, statistics
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def clean_csv_data(input_path, output_path=None, fill_method='mean'):
+    """
+    Load a CSV file, clean missing values, and save cleaned data.
+    
+    Parameters:
+    input_path (str): Path to input CSV file
+    output_path (str, optional): Path for output CSV file
+    fill_method (str): Method for filling missing values ('mean', 'median', 'zero')
+    
+    Returns:
+    pandas.DataFrame: Cleaned DataFrame
+    """
+    try:
+        df = pd.read_csv(input_path)
+        
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        
+        if fill_method == 'mean':
+            fill_values = df[numeric_cols].mean()
+        elif fill_method == 'median':
+            fill_values = df[numeric_cols].median()
+        elif fill_method == 'zero':
+            fill_values = 0
+        else:
+            raise ValueError("fill_method must be 'mean', 'median', or 'zero'")
+        
+        df[numeric_cols] = df[numeric_cols].fillna(fill_values)
+        
+        if output_path:
+            output_path = Path(output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {input_path}")
+        raise
+    except pd.errors.EmptyDataError:
+        print("Error: The CSV file is empty")
+        raise
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        raise
+
+def detect_outliers_iqr(df, column, threshold=1.5):
+    """
+    Detect outliers using IQR method for a specific column.
+    
+    Parameters:
+    df (pandas.DataFrame): Input DataFrame
+    column (str): Column name to check for outliers
+    threshold (float): IQR multiplier threshold
+    
+    Returns:
+    pandas.Series: Boolean series indicating outliers
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        raise ValueError(f"Column '{column}' must be numeric")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    outliers = (df[column] < lower_bound) | (df[column] > upper_bound)
+    
+    return outliers
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Parameters:
+    df (pandas.DataFrame): Input DataFrame
+    subset (list, optional): Columns to consider for duplicates
+    keep (str): Which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+    pandas.DataFrame: DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 3, 4, 5],
+        'value': [10.5, None, 15.2, 20.1, None],
+        'category': ['A', 'B', 'A', 'C', 'B']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    test_file = 'test_data.csv'
+    df.to_csv(test_file, index=False)
+    
+    try:
+        cleaned_df = clean_csv_data(test_file, 'cleaned_data.csv', 'mean')
+        print("Data cleaning completed successfully")
+        print(f"Original shape: {df.shape}")
+        print(f"Cleaned shape: {cleaned_df.shape}")
+        
+        outliers = detect_outliers_iqr(cleaned_df, 'value')
+        print(f"Outliers detected: {outliers.sum()}")
+        
+        unique_df = remove_duplicates(cleaned_df)
+        print(f"After duplicate removal: {unique_df.shape}")
+        
+    finally:
+        import os
+        if os.path.exists(test_file):
+            os.remove(test_file)
+        if os.path.exists('cleaned_data.csv'):
+            os.remove('cleaned_data.csv')
