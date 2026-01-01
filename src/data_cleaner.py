@@ -259,3 +259,17 @@ if __name__ == "__main__":
     # Validate the cleaned data
     is_valid = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
     print(f"\nData validation passed: {is_valid}")
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+if __name__ == "__main__":
+    sample_list = [1, 2, 2, 3, 4, 3, 5, 1, 6]
+    cleaned_list = remove_duplicates_preserve_order(sample_list)
+    print(f"Original list: {sample_list}")
+    print(f"Cleaned list: {cleaned_list}")
