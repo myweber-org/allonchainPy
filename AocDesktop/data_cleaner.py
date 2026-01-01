@@ -390,3 +390,188 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataframe(cleaned_df, required_columns=['id', 'value'])
     print(f"\nValidation: {message}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns):
+    """
+    Remove outliers using IQR method for specified columns.
+    Returns cleaned DataFrame and outlier indices.
+    """
+    clean_df = df.copy()
+    outlier_indices = []
+    
+    for col in columns:
+        if col not in clean_df.columns:
+            continue
+            
+        Q1 = clean_df[col].quantile(0.25)
+        Q3 = clean_df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        
+        col_outliers = clean_df[(clean_df[col] < lower_bound) | (clean_df[col] > upper_bound)].index
+        outlier_indices.extend(col_outliers)
+        
+    outlier_indices = list(set(outlier_indices))
+    clean_df = clean_df.drop(outlier_indices)
+    
+    return clean_df, outlier_indices
+
+def normalize_minmax(df, columns):
+    """
+    Apply min-max normalization to specified columns.
+    Returns DataFrame with normalized values.
+    """
+    normalized_df = df.copy()
+    
+    for col in columns:
+        if col not in normalized_df.columns:
+            continue
+            
+        col_min = normalized_df[col].min()
+        col_max = normalized_df[col].max()
+        
+        if col_max != col_min:
+            normalized_df[col] = (normalized_df[col] - col_min) / (col_max - col_min)
+        else:
+            normalized_df[col] = 0
+    
+    return normalized_df
+
+def standardize_zscore(df, columns):
+    """
+    Apply z-score standardization to specified columns.
+    Returns DataFrame with standardized values.
+    """
+    standardized_df = df.copy()
+    
+    for col in columns:
+        if col not in standardized_df.columns:
+            continue
+            
+        col_mean = standardized_df[col].mean()
+        col_std = standardized_df[col].std()
+        
+        if col_std > 0:
+            standardized_df[col] = (standardized_df[col] - col_mean) / col_std
+        else:
+            standardized_df[col] = 0
+    
+    return standardized_df
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values using specified strategy.
+    Supported strategies: 'mean', 'median', 'mode', 'drop'
+    """
+    if columns is None:
+        columns = df.columns
+    
+    processed_df = df.copy()
+    
+    if strategy == 'drop':
+        return processed_df.dropna(subset=columns)
+    
+    for col in columns:
+        if col not in processed_df.columns:
+            continue
+            
+        if processed_df[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = processed_df[col].mean()
+            elif strategy == 'median':
+                fill_value = processed_df[col].median()
+            elif strategy == 'mode':
+                fill_value = processed_df[col].mode()[0] if not processed_df[col].mode().empty else 0
+            else:
+                fill_value = 0
+                
+            processed_df[col] = processed_df[col].fillna(fill_value)
+    
+    return processed_df
+
+def validate_dataframe(df, required_columns=None, numeric_columns=None):
+    """
+    Validate DataFrame structure and data types.
+    Returns validation results dictionary.
+    """
+    validation_results = {
+        'is_valid': True,
+        'missing_columns': [],
+        'non_numeric_columns': [],
+        'empty_dataframe': False,
+        'null_values': {}
+    }
+    
+    if df.empty:
+        validation_results['empty_dataframe'] = True
+        validation_results['is_valid'] = False
+        return validation_results
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            validation_results['missing_columns'] = missing
+            validation_results['is_valid'] = False
+    
+    if numeric_columns:
+        non_numeric = []
+        for col in numeric_columns:
+            if col in df.columns:
+                if not np.issubdtype(df[col].dtype, np.number):
+                    non_numeric.append(col)
+        
+        if non_numeric:
+            validation_results['non_numeric_columns'] = non_numeric
+            validation_results['is_valid'] = False
+    
+    null_counts = df.isnull().sum()
+    null_columns = null_counts[null_counts > 0].to_dict()
+    if null_columns:
+        validation_results['null_values'] = null_columns
+    
+    return validation_results
+
+def create_data_summary(df):
+    """
+    Create comprehensive summary statistics for DataFrame.
+    Returns summary dictionary.
+    """
+    summary = {
+        'shape': df.shape,
+        'columns': list(df.columns),
+        'dtypes': df.dtypes.to_dict(),
+        'missing_values': df.isnull().sum().to_dict(),
+        'numeric_summary': {},
+        'categorical_summary': {}
+    }
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    categorical_cols = df.select_dtypes(exclude=[np.number]).columns
+    
+    for col in numeric_cols:
+        summary['numeric_summary'][col] = {
+            'mean': df[col].mean(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            '25%': df[col].quantile(0.25),
+            '50%': df[col].quantile(0.50),
+            '75%': df[col].quantile(0.75),
+            'max': df[col].max(),
+            'skewness': df[col].skew(),
+            'kurtosis': df[col].kurtosis()
+        }
+    
+    for col in categorical_cols:
+        value_counts = df[col].value_counts()
+        summary['categorical_summary'][col] = {
+            'unique_values': df[col].nunique(),
+            'top_value': value_counts.index[0] if not value_counts.empty else None,
+            'top_frequency': value_counts.iloc[0] if not value_counts.empty else 0,
+            'value_counts': value_counts.head(10).to_dict()
+        }
+    
+    return summary
