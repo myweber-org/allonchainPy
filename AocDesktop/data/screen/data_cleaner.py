@@ -1,111 +1,67 @@
 import pandas as pd
-import numpy as np
+import re
 
-def clean_missing_values(df, strategy='mean', columns=None):
+def clean_text_column(df, column_name):
     """
-    Handle missing values in a DataFrame.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    strategy (str): Strategy to handle missing values. 
-                    Options: 'mean', 'median', 'mode', 'drop'.
-    columns (list): List of columns to apply cleaning. If None, applies to all numeric columns.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
+    Standardize text in a DataFrame column by converting to lowercase,
+    removing extra whitespace, and stripping special characters.
     """
-    df_clean = df.copy()
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
     
-    if columns is None:
-        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
-        columns = list(numeric_cols)
+    df[column_name] = df[column_name].astype(str).str.lower()
+    df[column_name] = df[column_name].str.strip()
+    df[column_name] = df[column_name].apply(lambda x: re.sub(r'[^\w\s]', '', x))
+    df[column_name] = df[column_name].str.replace(r'\s+', ' ', regex=True)
     
-    if strategy == 'drop':
-        df_clean = df_clean.dropna(subset=columns)
-    else:
-        for col in columns:
-            if df_clean[col].isnull().any():
-                if strategy == 'mean':
-                    fill_value = df_clean[col].mean()
-                elif strategy == 'median':
-                    fill_value = df_clean[col].median()
-                elif strategy == 'mode':
-                    fill_value = df_clean[col].mode()[0]
-                else:
-                    raise ValueError(f"Unsupported strategy: {strategy}")
-                
-                df_clean[col] = df_clean[col].fillna(fill_value)
-    
-    return df_clean
+    return df
 
-def remove_outliers_iqr(df, columns=None, multiplier=1.5):
+def remove_duplicates(df, subset=None, keep='first'):
     """
-    Remove outliers using the Interquartile Range (IQR) method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    columns (list): List of columns to check for outliers.
-    multiplier (float): IQR multiplier for outlier detection.
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed.
+    Remove duplicate rows from a DataFrame.
     """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
-    df_clean = df.copy()
-    
-    for col in columns:
-        Q1 = df_clean[col].quantile(0.25)
-        Q3 = df_clean[col].quantile(0.75)
-        IQR = Q3 - Q1
-        
-        lower_bound = Q1 - multiplier * IQR
-        upper_bound = Q3 + multiplier * IQR
-        
-        df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
-    
-    return df_clean
+    return df.drop_duplicates(subset=subset, keep=keep)
 
-def standardize_columns(df, columns=None):
+def validate_email_column(df, column_name):
     """
-    Standardize numeric columns to have zero mean and unit variance.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    columns (list): List of columns to standardize.
-    
-    Returns:
-    pd.DataFrame: DataFrame with standardized columns.
+    Validate email addresses in a DataFrame column.
+    Returns a boolean Series indicating valid emails.
     """
-    from sklearn.preprocessing import StandardScaler
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
     
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
-    df_clean = df.copy()
-    scaler = StandardScaler()
-    
-    df_clean[columns] = scaler.fit_transform(df_clean[columns])
-    
-    return df_clean
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return df[column_name].str.match(email_pattern)
 
-if __name__ == "__main__":
-    sample_data = {
-        'A': [1, 2, np.nan, 4, 5],
-        'B': [10, 20, 30, np.nan, 50],
-        'C': [100, 200, 300, 400, 500],
-        'category': ['X', 'Y', 'X', 'Y', 'Z']
+def main():
+    # Example usage
+    data = {
+        'name': ['John Doe', 'Jane Smith', 'john doe', 'Bob Johnson  ', 'ALICE'],
+        'email': ['john@example.com', 'jane@test.org', 'invalid-email', 'bob@company.com', 'alice@domain.net'],
+        'age': [25, 30, 25, 35, 28]
     }
     
-    df = pd.DataFrame(sample_data)
+    df = pd.DataFrame(data)
     print("Original DataFrame:")
     print(df)
+    print()
     
-    cleaned_df = clean_missing_values(df, strategy='mean')
-    print("\nDataFrame after cleaning missing values:")
-    print(cleaned_df)
+    # Clean text column
+    df_cleaned = clean_text_column(df.copy(), 'name')
+    print("After cleaning 'name' column:")
+    print(df_cleaned)
+    print()
     
-    standardized_df = standardize_columns(cleaned_df, columns=['A', 'B', 'C'])
-    print("\nDataFrame after standardization:")
-    print(standardized_df)
+    # Remove duplicates
+    df_no_dupes = remove_duplicates(df_cleaned, subset=['name'], keep='first')
+    print("After removing duplicate names:")
+    print(df_no_dupes)
+    print()
+    
+    # Validate emails
+    valid_emails = validate_email_column(df, 'email')
+    print("Valid email addresses:")
+    print(valid_emails)
+
+if __name__ == "__main__":
+    main()
