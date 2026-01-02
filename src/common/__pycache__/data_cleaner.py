@@ -1,10 +1,10 @@
 
-import numpy as np
 import pandas as pd
+import numpy as np
 
 def remove_outliers_iqr(df, column):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Remove outliers from a DataFrame column using the Interquartile Range (IQR) method.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
@@ -29,7 +29,7 @@ def remove_outliers_iqr(df, column):
 
 def calculate_summary_statistics(df, column):
     """
-    Calculate summary statistics for a DataFrame column.
+    Calculate summary statistics for a column after outlier removal.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
@@ -47,34 +47,34 @@ def calculate_summary_statistics(df, column):
         'std': df[column].std(),
         'min': df[column].min(),
         'max': df[column].max(),
-        'count': df[column].count(),
-        'missing': df[column].isnull().sum()
+        'count': df[column].count()
     }
     
     return stats
 
 def example_usage():
     """
-    Example usage of the data cleaning functions.
+    Example demonstrating the usage of data cleaning functions.
     """
     np.random.seed(42)
     
     data = {
         'id': range(1, 101),
-        'value': np.random.normal(100, 15, 100)
+        'value': np.concatenate([
+            np.random.normal(100, 15, 90),
+            np.array([500, -300, 1000, 800, -500, 600, -400, 700, 900, -600])
+        ])
     }
     
     df = pd.DataFrame(data)
     
-    print("Original DataFrame shape:", df.shape)
-    print("Original summary statistics:")
-    print(calculate_summary_statistics(df, 'value'))
+    print("Original data shape:", df.shape)
+    print("Original statistics:", calculate_summary_statistics(df, 'value'))
     
     cleaned_df = remove_outliers_iqr(df, 'value')
     
-    print("\nCleaned DataFrame shape:", cleaned_df.shape)
-    print("Cleaned summary statistics:")
-    print(calculate_summary_statistics(cleaned_df, 'value'))
+    print("\nCleaned data shape:", cleaned_df.shape)
+    print("Cleaned statistics:", calculate_summary_statistics(cleaned_df, 'value'))
     
     return cleaned_df
 
