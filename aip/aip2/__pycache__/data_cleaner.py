@@ -97,3 +97,11 @@ if __name__ == "__main__":
     print("\nStatistics for column 'A':")
     for key, value in stats['A'].items():
         print(f"{key}: {value:.2f}")
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
