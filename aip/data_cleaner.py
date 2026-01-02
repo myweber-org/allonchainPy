@@ -1,40 +1,53 @@
 
-import numpy as np
+import pandas as pd
+import re
 
-def remove_outliers_iqr(data, column):
+def clean_text_column(df, column_name):
     """
-    Remove outliers from a pandas DataFrame column using the IQR method.
-    
-    Parameters:
-    data (pd.DataFrame): The input DataFrame.
-    column (str): The column name to clean.
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed.
+    Standardize text by converting to lowercase, removing extra spaces,
+    and stripping special characters except alphanumeric and basic punctuation.
     """
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
     
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    df[column_name] = df[column_name].astype(str).str.lower()
+    df[column_name] = df[column_name].apply(lambda x: re.sub(r'\s+', ' ', x.strip()))
+    df[column_name] = df[column_name].apply(lambda x: re.sub(r'[^\w\s.,!?-]', '', x))
+    return df
 
-def calculate_basic_stats(data, column):
+def remove_duplicates(df, subset=None, keep='first'):
     """
-    Calculate basic statistics for a column.
-    
-    Parameters:
-    data (pd.DataFrame): The input DataFrame.
-    column (str): The column name.
-    
-    Returns:
-    dict: Dictionary containing mean, median, and standard deviation.
+    Remove duplicate rows from DataFrame.
     """
-    stats = {
-        'mean': np.mean(data[column]),
-        'median': np.median(data[column]),
-        'std': np.std(data[column])
-    }
-    return stats
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def standardize_dates(df, column_name, date_format='%Y-%m-%d'):
+    """
+    Attempt to parse and standardize date column to specified format.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    df[column_name] = pd.to_datetime(df[column_name], errors='coerce').dt.strftime(date_format)
+    return df
+
+def clean_dataset(df, text_columns=None, date_columns=None, deduplicate=True):
+    """
+    Main function to clean dataset with multiple operations.
+    """
+    df_clean = df.copy()
+    
+    if deduplicate:
+        df_clean = remove_duplicates(df_clean)
+    
+    if text_columns:
+        for col in text_columns:
+            if col in df_clean.columns:
+                df_clean = clean_text_column(df_clean, col)
+    
+    if date_columns:
+        for col in date_columns:
+            if col in df_clean.columns:
+                df_clean = standardize_dates(df_clean, col)
+    
+    return df_clean
