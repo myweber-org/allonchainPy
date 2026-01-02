@@ -193,4 +193,67 @@ if __name__ == "__main__":
     if result >= 0:
         sys.exit(0)
     else:
-        sys.exit(1)
+        sys.exit(1)import re
+import pandas as pd
+from typing import Optional, List, Union
+
+def clean_string(text: str, remove_digits: bool = False) -> str:
+    """Clean a string by removing extra whitespace and optionally digits."""
+    if not isinstance(text, str):
+        return ''
+    cleaned = re.sub(r'\s+', ' ', text.strip())
+    if remove_digits:
+        cleaned = re.sub(r'\d+', '', cleaned)
+    return cleaned
+
+def validate_email(email: str) -> bool:
+    """Validate an email address format."""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def normalize_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """Normalize a DataFrame column to lowercase and strip whitespace."""
+    if column in df.columns:
+        df[column] = df[column].astype(str).str.lower().str.strip()
+    return df
+
+def filter_outliers_iqr(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """Filter outliers from a DataFrame column using the IQR method."""
+    if column not in df.columns:
+        return df
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def convert_to_datetime(df: pd.DataFrame, column: str, format: Optional[str] = None) -> pd.DataFrame:
+    """Convert a column to datetime format."""
+    if column in df.columns:
+        if format:
+            df[column] = pd.to_datetime(df[column], format=format, errors='coerce')
+        else:
+            df[column] = pd.to_datetime(df[column], errors='coerce')
+    return df
+
+def fill_missing_with_mean(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """Fill missing values in a numeric column with the column mean."""
+    if column in df.columns and pd.api.types.is_numeric_dtype(df[column]):
+        df[column] = df[column].fillna(df[column].mean())
+    return df
+
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+    """Remove duplicate rows from a DataFrame."""
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def categorize_age(age: Union[int, float]) -> str:
+    """Categorize a numerical age into a descriptive group."""
+    if not isinstance(age, (int, float)):
+        return 'Unknown'
+    if age < 18:
+        return 'Minor'
+    elif age < 65:
+        return 'Adult'
+    else:
+        return 'Senior'
