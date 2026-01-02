@@ -132,3 +132,113 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation: {message}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, missing_strategy='mean', outlier_method='iqr', columns=None):
+    """
+    Clean a dataset by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    missing_strategy (str): Strategy for missing values ('mean', 'median', 'mode', 'drop')
+    outlier_method (str): Method for outlier detection ('iqr', 'zscore')
+    columns (list): Specific columns to clean, if None clean all numeric columns
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns.tolist()
+    else:
+        numeric_cols = [col for col in columns if col in df_clean.columns]
+    
+    # Handle missing values
+    for col in numeric_cols:
+        if df_clean[col].isnull().any():
+            if missing_strategy == 'mean':
+                df_clean[col].fillna(df_clean[col].mean(), inplace=True)
+            elif missing_strategy == 'median':
+                df_clean[col].fillna(df_clean[col].median(), inplace=True)
+            elif missing_strategy == 'mode':
+                df_clean[col].fillna(df_clean[col].mode()[0], inplace=True)
+            elif missing_strategy == 'drop':
+                df_clean.dropna(subset=[col], inplace=True)
+    
+    # Handle outliers
+    for col in numeric_cols:
+        if outlier_method == 'iqr':
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            # Cap outliers
+            df_clean[col] = np.where(df_clean[col] < lower_bound, lower_bound, df_clean[col])
+            df_clean[col] = np.where(df_clean[col] > upper_bound, upper_bound, df_clean[col])
+            
+        elif outlier_method == 'zscore':
+            mean_val = df_clean[col].mean()
+            std_val = df_clean[col].std()
+            z_scores = np.abs((df_clean[col] - mean_val) / std_val)
+            
+            # Cap values beyond 3 standard deviations
+            df_clean[col] = np.where(z_scores > 3, 
+                                    np.sign(df_clean[col] - mean_val) * 3 * std_val + mean_val, 
+                                    df_clean[col])
+    
+    return df_clean
+
+def validate_cleaning(df_original, df_cleaned):
+    """
+    Validate the cleaning process by comparing statistics.
+    
+    Parameters:
+    df_original (pd.DataFrame): Original DataFrame
+    df_cleaned (pd.DataFrame): Cleaned DataFrame
+    
+    Returns:
+    dict: Dictionary with validation metrics
+    """
+    validation = {}
+    
+    numeric_cols = df_original.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        if col in df_cleaned.columns:
+            validation[col] = {
+                'original_missing': df_original[col].isnull().sum(),
+                'cleaned_missing': df_cleaned[col].isnull().sum(),
+                'original_range': (df_original[col].min(), df_original[col].max()),
+                'cleaned_range': (df_cleaned[col].min(), df_cleaned[col].max()),
+                'original_std': df_original[col].std(),
+                'cleaned_std': df_cleaned[col].std()
+            }
+    
+    return validation
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 100],
+        'B': [5, 6, 7, np.nan, 9],
+        'C': [10, 11, 12, 13, 14]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned_df = clean_dataset(df, missing_strategy='mean', outlier_method='iqr')
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print("\n")
+    
+    validation_results = validate_cleaning(df, cleaned_df)
+    print("Validation Results:")
+    for col, metrics in validation_results.items():
+        print(f"{col}: {metrics}")
