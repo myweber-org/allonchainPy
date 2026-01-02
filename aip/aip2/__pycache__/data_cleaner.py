@@ -105,3 +105,122 @@ def remove_duplicates(sequence):
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def load_data(filepath):
+    """Load data from CSV file."""
+    try:
+        df = pd.read_csv(filepath)
+        print(f"Loaded {len(df)} records from {filepath}")
+        return df
+    except FileNotFoundError:
+        print(f"Error: File {filepath} not found")
+        return None
+
+def remove_duplicates(df, subset=None):
+    """Remove duplicate rows from DataFrame."""
+    if df is None or df.empty:
+        return df
+    
+    initial_count = len(df)
+    
+    if subset:
+        df_clean = df.drop_duplicates(subset=subset, keep='first')
+    else:
+        df_clean = df.drop_duplicates(keep='first')
+    
+    removed_count = initial_count - len(df_clean)
+    print(f"Removed {removed_count} duplicate records")
+    
+    return df_clean
+
+def clean_missing_values(df, strategy='drop'):
+    """Handle missing values in DataFrame."""
+    if df is None or df.empty:
+        return df
+    
+    missing_before = df.isnull().sum().sum()
+    
+    if strategy == 'drop':
+        df_clean = df.dropna()
+    elif strategy == 'fill':
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        df_clean = df.copy()
+        df_clean[numeric_cols] = df_clean[numeric_cols].fillna(df_clean[numeric_cols].mean())
+    else:
+        df_clean = df.copy()
+    
+    missing_after = df_clean.isnull().sum().sum()
+    print(f"Reduced missing values from {missing_before} to {missing_after}")
+    
+    return df_clean
+
+def validate_data(df):
+    """Perform basic data validation."""
+    if df is None or df.empty:
+        print("No data to validate")
+        return False
+    
+    validation_passed = True
+    
+    if df.isnull().any().any():
+        print("Warning: Data contains missing values")
+        validation_passed = False
+    
+    duplicate_count = df.duplicated().sum()
+    if duplicate_count > 0:
+        print(f"Warning: Data contains {duplicate_count} duplicate rows")
+        validation_passed = False
+    
+    if validation_passed:
+        print("Data validation passed")
+    
+    return validation_passed
+
+def save_clean_data(df, output_path):
+    """Save cleaned DataFrame to CSV."""
+    if df is None or df.empty:
+        print("No data to save")
+        return False
+    
+    try:
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(output_path, index=False)
+        print(f"Saved {len(df)} records to {output_path}")
+        return True
+    except Exception as e:
+        print(f"Error saving data: {e}")
+        return False
+
+def main():
+    """Main function to execute data cleaning pipeline."""
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    print("Starting data cleaning process...")
+    
+    df = load_data(input_file)
+    if df is None:
+        return
+    
+    print("Removing duplicates...")
+    df = remove_duplicates(df, subset=['id', 'timestamp'])
+    
+    print("Cleaning missing values...")
+    df = clean_missing_values(df, strategy='fill')
+    
+    print("Validating data...")
+    if validate_data(df):
+        print("Data cleaning completed successfully")
+    else:
+        print("Data cleaning completed with warnings")
+    
+    save_clean_data(df, output_file)
+    
+    print("Data cleaning pipeline finished")
+
+if __name__ == "__main__":
+    main()
