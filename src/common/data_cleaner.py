@@ -373,3 +373,55 @@ def example_usage():
     print(f"Summary: {summary}")
     
     return cleaned_df
+import pandas as pd
+import numpy as np
+import sys
+
+def clean_csv(input_file, output_file):
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original shape: {df.shape}")
+        
+        df_cleaned = df.copy()
+        
+        numeric_columns = df_cleaned.select_dtypes(include=[np.number]).columns
+        for col in numeric_columns:
+            if df_cleaned[col].isnull().sum() > 0:
+                df_cleaned[col].fillna(df_cleaned[col].median(), inplace=True)
+        
+        categorical_columns = df_cleaned.select_dtypes(include=['object']).columns
+        for col in categorical_columns:
+            if df_cleaned[col].isnull().sum() > 0:
+                df_cleaned[col].fillna('Unknown', inplace=True)
+        
+        df_cleaned = df_cleaned.drop_duplicates()
+        
+        df_cleaned.to_csv(output_file, index=False)
+        print(f"Cleaned shape: {df_cleaned.shape}")
+        print(f"Cleaned data saved to: {output_file}")
+        
+        missing_report = df_cleaned.isnull().sum()
+        if missing_report.sum() == 0:
+            print("No missing values remaining")
+        else:
+            print("Remaining missing values:")
+            print(missing_report[missing_report > 0])
+            
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found")
+        sys.exit(1)
+    except pd.errors.EmptyDataError:
+        print("Error: Input file is empty")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error during processing: {str(e)}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: python data_cleaner.py <input_file.csv> <output_file.csv>")
+        sys.exit(1)
+    
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    clean_csv(input_file, output_file)
