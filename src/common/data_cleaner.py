@@ -425,3 +425,122 @@ if __name__ == "__main__":
     input_file = sys.argv[1]
     output_file = sys.argv[2]
     clean_csv(input_file, output_file)
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+class CSVDataCleaner:
+    def __init__(self, file_path):
+        self.file_path = Path(file_path)
+        self.df = None
+        self.cleaning_report = {}
+        
+    def load_data(self):
+        try:
+            self.df = pd.read_csv(self.file_path)
+            self.cleaning_report['original_rows'] = len(self.df)
+            self.cleaning_report['original_columns'] = len(self.df.columns)
+            return True
+        except Exception as e:
+            print(f"Error loading file: {e}")
+            return False
+    
+    def handle_missing_values(self, strategy='mean', fill_value=None):
+        if self.df is None:
+            print("No data loaded. Call load_data() first.")
+            return
+        
+        missing_before = self.df.isnull().sum().sum()
+        self.cleaning_report['missing_before'] = missing_before
+        
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols:
+            if self.df[col].isnull().any():
+                if strategy == 'mean':
+                    fill_val = self.df[col].mean()
+                elif strategy == 'median':
+                    fill_val = self.df[col].median()
+                elif strategy == 'mode':
+                    fill_val = self.df[col].mode()[0]
+                elif strategy == 'constant' and fill_value is not None:
+                    fill_val = fill_value
+                else:
+                    continue
+                
+                self.df[col].fillna(fill_val, inplace=True)
+        
+        missing_after = self.df.isnull().sum().sum()
+        self.cleaning_report['missing_after'] = missing_after
+        self.cleaning_report['missing_fixed'] = missing_before - missing_after
+    
+    def remove_duplicates(self):
+        if self.df is None:
+            print("No data loaded. Call load_data() first.")
+            return
+        
+        duplicates_before = self.df.duplicated().sum()
+        self.cleaning_report['duplicates_before'] = duplicates_before
+        
+        self.df.drop_duplicates(inplace=True)
+        
+        duplicates_after = self.df.duplicated().sum()
+        self.cleaning_report['duplicates_after'] = duplicates_after
+        self.cleaning_report['duplicates_removed'] = duplicates_before
+    
+    def standardize_column_names(self):
+        if self.df is None:
+            print("No data loaded. Call load_data() first.")
+            return
+        
+        new_columns = {}
+        for col in self.df.columns:
+            new_name = col.strip().lower().replace(' ', '_').replace('-', '_')
+            new_columns[col] = new_name
+        
+        self.df.rename(columns=new_columns, inplace=True)
+        self.cleaning_report['columns_renamed'] = len(new_columns)
+    
+    def save_cleaned_data(self, output_path=None):
+        if self.df is None:
+            print("No data to save. Perform cleaning operations first.")
+            return
+        
+        if output_path is None:
+            output_path = self.file_path.parent / f"cleaned_{self.file_path.name}"
+        
+        self.df.to_csv(output_path, index=False)
+        self.cleaning_report['output_file'] = str(output_path)
+        return output_path
+    
+    def generate_report(self):
+        report_lines = [
+            "Data Cleaning Report",
+            "=" * 50,
+            f"Original dataset: {self.cleaning_report.get('original_rows', 'N/A')} rows, "
+            f"{self.cleaning_report.get('original_columns', 'N/A')} columns",
+            f"Missing values handled: {self.cleaning_report.get('missing_fixed', 0)}",
+            f"Duplicates removed: {self.cleaning_report.get('duplicates_removed', 0)}",
+            f"Columns renamed: {self.cleaning_report.get('columns_renamed', 0)}",
+            f"Final dataset: {len(self.df) if self.df is not None else 'N/A'} rows, "
+            f"{len(self.df.columns) if self.df is not None else 'N/A'} columns",
+            f"Output saved to: {self.cleaning_report.get('output_file', 'Not saved yet')}"
+        ]
+        
+        return "\n".join(report_lines)
+
+def clean_csv_file(input_file, output_file=None):
+    cleaner = CSVDataCleaner(input_file)
+    
+    if not cleaner.load_data():
+        return None
+    
+    cleaner.handle_missing_values(strategy='mean')
+    cleaner.remove_duplicates()
+    cleaner.standardize_column_names()
+    
+    output_path = cleaner.save_cleaned_data(output_file)
+    report = cleaner.generate_report()
+    
+    print(report)
+    return output_path
