@@ -284,3 +284,113 @@ if __name__ == "__main__":
     is_valid, message = validate_data(cleaned_df, required_columns=['Column_A', 'Column_B', 'C'])
     print(f"Validation result: {is_valid}")
     print(f"Validation message: {message}")
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, threshold=1.5):
+    """
+    Remove outliers from a column using the IQR method.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to process
+    threshold (float): IQR multiplier for outlier detection
+    
+    Returns:
+    pd.DataFrame: Dataframe with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data.copy()
+
+def normalize_minmax(data, columns=None):
+    """
+    Normalize specified columns using min-max scaling.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    columns (list): List of column names to normalize. If None, normalize all numeric columns.
+    
+    Returns:
+    pd.DataFrame: Dataframe with normalized columns
+    """
+    if columns is None:
+        numeric_cols = data.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    normalized_data = data.copy()
+    
+    for col in columns:
+        if col not in normalized_data.columns:
+            continue
+            
+        if normalized_data[col].dtype in [np.float64, np.int64]:
+            col_min = normalized_data[col].min()
+            col_max = normalized_data[col].max()
+            
+            if col_max != col_min:
+                normalized_data[col] = (normalized_data[col] - col_min) / (col_max - col_min)
+            else:
+                normalized_data[col] = 0
+    
+    return normalized_data
+
+def clean_dataset(data, outlier_columns=None, normalize_columns=None, outlier_threshold=1.5):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    outlier_columns (list): Columns to remove outliers from
+    normalize_columns (list): Columns to normalize
+    outlier_threshold (float): IQR threshold for outlier detection
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    cleaned_data = data.copy()
+    
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in cleaned_data.columns:
+                cleaned_data = remove_outliers_iqr(cleaned_data, col, outlier_threshold)
+    
+    if normalize_columns:
+        cleaned_data = normalize_minmax(cleaned_data, normalize_columns)
+    
+    cleaned_data = cleaned_data.reset_index(drop=True)
+    return cleaned_data
+
+def validate_data(data, required_columns=None, allow_nan=False):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    data (pd.DataFrame): Dataframe to validate
+    required_columns (list): List of required column names
+    allow_nan (bool): Whether NaN values are allowed
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(data, pd.DataFrame):
+        return False, "Input must be a pandas DataFrame"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in data.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    if not allow_nan and data.isnull().any().any():
+        return False, "Dataframe contains NaN values"
+    
+    return True, "Data validation passed"
