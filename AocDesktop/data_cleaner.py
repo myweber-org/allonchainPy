@@ -1,16 +1,14 @@
-
 import pandas as pd
-import numpy as np
 
-def clean_dataset(df, drop_duplicates=True, handle_nulls='drop', fill_value=None):
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     """
-    Clean a pandas DataFrame by removing duplicates and handling null values.
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to drop duplicate rows.
-    handle_nulls (str): Method to handle nulls - 'drop', 'fill', or 'ignore'.
-    fill_value: Value to fill nulls with if handle_nulls is 'fill'.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    fill_missing (str): Strategy to fill missing values. 
+                        Options: 'mean', 'median', 'mode', or 'drop'. Default is 'mean'.
     
     Returns:
     pd.DataFrame: Cleaned DataFrame.
@@ -20,57 +18,55 @@ def clean_dataset(df, drop_duplicates=True, handle_nulls='drop', fill_value=None
     if drop_duplicates:
         cleaned_df = cleaned_df.drop_duplicates()
     
-    if handle_nulls == 'drop':
+    if fill_missing == 'drop':
         cleaned_df = cleaned_df.dropna()
-    elif handle_nulls == 'fill' and fill_value is not None:
-        cleaned_df = cleaned_df.fillna(fill_value)
+    elif fill_missing in ['mean', 'median', 'mode']:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+            elif fill_missing == 'median':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+            elif fill_missing == 'mode':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0])
     
     return cleaned_df
 
 def validate_dataframe(df, required_columns=None):
     """
-    Validate DataFrame structure and content.
+    Validate a DataFrame for basic integrity checks.
     
     Parameters:
     df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of required column names.
+    required_columns (list): List of column names that must be present.
     
     Returns:
-    tuple: (is_valid, error_message)
+    tuple: (is_valid, message)
     """
-    if not isinstance(df, pd.DataFrame):
-        return False, "Input is not a pandas DataFrame"
-    
     if df.empty:
         return False, "DataFrame is empty"
     
     if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
     
     return True, "DataFrame is valid"
 
-def remove_outliers_iqr(df, column, multiplier=1.5):
-    """
-    Remove outliers from a DataFrame column using IQR method.
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, None],
+        'B': [5, None, 7, 8, 9],
+        'C': ['x', 'y', 'y', 'z', 'z']
+    }
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    column (str): Column name to process.
-    multiplier (float): IQR multiplier for outlier detection.
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
     
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed.
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    cleaned = clean_dataset(df, fill_missing='median')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
     
-    q1 = df[column].quantile(0.25)
-    q3 = df[column].quantile(0.75)
-    iqr = q3 - q1
-    
-    lower_bound = q1 - multiplier * iqr
-    upper_bound = q3 + multiplier * iqr
-    
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B'])
+    print(f"\nValidation: {message}")
