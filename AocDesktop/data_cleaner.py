@@ -2,96 +2,41 @@
 import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    return filtered_df
-
-def clean_dataset(input_file, output_file):
-    df = pd.read_csv(input_file)
-    numeric_columns = df.select_dtypes(include=[np.number]).columns
-    
-    for col in numeric_columns:
-        original_count = len(df)
-        df = remove_outliers_iqr(df, col)
-        removed_count = original_count - len(df)
-        if removed_count > 0:
-            print(f"Removed {removed_count} outliers from column '{col}'")
-    
-    df.to_csv(output_file, index=False)
-    print(f"Cleaned data saved to {output_file}")
-    return df
-
-if __name__ == "__main__":
-    cleaned_df = clean_dataset("raw_data.csv", "cleaned_data.csv")
-    print(f"Dataset shape after cleaning: {cleaned_df.shape}")
-import pandas as pd
-import numpy as np
-
-def remove_outliers_iqr(df, column):
+def clean_dataset(df, drop_duplicates=True, handle_nulls='drop', fill_value=None):
     """
-    Remove outliers from a DataFrame column using the IQR method.
+    Clean a pandas DataFrame by removing duplicates and handling null values.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    handle_nulls (str): Method to handle nulls - 'drop', 'fill', or 'ignore'.
+    fill_value: Value to fill nulls with if handle_nulls is 'fill'.
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    pd.DataFrame: Cleaned DataFrame.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    cleaned_df = df.copy()
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    if handle_nulls == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif handle_nulls == 'fill' and fill_value is not None:
+        cleaned_df = cleaned_df.fillna(fill_value)
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
-
-def calculate_statistics(df, column):
-    """
-    Calculate basic statistics for a column.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
-    
-    Returns:
-    dict: Dictionary containing statistics
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
-    }
-    
-    return stats
+    return cleaned_df
 
 def validate_dataframe(df, required_columns=None):
     """
     Validate DataFrame structure and content.
     
     Parameters:
-    df (pd.DataFrame): DataFrame to validate
-    required_columns (list): List of required column names
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
     
     Returns:
-    tuple: (is_valid, message)
+    tuple: (is_valid, error_message)
     """
     if not isinstance(df, pd.DataFrame):
         return False, "Input is not a pandas DataFrame"
@@ -106,28 +51,26 @@ def validate_dataframe(df, required_columns=None):
     
     return True, "DataFrame is valid"
 
-def example_usage():
+def remove_outliers_iqr(df, column, multiplier=1.5):
     """
-    Example usage of the data cleaning functions.
+    Remove outliers from a DataFrame column using IQR method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to process.
+    multiplier (float): IQR multiplier for outlier detection.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
     """
-    np.random.seed(42)
-    data = {
-        'id': range(100),
-        'value': np.random.normal(100, 15, 100)
-    }
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    df = pd.DataFrame(data)
+    q1 = df[column].quantile(0.25)
+    q3 = df[column].quantile(0.75)
+    iqr = q3 - q1
     
-    print("Original DataFrame shape:", df.shape)
-    print("Original statistics:", calculate_statistics(df, 'value'))
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
     
-    cleaned_df = remove_outliers_iqr(df, 'value')
-    
-    print("\nCleaned DataFrame shape:", cleaned_df.shape)
-    print("Cleaned statistics:", calculate_statistics(cleaned_df, 'value'))
-    
-    is_valid, message = validate_dataframe(cleaned_df, ['id', 'value'])
-    print(f"\nDataFrame validation: {message}")
-
-if __name__ == "__main__":
-    example_usage()
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
