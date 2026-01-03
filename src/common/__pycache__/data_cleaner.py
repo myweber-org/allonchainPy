@@ -1,100 +1,77 @@
 
 import pandas as pd
-import numpy as np
 
-def remove_outliers_iqr(df, column):
+def remove_duplicates(df, subset=None, keep='first'):
     """
-    Remove outliers from a specified column using the Interquartile Range method.
+    Remove duplicate rows from a DataFrame.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    subset (list, optional): Column labels to consider for duplicates
+    keep (str, optional): Which duplicates to keep - 'first', 'last', or False
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    pd.DataFrame: DataFrame with duplicates removed
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
+    return df.drop_duplicates(subset=subset, keep=keep)
 
-def clean_numeric_data(df, columns=None):
+def clean_numeric_column(df, column_name, fill_method='mean'):
     """
-    Clean numeric data by removing outliers from specified columns.
-    If no columns specified, processes all numeric columns.
+    Clean a numeric column by handling missing values.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    columns (list): List of column names to clean
+    column_name (str): Name of column to clean
+    fill_method (str): Method to fill missing values - 'mean', 'median', or 'zero'
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame
+    pd.DataFrame: DataFrame with cleaned column
     """
-    if columns is None:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        columns = numeric_cols
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
     
-    cleaned_df = df.copy()
+    if not pd.api.types.is_numeric_dtype(df[column_name]):
+        raise TypeError(f"Column '{column_name}' must be numeric")
     
-    for col in columns:
-        if col in cleaned_df.columns:
-            original_len = len(cleaned_df)
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-            removed_count = original_len - len(cleaned_df)
-            print(f"Removed {removed_count} outliers from column '{col}'")
+    df_clean = df.copy()
     
-    return cleaned_df
+    if fill_method == 'mean':
+        fill_value = df_clean[column_name].mean()
+    elif fill_method == 'median':
+        fill_value = df_clean[column_name].median()
+    elif fill_method == 'zero':
+        fill_value = 0
+    else:
+        raise ValueError("fill_method must be 'mean', 'median', or 'zero'")
+    
+    df_clean[column_name] = df_clean[column_name].fillna(fill_value)
+    
+    return df_clean
 
-def validate_dataframe(df, required_columns=None):
+def validate_dataframe(df, required_columns=None, min_rows=1):
     """
     Validate DataFrame structure and content.
     
     Parameters:
     df (pd.DataFrame): DataFrame to validate
-    required_columns (list): List of required column names
+    required_columns (list, optional): List of required column names
+    min_rows (int): Minimum number of rows required
     
     Returns:
-    bool: True if validation passes
+    bool: True if validation passes, raises exception otherwise
     """
     if not isinstance(df, pd.DataFrame):
         raise TypeError("Input must be a pandas DataFrame")
     
-    if df.empty:
-        raise ValueError("DataFrame is empty")
+    if len(df) < min_rows:
+        raise ValueError(f"DataFrame must have at least {min_rows} rows")
     
     if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            raise ValueError(f"Missing required columns: {missing_cols}")
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
     
     return True
-
-def get_data_summary(df):
-    """
-    Generate summary statistics for the DataFrame.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    
-    Returns:
-    dict: Dictionary containing summary statistics
-    """
-    summary = {
-        'total_rows': len(df),
-        'total_columns': len(df.columns),
-        'numeric_columns': df.select_dtypes(include=[np.number]).columns.tolist(),
-        'categorical_columns': df.select_dtypes(include=['object']).columns.tolist(),
-        'missing_values': df.isnull().sum().to_dict(),
-        'data_types': df.dtypes.to_dict()
-    }
-    
-    return summary
