@@ -1,86 +1,86 @@
-
+import numpy as np
 import pandas as pd
 
-def clean_dataset(df, drop_na=True, column_case='lower'):
+def remove_outliers_iqr(df, columns):
     """
-    Clean a pandas DataFrame by handling missing values and standardizing column names.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean.
-        drop_na (bool): If True, drop rows with any null values. Default is True.
-        column_case (str): Target case for column names ('lower', 'upper', or 'title'). Default is 'lower'.
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame.
+    Remove outliers using the Interquartile Range method.
     """
-    df_clean = df.copy()
+    cleaned_df = df.copy()
+    for col in columns:
+        if col in cleaned_df.columns:
+            Q1 = cleaned_df[col].quantile(0.25)
+            Q3 = cleaned_df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
+    return cleaned_df
+
+def normalize_minmax(df, columns):
+    """
+    Normalize specified columns using Min-Max scaling.
+    """
+    normalized_df = df.copy()
+    for col in columns:
+        if col in normalized_df.columns:
+            min_val = normalized_df[col].min()
+            max_val = normalized_df[col].max()
+            if max_val > min_val:
+                normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+    return normalized_df
+
+def standardize_zscore(df, columns):
+    """
+    Standardize specified columns using Z-score normalization.
+    """
+    standardized_df = df.copy()
+    for col in columns:
+        if col in standardized_df.columns:
+            mean_val = standardized_df[col].mean()
+            std_val = standardized_df[col].std()
+            if std_val > 0:
+                standardized_df[col] = (standardized_df[col] - mean_val) / std_val
+    return standardized_df
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns using given strategy.
+    """
+    filled_df = df.copy()
+    if columns is None:
+        columns = filled_df.columns
     
-    # Handle missing values
-    if drop_na:
-        df_clean = df_clean.dropna()
-    else:
-        # Fill numeric columns with median, object columns with mode
-        for col in df_clean.columns:
-            if pd.api.types.is_numeric_dtype(df_clean[col]):
-                df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+    for col in columns:
+        if col in filled_df.columns and filled_df[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = filled_df[col].mean()
+            elif strategy == 'median':
+                fill_value = filled_df[col].median()
+            elif strategy == 'mode':
+                fill_value = filled_df[col].mode()[0]
+            elif strategy == 'constant':
+                fill_value = 0
             else:
-                df_clean[col] = df_clean[col].fillna(df_clean[col].mode()[0] if not df_clean[col].mode().empty else 'Unknown')
+                raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'constant'")
+            
+            filled_df[col].fillna(fill_value, inplace=True)
     
-    # Standardize column names
-    if column_case == 'lower':
-        df_clean.columns = df_clean.columns.str.lower()
-    elif column_case == 'upper':
-        df_clean.columns = df_clean.columns.str.upper()
-    elif column_case == 'title':
-        df_clean.columns = df_clean.columns.str.title()
+    return filled_df
+
+def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize_method=None, missing_strategy='mean'):
+    """
+    Comprehensive data cleaning pipeline.
+    """
+    if outlier_method == 'iqr':
+        df_clean = remove_outliers_iqr(df, numeric_columns)
+    else:
+        df_clean = df.copy()
     
-    # Remove leading/trailing whitespace from column names
-    df_clean.columns = df_clean.columns.str.strip()
+    df_clean = handle_missing_values(df_clean, strategy=missing_strategy, columns=numeric_columns)
     
-    # Replace spaces with underscores in column names
-    df_clean.columns = df_clean.columns.str.replace(' ', '_')
+    if normalize_method == 'minmax':
+        df_clean = normalize_minmax(df_clean, numeric_columns)
+    elif normalize_method == 'zscore':
+        df_clean = standardize_zscore(df_clean, numeric_columns)
     
     return df_clean
-
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate DataFrame structure and required columns.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_columns (list): List of column names that must be present.
-    
-    Returns:
-        tuple: (is_valid, message)
-    """
-    if not isinstance(df, pd.DataFrame):
-        return False, "Input is not a pandas DataFrame"
-    
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
-    
-    return True, "DataFrame is valid"
-
-# Example usage (commented out for production)
-# if __name__ == "__main__":
-#     # Create sample data
-#     data = {
-#         'Name': ['Alice', 'Bob', None, 'David'],
-#         'Age': [25, None, 30, 35],
-#         'City': ['NYC', 'LA', 'Chicago', None]
-#     }
-#     df = pd.DataFrame(data)
-#     
-#     # Clean the data
-#     cleaned_df = clean_dataset(df, drop_na=False, column_case='lower')
-#     print("Cleaned DataFrame:")
-#     print(cleaned_df)
-#     
-#     # Validate the cleaned data
-#     is_valid, message = validate_dataframe(cleaned_df, required_columns=['name', 'age'])
-#     print(f"Validation: {is_valid} - {message}")
