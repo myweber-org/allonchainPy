@@ -1,54 +1,60 @@
-import numpy as np
+
 import pandas as pd
 
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    if max_val - min_val == 0:
-        return df[column].apply(lambda x: 0.0)
-    return (df[column] - min_val) / (max_val - min_val)
-
-def clean_dataset(df, numeric_columns):
-    cleaned_df = df.copy()
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-            cleaned_df[col] = normalize_minmax(cleaned_df, col)
-    return cleaned_df.reset_index(drop=True)
-
-def validate_dataframe(df):
-    required_checks = [
-        (lambda x: isinstance(x, pd.DataFrame), "Input must be a pandas DataFrame"),
-        (lambda x: not x.empty, "DataFrame cannot be empty"),
-        (lambda x: x.isnull().sum().sum() == 0, "DataFrame contains null values")
-    ]
-    for check, message in required_checks:
-        if not check(df):
-            raise ValueError(message)
-    return True
-
-if __name__ == "__main__":
-    sample_data = {
-        'feature_a': [1, 2, 3, 100, 5, 6, 7, 8, 9, 10],
-        'feature_b': [10, 20, 30, 40, 50, 60, 70, 80, 90, 1000],
-        'category': ['A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B']
-    }
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
+def clean_dataframe(df, drop_duplicates=True, fill_missing=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
-    try:
-        validate_dataframe(df)
-        cleaned = clean_dataset(df, ['feature_a', 'feature_b'])
-        print("\nCleaned DataFrame:")
-        print(cleaned)
-    except ValueError as e:
-        print(f"Validation error: {e}")
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+        fill_missing (str or dict): Method to fill missing values. 
+            Options: 'mean', 'median', 'mode', or a dictionary of column:value pairs.
+            If None, missing values are not filled.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing is not None:
+        if isinstance(fill_missing, dict):
+            for column, value in fill_missing.items():
+                if column in cleaned_df.columns:
+                    cleaned_df[column].fillna(value, inplace=True)
+        elif fill_missing == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_missing == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        elif fill_missing == 'mode':
+            for column in cleaned_df.columns:
+                if cleaned_df[column].dtype == 'object':
+                    mode_value = cleaned_df[column].mode()
+                    if not mode_value.empty:
+                        cleaned_df[column].fillna(mode_value[0], inplace=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate a DataFrame for required columns and basic integrity.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
