@@ -108,3 +108,70 @@ def clean_dataset(data, outlier_method='iqr', normalize_method='minmax', missing
                 cleaned_data[f'{col}_standardized'] = normalize_zscore(cleaned_data, col)
     
     return cleaned_data
+import pandas as pd
+
+def clean_dataset(df, columns_to_check=None, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        columns_to_check (list, optional): Columns to check for duplicates. 
+            If None, checks all columns.
+        drop_duplicates (bool): Whether to drop duplicate rows.
+        fill_missing (str): Strategy to fill missing values. 
+            Options: 'mean', 'median', 'mode', or 'drop'.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    if drop_duplicates:
+        if columns_to_check:
+            df_clean = df_clean.drop_duplicates(subset=columns_to_check)
+        else:
+            df_clean = df_clean.drop_duplicates()
+    
+    if fill_missing == 'drop':
+        df_clean = df_clean.dropna()
+    elif fill_missing in ['mean', 'median', 'mode']:
+        numeric_cols = df_clean.select_dtypes(include=['number']).columns
+        
+        for col in numeric_cols:
+            if df_clean[col].isnull().any():
+                if fill_missing == 'mean':
+                    fill_value = df_clean[col].mean()
+                elif fill_missing == 'median':
+                    fill_value = df_clean[col].median()
+                elif fill_missing == 'mode':
+                    fill_value = df_clean[col].mode()[0]
+                
+                df_clean[col] = df_clean[col].fillna(fill_value)
+    
+    return df_clean
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+        min_rows (int): Minimum number of rows required.
+    
+    Returns:
+        tuple: (is_valid, message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Data validation passed"
