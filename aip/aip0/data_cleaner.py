@@ -309,3 +309,27 @@ if __name__ == "__main__":
     stats = calculate_statistics(cleaned_df)
     print("\nStatistics after cleaning:")
     print(stats)
+import pandas as pd
+
+def filter_and_clean(df, filter_column, filter_value, clean_column, fill_value=0):
+    """
+    Filters a DataFrame based on a condition and cleans a specified column
+    in the filtered subset by filling missing values.
+
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    filter_column (str): Column name to apply the filter condition.
+    filter_value: The value to filter rows by in the filter_column.
+    clean_column (str): Column name to clean (fill missing values).
+    fill_value: The value to use for filling missing data in clean_column.
+
+    Returns:
+    pd.DataFrame: A new DataFrame with filtered rows and cleaned column.
+    """
+    if filter_column not in df.columns or clean_column not in df.columns:
+        raise ValueError("Specified columns not found in DataFrame")
+
+    filtered_df = df[df[filter_column] == filter_value].copy()
+    filtered_df[clean_column] = filtered_df[clean_column].fillna(fill_value)
+
+    return filtered_df
