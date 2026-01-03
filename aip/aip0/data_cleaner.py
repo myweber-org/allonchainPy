@@ -78,4 +78,126 @@ def example_usage():
     return cleaned_df
 
 if __name__ == "__main__":
-    cleaned_data = example_usage()
+    cleaned_data = example_usage()import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, output_path=None, fill_strategy='mean', drop_threshold=0.5):
+    """
+    Clean CSV data by handling missing values and converting data types.
+    
+    Args:
+        file_path (str): Path to input CSV file
+        output_path (str, optional): Path for cleaned CSV output
+        fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', 'zero')
+        drop_threshold (float): Drop columns with missing values above this threshold (0-1)
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    
+    df = pd.read_csv(file_path)
+    original_shape = df.shape
+    
+    print(f"Original data shape: {original_shape}")
+    print(f"Missing values per column:")
+    print(df.isnull().sum())
+    
+    # Drop columns with too many missing values
+    missing_ratio = df.isnull().sum() / len(df)
+    columns_to_drop = missing_ratio[missing_ratio > drop_threshold].index
+    df = df.drop(columns=columns_to_drop)
+    
+    if len(columns_to_drop) > 0:
+        print(f"Dropped columns: {list(columns_to_drop)}")
+    
+    # Fill missing values based on strategy
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if fill_strategy == 'mean':
+        for col in numeric_cols:
+            if df[col].isnull().any():
+                df[col] = df[col].fillna(df[col].mean())
+    elif fill_strategy == 'median':
+        for col in numeric_cols:
+            if df[col].isnull().any():
+                df[col] = df[col].fillna(df[col].median())
+    elif fill_strategy == 'zero':
+        df = df.fillna(0)
+    elif fill_strategy == 'mode':
+        for col in df.columns:
+            if df[col].isnull().any():
+                mode_val = df[col].mode()[0] if not df[col].mode().empty else None
+                if mode_val is not None:
+                    df[col] = df[col].fillna(mode_val)
+    
+    # Convert object columns to categorical where appropriate
+    for col in df.select_dtypes(include=['object']).columns:
+        unique_ratio = df[col].nunique() / len(df)
+        if unique_ratio < 0.5:  # If less than 50% unique values
+            df[col] = pd.Categorical(df[col])
+    
+    # Remove duplicate rows
+    duplicates = df.duplicated().sum()
+    df = df.drop_duplicates()
+    
+    print(f"Removed {duplicates} duplicate rows")
+    print(f"Cleaned data shape: {df.shape}")
+    print(f"Removed {original_shape[0] - df.shape[0]} rows and {original_shape[1] - df.shape[1]} columns")
+    
+    # Save to file if output path provided
+    if output_path:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+    
+    return df
+
+def validate_data_types(df, expected_types):
+    """
+    Validate that DataFrame columns match expected data types.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        expected_types (dict): Dictionary mapping column names to expected dtypes
+    
+    Returns:
+        dict: Validation results with mismatches
+    """
+    validation_results = {}
+    
+    for col, expected_type in expected_types.items():
+        if col in df.columns:
+            actual_type = str(df[col].dtype)
+            validation_results[col] = {
+                'expected': expected_type,
+                'actual': actual_type,
+                'match': expected_type in actual_type
+            }
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 3, 4, 5],
+        'value': [10.5, np.nan, 15.2, np.nan, 20.1],
+        'category': ['A', 'B', 'A', np.nan, 'B'],
+        'score': [85, 92, np.nan, 78, 88]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.to_csv('sample_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('sample_data.csv', 'cleaned_sample.csv', fill_strategy='mean')
+    
+    expected_types = {
+        'id': 'int',
+        'value': 'float',
+        'category': 'category',
+        'score': 'int'
+    }
+    
+    validation = validate_data_types(cleaned_df, expected_types)
+    print("\nData type validation:")
+    for col, result in validation.items():
+        status = "✓" if result['match'] else "✗"
+        print(f"{status} {col}: expected {result['expected']}, got {result['actual']}")
