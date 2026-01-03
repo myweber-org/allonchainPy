@@ -269,3 +269,45 @@ if __name__ == "__main__":
     
     print("\nSample statistics after cleaning:")
     print(cleaned_df.describe())
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_name):
+    """
+    Clean a specified column in a DataFrame by removing duplicates,
+    stripping whitespace, and converting to lowercase.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+
+    df_clean = df.copy()
+    df_clean[column_name] = df_clean[column_name].astype(str)
+    df_clean[column_name] = df_clean[column_name].str.strip()
+    df_clean[column_name] = df_clean[column_name].str.lower()
+    df_clean = df_clean.drop_duplicates(subset=[column_name], keep='first')
+    df_clean = df_clean.reset_index(drop=True)
+    return df_clean
+
+def normalize_string(text):
+    """
+    Normalize a string by removing extra spaces and special characters.
+    """
+    if not isinstance(text, str):
+        return text
+    text = re.sub(r'\s+', ' ', text)
+    text = re.sub(r'[^\w\s]', '', text)
+    return text.strip()
+
+if __name__ == "__main__":
+    sample_data = {'Name': ['  Alice  ', 'Bob', 'alice', 'Charlie ', 'bob']}
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataframe(df, 'Name')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    test_string = "  Hello,   World!  "
+    normalized = normalize_string(test_string)
+    print(f"\nNormalized string: '{normalized}'")
