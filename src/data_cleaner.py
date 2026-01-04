@@ -128,4 +128,114 @@ if __name__ == "__main__":
         print("\nValidation results:")
         print(f"  Valid: {validation['is_valid']}")
         print(f"  Errors: {validation['errors']}")
-        print(f"  Warnings: {validation['warnings']}")
+        print(f"  Warnings: {validation['warnings']}")import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, output_path=None):
+    """
+    Clean CSV data by handling missing values and converting data types.
+    
+    Args:
+        file_path (str): Path to input CSV file
+        output_path (str, optional): Path for cleaned output CSV
+    
+    Returns:
+        pandas.DataFrame: Cleaned DataFrame
+    """
+    try:
+        df = pd.read_csv(file_path)
+        
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].median())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+        
+        # Convert date columns if present
+        date_columns = [col for col in df.columns if 'date' in col.lower() or 'time' in col.lower()]
+        for col in date_columns:
+            try:
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+            except:
+                pass
+        
+        # Remove duplicate rows
+        initial_rows = len(df)
+        df = df.drop_duplicates()
+        duplicates_removed = initial_rows - len(df)
+        
+        if output_path:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to {output_path}")
+        
+        print(f"Data cleaning completed:")
+        print(f"  - Rows processed: {initial_rows}")
+        print(f"  - Duplicates removed: {duplicates_removed}")
+        print(f"  - Missing values filled: {df.isnull().sum().sum()}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except pd.errors.EmptyDataError:
+        print("Error: The CSV file is empty")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pandas.DataFrame): DataFrame to validate
+        required_columns (list, optional): List of required column names
+    
+    Returns:
+        dict: Validation results
+    """
+    if df is None or df.empty:
+        return {"valid": False, "message": "DataFrame is empty or None"}
+    
+    validation_results = {
+        "valid": True,
+        "row_count": len(df),
+        "column_count": len(df.columns),
+        "missing_values": df.isnull().sum().sum(),
+        "duplicate_rows": df.duplicated().sum(),
+        "column_types": {col: str(dtype) for col, dtype in df.dtypes.items()}
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results["valid"] = False
+            validation_results["missing_columns"] = missing_columns
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 3, 4, 5],
+        'value': [10.5, np.nan, 15.2, 20.1, np.nan],
+        'category': ['A', 'B', None, 'A', 'C'],
+        'date': ['2023-01-01', '2023-01-02', None, '2023-01-04', '2023-01-05']
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('test_data.csv', 'cleaned_data.csv')
+    
+    if cleaned_df is not None:
+        validation = validate_dataframe(cleaned_df, required_columns=['id', 'value'])
+        print("\nValidation Results:")
+        for key, value in validation.items():
+            print(f"  {key}: {value}")
