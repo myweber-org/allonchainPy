@@ -75,4 +75,95 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
     else:
         return df
     
-    return df[mask]
+    return df[mask]import numpy as np
+import pandas as pd
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    def detect_outliers_iqr(self, column, threshold=1.5):
+        if column not in self.numeric_columns:
+            raise ValueError(f"Column {column} is not numeric")
+        
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        
+        outliers = self.df[(self.df[column] < lower_bound) | (self.df[column] > upper_bound)]
+        return outliers.index.tolist()
+    
+    def remove_outliers(self, columns=None, threshold=1.5):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        outlier_indices = []
+        for col in columns:
+            if col in self.numeric_columns:
+                outlier_indices.extend(self.detect_outliers_iqr(col, threshold))
+        
+        unique_outliers = list(set(outlier_indices))
+        cleaned_df = self.df.drop(index=unique_outliers).reset_index(drop=True)
+        return cleaned_df
+    
+    def normalize_column(self, column, method='minmax'):
+        if column not in self.numeric_columns:
+            raise ValueError(f"Column {column} is not numeric")
+        
+        if method == 'minmax':
+            min_val = self.df[column].min()
+            max_val = self.df[column].max()
+            if max_val - min_val == 0:
+                return self.df[column].apply(lambda x: 0.5)
+            return (self.df[column] - min_val) / (max_val - min_val)
+        
+        elif method == 'zscore':
+            mean_val = self.df[column].mean()
+            std_val = self.df[column].std()
+            if std_val == 0:
+                return self.df[column].apply(lambda x: 0)
+            return (self.df[column] - mean_val) / std_val
+        
+        else:
+            raise ValueError("Method must be 'minmax' or 'zscore'")
+    
+    def get_summary(self):
+        summary = {
+            'original_rows': len(self.df),
+            'numeric_columns': self.numeric_columns,
+            'missing_values': self.df.isnull().sum().to_dict()
+        }
+        return summary
+
+def example_usage():
+    np.random.seed(42)
+    data = {
+        'A': np.random.normal(100, 15, 50),
+        'B': np.random.exponential(2, 50),
+        'C': np.random.randint(1, 100, 50),
+        'category': np.random.choice(['X', 'Y', 'Z'], 50)
+    }
+    
+    df = pd.DataFrame(data)
+    cleaner = DataCleaner(df)
+    
+    print("Data Summary:")
+    print(cleaner.get_summary())
+    
+    outliers = cleaner.detect_outliers_iqr('A')
+    print(f"\nOutliers in column A: {len(outliers)}")
+    
+    cleaned_df = cleaner.remove_outliers(['A', 'B'])
+    print(f"\nCleaned data shape: {cleaned_df.shape}")
+    
+    normalized = cleaner.normalize_column('C', method='zscore')
+    print(f"\nNormalized column C (first 5 values):")
+    print(normalized.head())
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    result = example_usage()
