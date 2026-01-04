@@ -1,7 +1,10 @@
-
 import numpy as np
+import pandas as pd
 
 def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    """
     Q1 = data[column].quantile(0.25)
     Q3 = data[column].quantile(0.75)
     IQR = Q3 - Q1
@@ -9,66 +12,48 @@ def remove_outliers_iqr(data, column):
     upper_bound = Q3 + 1.5 * IQR
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
     return filtered_data
-import numpy as np
-import pandas as pd
 
-def remove_outliers_iqr(df, column):
+def normalize_minmax(data, column):
     """
-    Remove outliers from a DataFrame column using the IQR method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    Normalize a DataFrame column using min-max scaling.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    min_val = data[column].min()
+    max_val = data[column].max()
+    if max_val - min_val == 0:
+        return data[column].apply(lambda x: 0.0)
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
 
-def clean_dataset(df, columns=None):
+def standardize_zscore(data, column):
     """
-    Clean multiple columns in a DataFrame using IQR method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    columns (list): List of column names to clean. If None, clean all numeric columns.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
+    Standardize a DataFrame column using z-score normalization.
     """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns.tolist()
-    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    if std_val == 0:
+        return data[column].apply(lambda x: 0.0)
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(df, numeric_columns):
+    """
+    Apply outlier removal and normalization to numeric columns.
+    """
     cleaned_df = df.copy()
-    for column in columns:
-        if column in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[column]):
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
     return cleaned_df
 
 if __name__ == "__main__":
-    sample_data = {
-        'A': [1, 2, 3, 4, 5, 100],
-        'B': [10, 20, 30, 40, 50, 200],
-        'C': ['a', 'b', 'c', 'd', 'e', 'f']
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    
-    cleaned = clean_dataset(df, columns=['A', 'B'])
-    print("\nCleaned DataFrame:")
-    print(cleaned)
+    sample_data = pd.DataFrame({
+        'A': np.random.randn(100) * 10 + 50,
+        'B': np.random.randn(100) * 5 + 20,
+        'C': np.random.randn(100) * 2 + 10
+    })
+    print("Original data shape:", sample_data.shape)
+    cleaned = clean_dataset(sample_data, ['A', 'B', 'C'])
+    print("Cleaned data shape:", cleaned.shape)
+    print("Cleaned data summary:")
+    print(cleaned.describe())
