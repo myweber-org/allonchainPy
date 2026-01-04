@@ -292,4 +292,83 @@ def main():
         print(f"{key}: {value:.2f}")
 
 if __name__ == "__main__":
-    main()
+    main()import pandas as pd
+import numpy as np
+
+def detect_outliers_iqr(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
+
+def remove_outliers(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    min_val = data[column].min()
+    max_val = data[column].max()
+    if max_val - min_val == 0:
+        return data[column].apply(lambda x: 0.0)
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    if std_val == 0:
+        return data[column].apply(lambda x: 0.0)
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(df, numeric_columns, outlier_handling='remove', normalization='standardize'):
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col not in cleaned_df.columns:
+            continue
+            
+        if outlier_handling == 'remove':
+            cleaned_df = remove_outliers(cleaned_df, col)
+        elif outlier_handling == 'report':
+            outliers = detect_outliers_iqr(cleaned_df, col)
+            print(f"Outliers in {col}: {len(outliers)}")
+        
+        if normalization == 'minmax':
+            cleaned_df[f'{col}_normalized'] = normalize_minmax(cleaned_df, col)
+        elif normalization == 'standardize':
+            cleaned_df[f'{col}_standardized'] = standardize_zscore(cleaned_df, col)
+    
+    return cleaned_df
+
+def example_usage():
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 100),
+        'feature_b': np.random.exponential(50, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    df = pd.DataFrame(data)
+    df.loc[10, 'feature_a'] = 500
+    df.loc[20, 'feature_b'] = 1000
+    
+    numeric_cols = ['feature_a', 'feature_b']
+    cleaned = clean_dataset(df, numeric_cols, outlier_handling='remove', normalization='standardize')
+    
+    print(f"Original shape: {df.shape}")
+    print(f"Cleaned shape: {cleaned.shape}")
+    print(f"Cleaned columns: {cleaned.columns.tolist()}")
+    
+    return cleaned
+
+if __name__ == "__main__":
+    result = example_usage()
+    print(result.head())
