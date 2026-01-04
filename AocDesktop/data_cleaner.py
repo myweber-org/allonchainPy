@@ -104,4 +104,85 @@ def example_usage():
 if __name__ == "__main__":
     result_df = example_usage()
     print("\nFirst 5 rows of cleaned data:")
-    print(result_df.head())
+    print(result_df.head())import pandas as pd
+
+def clean_dataset(df, remove_duplicates=True, fill_missing=False, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        remove_duplicates (bool): Whether to remove duplicate rows
+        fill_missing (bool): Whether to fill missing values
+        fill_value: Value to use for filling missing data
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if remove_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_missing:
+        missing_before = cleaned_df.isnull().sum().sum()
+        cleaned_df = cleaned_df.fillna(fill_value)
+        missing_after = cleaned_df.isnull().sum().sum()
+        print(f"Filled {missing_before - missing_after} missing values")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
+
+def sample_data_cleaning():
+    """Example usage of the data cleaning functions."""
+    data = {
+        'id': [1, 2, 2, 3, 4, 4],
+        'value': [10, 20, 20, None, 40, 40],
+        'category': ['A', 'B', 'B', 'C', 'D', 'D']
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nDataFrame info:")
+    print(df.info())
+    
+    is_valid, message = validate_dataframe(df, required_columns=['id', 'value'])
+    print(f"\nValidation: {message}")
+    
+    if is_valid:
+        cleaned = clean_dataset(df, remove_duplicates=True, fill_missing=True, fill_value=0)
+        print("\nCleaned DataFrame:")
+        print(cleaned)
+        return cleaned
+    
+    return None
+
+if __name__ == "__main__":
+    sample_data_cleaning()
