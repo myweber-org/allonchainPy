@@ -178,4 +178,35 @@ def handle_missing_values(df, strategy='mean', columns=None):
         elif strategy == 'mode':
             df_processed[col] = df_processed[col].fillna(df_processed[col].mode()[0])
     
-    return df_processed.reset_index(drop=True)
+    return df_processed.reset_index(drop=True)import re
+
+def clean_string(text):
+    """
+    Cleans and normalizes a string by:
+    - Converting to lowercase.
+    - Removing leading/trailing whitespace.
+    - Replacing multiple spaces with a single space.
+    - Removing non-alphanumeric characters (except basic punctuation).
+    """
+    if not isinstance(text, str):
+        return text
+
+    # Convert to lowercase and strip whitespace
+    text = text.lower().strip()
+
+    # Replace multiple spaces/newlines/tabs with a single space
+    text = re.sub(r'\s+', ' ', text)
+
+    # Remove non-alphanumeric characters, but keep basic punctuation
+    # This keeps letters, numbers, spaces, and .,!?;:-
+    text = re.sub(r'[^a-z0-9\s.,!?;:-]', '', text)
+
+    return text
+
+def normalize_whitespace(text):
+    """
+    Normalizes whitespace in a string by ensuring single spaces between words.
+    """
+    if not isinstance(text, str):
+        return text
+    return ' '.join(text.split())
