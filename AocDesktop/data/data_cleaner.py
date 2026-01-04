@@ -298,3 +298,128 @@ def clean_dataset(df, config=None):
     cleaner.normalize_numeric(method=config['normalize_method'])
     
     return cleaner.get_cleaned_data(), cleaner.get_summary()
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, threshold=1.5):
+    """
+    Detect outliers using Interquartile Range method.
+    
+    Args:
+        data: Array-like data
+        threshold: IQR multiplier for outlier detection
+    
+    Returns:
+        Boolean mask where True indicates outliers
+    """
+    q1 = np.percentile(data, 25)
+    q3 = np.percentile(data, 75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    return (data < lower_bound) | (data > upper_bound)
+
+def remove_outliers(df, columns, method='iqr', **kwargs):
+    """
+    Remove outliers from specified columns in DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        columns: List of column names to process
+        method: Outlier detection method ('iqr' or 'zscore')
+        **kwargs: Additional arguments for detection function
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    df_clean = df.copy()
+    
+    for col in columns:
+        if method == 'iqr':
+            outlier_mask = detect_outliers_iqr(df_clean[col], **kwargs)
+        elif method == 'zscore':
+            z_scores = np.abs(stats.zscore(df_clean[col]))
+            outlier_mask = z_scores > kwargs.get('threshold', 3)
+        else:
+            raise ValueError(f"Unknown method: {method}")
+        
+        df_clean = df_clean[~outlier_mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def normalize_data(df, columns, method='minmax'):
+    """
+    Normalize specified columns in DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        columns: List of column names to normalize
+        method: Normalization method ('minmax' or 'standard')
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    df_norm = df.copy()
+    
+    for col in columns:
+        if method == 'minmax':
+            min_val = df_norm[col].min()
+            max_val = df_norm[col].max()
+            df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+        elif method == 'standard':
+            mean_val = df_norm[col].mean()
+            std_val = df_norm[col].std()
+            df_norm[col] = (df_norm[col] - mean_val) / std_val
+        else:
+            raise ValueError(f"Unknown method: {method}")
+    
+    return df_norm
+
+def clean_dataset(df, numeric_columns, outlier_method='iqr', norm_method='standard'):
+    """
+    Complete data cleaning pipeline.
+    
+    Args:
+        df: Input DataFrame
+        numeric_columns: List of numeric column names to process
+        outlier_method: Method for outlier detection
+        norm_method: Method for normalization
+    
+    Returns:
+        Cleaned and normalized DataFrame
+    """
+    # Remove outliers
+    df_clean = remove_outliers(df, numeric_columns, method=outlier_method)
+    
+    # Normalize data
+    df_normalized = normalize_data(df_clean, numeric_columns, method=norm_method)
+    
+    return df_normalized
+
+if __name__ == "__main__":
+    # Example usage
+    np.random.seed(42)
+    sample_data = {
+        'feature1': np.random.normal(100, 15, 100),
+        'feature2': np.random.exponential(50, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    
+    df_sample = pd.DataFrame(sample_data)
+    df_sample.loc[10, 'feature1'] = 500  # Add outlier
+    
+    print("Original shape:", df_sample.shape)
+    print("Original stats:")
+    print(df_sample[['feature1', 'feature2']].describe())
+    
+    cleaned_df = clean_dataset(
+        df_sample, 
+        numeric_columns=['feature1', 'feature2'],
+        outlier_method='iqr',
+        norm_method='standard'
+    )
+    
+    print("\nCleaned shape:", cleaned_df.shape)
+    print("Cleaned stats:")
+    print(cleaned_df[['feature1', 'feature2']].describe())
