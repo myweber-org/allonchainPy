@@ -200,3 +200,41 @@ if __name__ == "__main__":
     
     cleaned_df = load_and_clean_data(input_file)
     save_cleaned_data(cleaned_df, output_file)
+import pandas as pd
+
+def clean_dataset(df, column_mapping=None, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        column_mapping (dict, optional): Dictionary to rename columns.
+        drop_duplicates (bool): If True, remove duplicate rows.
+        fill_missing (str): Strategy to fill missing values ('mean', 'median', 'mode', or 'drop').
+
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+
+    if column_mapping:
+        cleaned_df.rename(columns=column_mapping, inplace=True)
+
+    if drop_duplicates:
+        cleaned_df.drop_duplicates(inplace=True)
+
+    if fill_missing == 'drop':
+        cleaned_df.dropna(inplace=True)
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
+            elif fill_missing == 'median':
+                cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
+    elif fill_missing == 'mode':
+        for col in cleaned_df.columns:
+            cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None, inplace=True)
+
+    cleaned_df.reset_index(drop=True, inplace=True)
+    return cleaned_df
