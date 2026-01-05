@@ -187,3 +187,76 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned, required_columns=['id', 'value'], min_rows=3)
     print(f"\nData validation result: {is_valid}")
+import numpy as np
+import pandas as pd
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+
+    def remove_outliers_iqr(self, column, multiplier=1.5):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        self.df = self.df[(self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)]
+        return self
+
+    def normalize_column(self, column, method='minmax'):
+        if method == 'minmax':
+            min_val = self.df[column].min()
+            max_val = self.df[column].max()
+            if max_val != min_val:
+                self.df[column] = (self.df[column] - min_val) / (max_val - min_val)
+        elif method == 'zscore':
+            mean_val = self.df[column].mean()
+            std_val = self.df[column].std()
+            if std_val > 0:
+                self.df[column] = (self.df[column] - mean_val) / std_val
+        return self
+
+    def fill_missing(self, column, strategy='mean'):
+        if strategy == 'mean':
+            fill_value = self.df[column].mean()
+        elif strategy == 'median':
+            fill_value = self.df[column].median()
+        elif strategy == 'mode':
+            fill_value = self.df[column].mode()[0]
+        else:
+            fill_value = 0
+        self.df[column].fillna(fill_value, inplace=True)
+        return self
+
+    def get_cleaned_data(self):
+        print(f"Original shape: {self.original_shape}")
+        print(f"Cleaned shape: {self.df.shape}")
+        print(f"Rows removed: {self.original_shape[0] - self.df.shape[0]}")
+        return self.df
+
+def example_usage():
+    np.random.seed(42)
+    data = {
+        'feature1': np.random.normal(100, 15, 200),
+        'feature2': np.random.exponential(50, 200),
+        'target': np.random.randint(0, 2, 200)
+    }
+    df = pd.DataFrame(data)
+    df.loc[10:15, 'feature1'] = np.nan
+    df.loc[5, 'feature2'] = 1000
+
+    cleaner = DataCleaner(df)
+    cleaned_df = (cleaner
+                  .remove_outliers_iqr('feature1')
+                  .remove_outliers_iqr('feature2')
+                  .fill_missing('feature1', 'mean')
+                  .normalize_column('feature1', 'minmax')
+                  .normalize_column('feature2', 'zscore')
+                  .get_cleaned_data())
+    return cleaned_df
+
+if __name__ == "__main__":
+    result = example_usage()
+    print("\nFirst 5 rows of cleaned data:")
+    print(result.head())
