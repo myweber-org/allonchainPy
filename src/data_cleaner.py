@@ -238,4 +238,51 @@ if __name__ == "__main__":
         validation = validate_dataframe(cleaned_df, required_columns=['id', 'value'])
         print("\nValidation Results:")
         for key, value in validation.items():
-            print(f"  {key}: {value}")
+            print(f"  {key}: {value}")import pandas as pd
+import re
+
+def clean_dataframe(df, text_column):
+    """
+    Clean a DataFrame by removing duplicates and normalizing text in a specified column.
+    """
+    # Remove duplicate rows
+    df_clean = df.drop_duplicates().reset_index(drop=True)
+    
+    # Normalize text: lowercase, remove extra whitespace, and strip punctuation
+    def normalize_text(text):
+        if pd.isna(text):
+            return text
+        # Convert to lowercase
+        text = str(text).lower()
+        # Remove extra whitespace
+        text = re.sub(r'\s+', ' ', text).strip()
+        # Remove common punctuation (optional, can be customized)
+        text = re.sub(r'[^\w\s]', '', text)
+        return text
+    
+    df_clean[text_column] = df_clean[text_column].apply(normalize_text)
+    
+    return df_clean
+
+def main():
+    # Example usage
+    data = {
+        'id': [1, 2, 3, 4, 2],
+        'comment': [
+            'Hello World!',
+            'hello world',
+            '  Hello   World  ',
+            'Goodbye',
+            'hello world'
+        ]
+    }
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataframe(df, 'comment')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+
+if __name__ == '__main__':
+    main()
