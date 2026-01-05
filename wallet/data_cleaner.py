@@ -1,75 +1,49 @@
-
 import pandas as pd
 import numpy as np
 
-def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
-    """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
-    """
-    original_shape = df.shape
-    
-    if drop_duplicates:
-        df = df.drop_duplicates()
-        print(f"Removed {original_shape[0] - df.shape[0]} duplicate rows")
-    
-    if fill_missing:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns
-        for col in numeric_cols:
-            if df[col].isnull().any():
-                if fill_missing == 'mean':
-                    fill_value = df[col].mean()
-                elif fill_missing == 'median':
-                    fill_value = df[col].median()
-                elif fill_missing == 'zero':
-                    fill_value = 0
-                else:
-                    fill_value = fill_missing
-                
-                df[col] = df[col].fillna(fill_value)
-                print(f"Filled missing values in column '{col}' with {fill_value}")
-    
-    categorical_cols = df.select_dtypes(include=['object']).columns
-    for col in categorical_cols:
-        if df[col].isnull().any():
-            df[col] = df[col].fillna('Unknown')
-            print(f"Filled missing values in categorical column '{col}' with 'Unknown'")
-    
-    print(f"Dataset cleaned: {original_shape} -> {df.shape}")
+def remove_duplicates(df):
+    """Remove duplicate rows from DataFrame."""
+    return df.drop_duplicates()
+
+def fill_missing_values(df, strategy='mean'):
+    """Fill missing values using specified strategy."""
+    if strategy == 'mean':
+        return df.fillna(df.mean(numeric_only=True))
+    elif strategy == 'median':
+        return df.fillna(df.median(numeric_only=True))
+    elif strategy == 'mode':
+        return df.fillna(df.mode().iloc[0])
+    else:
+        return df.fillna(0)
+
+def normalize_column(df, column_name):
+    """Normalize specified column to range [0,1]."""
+    if column_name in df.columns:
+        col_min = df[column_name].min()
+        col_max = df[column_name].max()
+        if col_max != col_min:
+            df[column_name] = (df[column_name] - col_min) / (col_max - col_min)
     return df
 
-def validate_data(df, required_columns=None, min_rows=1):
-    """
-    Validate the dataset meets basic requirements.
-    """
-    if len(df) < min_rows:
-        raise ValueError(f"Dataset must have at least {min_rows} rows")
+def clean_dataframe(df, remove_dups=True, fill_strategy='mean', normalize_cols=None):
+    """Apply multiple cleaning operations to DataFrame."""
+    if remove_dups:
+        df = remove_duplicates(df)
     
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            raise ValueError(f"Missing required columns: {missing_cols}")
+    df = fill_missing_values(df, strategy=fill_strategy)
     
-    return True
+    if normalize_cols:
+        for col in normalize_cols:
+            if col in df.columns:
+                df = normalize_column(df, col)
+    
+    return df
 
-if __name__ == "__main__":
-    # Example usage
-    sample_data = {
-        'id': [1, 2, 2, 3, 4],
-        'value': [10.5, np.nan, 15.0, 20.0, np.nan],
-        'category': ['A', 'B', None, 'A', 'C']
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original dataset:")
-    print(df)
-    print("\n" + "="*50 + "\n")
-    
-    cleaned_df = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
-    print("\nCleaned dataset:")
-    print(cleaned_df)
-    
+def load_and_clean_csv(filepath, **kwargs):
+    """Load CSV file and apply cleaning operations."""
     try:
-        validate_data(cleaned_df, required_columns=['id', 'value'], min_rows=3)
-        print("\nData validation passed!")
-    except ValueError as e:
-        print(f"\nData validation failed: {e}")
+        df = pd.read_csv(filepath)
+        return clean_dataframe(df, **kwargs)
+    except Exception as e:
+        print(f"Error loading or cleaning file: {e}")
+        return None
