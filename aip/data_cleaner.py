@@ -96,4 +96,44 @@ def validate_data(df, required_columns, numeric_columns):
             if not pd.api.types.is_numeric_dtype(df[col]):
                 raise ValueError(f"Column '{col}' must be numeric")
     
-    return True
+    return Trueimport pandas as pd
+import re
+
+def clean_dataframe(df, text_column):
+    """
+    Clean a DataFrame by removing duplicate rows and standardizing text in a specified column.
+    """
+    # Remove duplicate rows
+    df_clean = df.drop_duplicates().reset_index(drop=True)
+    
+    # Standardize text: lowercase, remove extra whitespace, and strip punctuation
+    def standardize_text(text):
+        if pd.isna(text):
+            return text
+        # Convert to lowercase
+        text = str(text).lower()
+        # Remove extra whitespace
+        text = re.sub(r'\s+', ' ', text).strip()
+        # Remove common punctuation (optional, can be customized)
+        text = re.sub(r'[^\w\s]', '', text)
+        return text
+    
+    df_clean[text_column] = df_clean[text_column].apply(standardize_text)
+    
+    return df_clean
+
+def save_cleaned_data(df, output_path):
+    """
+    Save the cleaned DataFrame to a CSV file.
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+
+# Example usage (commented out for script functionality)
+# if __name__ == "__main__":
+#     # Load data
+#     input_df = pd.read_csv("raw_data.csv")
+#     # Clean data
+#     cleaned_df = clean_dataframe(input_df, "description")
+#     # Save cleaned data
+#     save_cleaned_data(cleaned_df, "cleaned_data.csv")
