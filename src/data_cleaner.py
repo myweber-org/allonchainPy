@@ -377,3 +377,39 @@ if __name__ == "__main__":
     
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("Cleaned statistics:", calculate_basic_stats(cleaned_df, 'value'))
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_data(input_data):
+    if isinstance(input_data, list):
+        return remove_duplicates_preserve_order(input_data)
+    elif isinstance(input_data, dict):
+        cleaned_dict = {}
+        for key, value in input_data.items():
+            if isinstance(value, (list, dict)):
+                cleaned_dict[key] = clean_data(value)
+            else:
+                cleaned_dict[key] = value
+        return cleaned_dict
+    else:
+        return input_data
+
+if __name__ == "__main__":
+    sample_list = [3, 1, 2, 3, 4, 2, 5, 1]
+    sample_dict = {
+        "ids": [1, 2, 2, 3, 1],
+        "nested": {
+            "values": ["a", "b", "a", "c"]
+        }
+    }
+    
+    print("Original list:", sample_list)
+    print("Cleaned list:", clean_data(sample_list))
+    print("\nOriginal dict:", sample_dict)
+    print("Cleaned dict:", clean_data(sample_dict))
