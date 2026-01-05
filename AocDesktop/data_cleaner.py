@@ -185,4 +185,95 @@ def sample_data_cleaning():
     return None
 
 if __name__ == "__main__":
-    sample_data_cleaning()
+    sample_data_cleaning()import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, missing_strategy='mean', outlier_threshold=3):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    missing_strategy (str): Strategy for handling missing values.
+        Options: 'mean', 'median', 'mode', 'drop'.
+    outlier_threshold (float): Number of standard deviations to identify outliers.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if missing_strategy == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif missing_strategy in ['mean', 'median', 'mode']:
+        for column in cleaned_df.select_dtypes(include=[np.number]).columns:
+            if missing_strategy == 'mean':
+                fill_value = cleaned_df[column].mean()
+            elif missing_strategy == 'median':
+                fill_value = cleaned_df[column].median()
+            else:  # mode
+                fill_value = cleaned_df[column].mode()[0] if not cleaned_df[column].mode().empty else 0
+            cleaned_df[column] = cleaned_df[column].fillna(fill_value)
+    
+    # Remove outliers for numerical columns
+    numeric_columns = cleaned_df.select_dtypes(include=[np.number]).columns
+    for column in numeric_columns:
+        mean = cleaned_df[column].mean()
+        std = cleaned_df[column].std()
+        lower_bound = mean - outlier_threshold * std
+        upper_bound = mean + outlier_threshold * std
+        cleaned_df = cleaned_df[(cleaned_df[column] >= lower_bound) & 
+                                (cleaned_df[column] <= upper_bound)]
+    
+    return cleaned_df.reset_index(drop=True)
+
+def normalize_data(df, method='minmax'):
+    """
+    Normalize numerical columns in the DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    method (str): Normalization method. Options: 'minmax', 'zscore'.
+    
+    Returns:
+    pd.DataFrame: Normalized DataFrame.
+    """
+    normalized_df = df.copy()
+    numeric_columns = normalized_df.select_dtypes(include=[np.number]).columns
+    
+    if method == 'minmax':
+        for column in numeric_columns:
+            min_val = normalized_df[column].min()
+            max_val = normalized_df[column].max()
+            if max_val != min_val:
+                normalized_df[column] = (normalized_df[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        for column in numeric_columns:
+            mean = normalized_df[column].mean()
+            std = normalized_df[column].std()
+            if std != 0:
+                normalized_df[column] = (normalized_df[column] - mean) / std
+    
+    return normalized_df
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 100],
+        'B': [5, 6, 7, np.nan, 9],
+        'C': [10, 11, 12, 13, 14]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataframe(df, missing_strategy='mean', outlier_threshold=2)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    normalized = normalize_data(cleaned, method='minmax')
+    print("\nNormalized DataFrame:")
+    print(normalized)
