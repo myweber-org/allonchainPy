@@ -247,4 +247,58 @@ if __name__ == "__main__":
     sample_list = [1, 2, 2, 3, 4, 4, 5, 1, 6]
     cleaned_list = remove_duplicates(sample_list)
     print(f"Original list: {sample_list}")
-    print(f"List after removing duplicates: {cleaned_list}")
+    print(f"List after removing duplicates: {cleaned_list}")import pandas as pd
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and
+    filling missing values with appropriate defaults.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing numeric values with column mean
+    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+    
+    # Fill missing categorical values with mode
+    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if df_cleaned[col].isnull().any():
+            mode_value = df_cleaned[col].mode()[0]
+            df_cleaned[col] = df_cleaned[col].fillna(mode_value)
+    
+    return df_cleaned
+
+def validate_data(df, required_columns):
+    """
+    Validate that the DataFrame contains all required columns
+    and has no completely empty rows.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    # Remove rows where all values are NaN
+    df_validated = df.dropna(how='all')
+    
+    return df_validated
+
+def process_dataframe(input_df, required_cols=None):
+    """
+    Main function to process and clean a DataFrame.
+    """
+    if required_cols is None:
+        required_cols = []
+    
+    # Validate data structure
+    validated_df = validate_data(input_df, required_cols)
+    
+    # Clean the data
+    cleaned_df = clean_dataset(validated_df)
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
