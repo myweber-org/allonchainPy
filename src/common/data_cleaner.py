@@ -44,3 +44,11 @@ if __name__ == "__main__":
     print("\nCleaned data shape:", cleaned.shape)
     print("Cleaned statistics:")
     print(cleaned[['feature_a', 'feature_b']].describe())
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
