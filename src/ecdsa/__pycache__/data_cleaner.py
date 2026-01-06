@@ -1,59 +1,84 @@
-
 import pandas as pd
+import numpy as np
+from scipy import stats
 
-def clean_dataset(df, drop_na=True, rename_columns=True):
-    """
-    Clean a pandas DataFrame by removing null values and standardizing column names.
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
     
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean
-        drop_na (bool): Whether to drop rows with null values
-        rename_columns (bool): Whether to standardize column names
+    def remove_missing(self, threshold=0.8):
+        self.df = self.df.dropna(thresh=len(self.df.columns) * threshold)
+        return self
     
-    Returns:
-        pd.DataFrame: Cleaned DataFrame
-    """
-    df_clean = df.copy()
+    def fill_numeric_missing(self, method='median'):
+        for col in self.numeric_columns:
+            if self.df[col].isnull().any():
+                if method == 'median':
+                    fill_value = self.df[col].median()
+                elif method == 'mean':
+                    fill_value = self.df[col].mean()
+                elif method == 'mode':
+                    fill_value = self.df[col].mode()[0]
+                else:
+                    fill_value = 0
+                self.df[col] = self.df[col].fillna(fill_value)
+        return self
     
-    if drop_na:
-        df_clean = df_clean.dropna()
+    def remove_outliers_zscore(self, threshold=3):
+        for col in self.numeric_columns:
+            z_scores = np.abs(stats.zscore(self.df[col]))
+            self.df = self.df[z_scores < threshold]
+        return self
     
-    if rename_columns:
-        df_clean.columns = df_clean.columns.str.strip().str.lower().str.replace(' ', '_')
+    def normalize_data(self, method='minmax'):
+        if method == 'minmax':
+            for col in self.numeric_columns:
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val > min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        elif method == 'standard':
+            for col in self.numeric_columns:
+                mean_val = self.df[col].mean()
+                std_val = self.df[col].std()
+                if std_val > 0:
+                    self.df[col] = (self.df[col] - mean_val) / std_val
+        return self
     
-    return df_clean
+    def get_cleaned_data(self):
+        return self.df.copy()
 
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate that a DataFrame meets basic requirements.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate
-        required_columns (list): List of required column names
-    
-    Returns:
-        tuple: (is_valid, error_message)
-    """
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
-    
-    return True, "DataFrame is valid"
+def process_dataset(file_path, output_path=None):
+    try:
+        df = pd.read_csv(file_path)
+        cleaner = DataCleaner(df)
+        cleaned_df = (cleaner
+                     .remove_missing(threshold=0.7)
+                     .fill_numeric_missing(method='median')
+                     .remove_outliers_zscore(threshold=3)
+                     .normalize_data(method='minmax')
+                     .get_cleaned_data())
+        
+        if output_path:
+            cleaned_df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to {output_path}")
+        
+        return cleaned_df
+    except Exception as e:
+        print(f"Error processing dataset: {e}")
+        return None
 
-def remove_duplicates(df, subset=None, keep='first'):
-    """
-    Remove duplicate rows from a DataFrame.
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature1': [1, 2, 3, 4, 5, 100, 7, 8, 9, 10],
+        'feature2': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+        'category': ['A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B']
+    })
     
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        subset (list): Columns to consider for duplicates
-        keep (str): Which duplicates to keep ('first', 'last', False)
-    
-    Returns:
-        pd.DataFrame: DataFrame with duplicates removed
-    """
-    return df.drop_duplicates(subset=subset, keep=keep)
+    cleaner = DataCleaner(sample_data)
+    result = cleaner.remove_outliers_zscore().normalize_data().get_cleaned_data()
+    print("Original shape:", sample_data.shape)
+    print("Cleaned shape:", result.shape)
+    print("Cleaned data preview:")
+    print(result.head())
