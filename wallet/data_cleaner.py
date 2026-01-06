@@ -1,197 +1,49 @@
-import pandas as pd
-import numpy as np
 
-def remove_duplicates(df):
-    """Remove duplicate rows from DataFrame."""
-    return df.drop_duplicates()
+def remove_duplicates(data_list):
+    """
+    Remove duplicate items from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    unique_list = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            unique_list.append(item)
+    return unique_list
 
-def fill_missing_values(df, strategy='mean'):
-    """Fill missing values using specified strategy."""
-    if strategy == 'mean':
-        return df.fillna(df.mean(numeric_only=True))
-    elif strategy == 'median':
-        return df.fillna(df.median(numeric_only=True))
-    elif strategy == 'mode':
-        return df.fillna(df.mode().iloc[0])
-    else:
-        return df.fillna(0)
+def clean_numeric_strings(data_list):
+    """
+    Convert string representations of numbers to actual integers.
+    Non-numeric strings are kept as-is.
+    """
+    cleaned = []
+    for item in data_list:
+        try:
+            cleaned.append(int(item))
+        except (ValueError, TypeError):
+            cleaned.append(item)
+    return cleaned
 
-def normalize_column(df, column_name):
-    """Normalize specified column to range [0,1]."""
-    if column_name in df.columns:
-        col_min = df[column_name].min()
-        col_max = df[column_name].max()
-        if col_max != col_min:
-            df[column_name] = (df[column_name] - col_min) / (col_max - col_min)
-    return df
+def filter_by_type(data_list, data_type):
+    """
+    Filter list to only include items of specified type.
+    """
+    return [item for item in data_list if isinstance(item, data_type)]
 
-def clean_dataframe(df, remove_dups=True, fill_strategy='mean', normalize_cols=None):
-    """Apply multiple cleaning operations to DataFrame."""
-    if remove_dups:
-        df = remove_duplicates(df)
+def main():
+    # Example usage
+    sample_data = [1, 2, 2, 3, "4", "4", 5, "hello", 5]
+    print("Original:", sample_data)
     
-    df = fill_missing_values(df, strategy=fill_strategy)
+    unique_data = remove_duplicates(sample_data)
+    print("Unique:", unique_data)
     
-    if normalize_cols:
-        for col in normalize_cols:
-            if col in df.columns:
-                df = normalize_column(df, col)
+    cleaned_data = clean_numeric_strings(unique_data)
+    print("Cleaned:", cleaned_data)
     
-    return df
-
-def load_and_clean_csv(filepath, **kwargs):
-    """Load CSV file and apply cleaning operations."""
-    try:
-        df = pd.read_csv(filepath)
-        return clean_dataframe(df, **kwargs)
-    except Exception as e:
-        print(f"Error loading or cleaning file: {e}")
-        return None
-import numpy as np
-import pandas as pd
-from scipy import stats
-
-class DataCleaner:
-    def __init__(self, df):
-        self.df = df.copy()
-        self.original_shape = df.shape
-        
-    def remove_outliers_iqr(self, columns=None, factor=1.5):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-        
-        df_clean = self.df.copy()
-        for col in columns:
-            if col in df_clean.columns:
-                Q1 = df_clean[col].quantile(0.25)
-                Q3 = df_clean[col].quantile(0.75)
-                IQR = Q3 - Q1
-                lower_bound = Q1 - factor * IQR
-                upper_bound = Q3 + factor * IQR
-                df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
-        
-        self.df = df_clean
-        return self
-    
-    def remove_outliers_zscore(self, columns=None, threshold=3):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-        
-        df_clean = self.df.copy()
-        for col in columns:
-            if col in df_clean.columns:
-                z_scores = np.abs(stats.zscore(df_clean[col].dropna()))
-                df_clean = df_clean[(z_scores < threshold) | df_clean[col].isna()]
-        
-        self.df = df_clean
-        return self
-    
-    def normalize_minmax(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-        
-        df_norm = self.df.copy()
-        for col in columns:
-            if col in df_norm.columns:
-                min_val = df_norm[col].min()
-                max_val = df_norm[col].max()
-                if max_val > min_val:
-                    df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
-        
-        self.df = df_norm
-        return self
-    
-    def normalize_zscore(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-        
-        df_norm = self.df.copy()
-        for col in columns:
-            if col in df_norm.columns:
-                mean_val = df_norm[col].mean()
-                std_val = df_norm[col].std()
-                if std_val > 0:
-                    df_norm[col] = (df_norm[col] - mean_val) / std_val
-        
-        self.df = df_norm
-        return self
-    
-    def fill_missing_mean(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-        
-        df_filled = self.df.copy()
-        for col in columns:
-            if col in df_filled.columns:
-                df_filled[col] = df_filled[col].fillna(df_filled[col].mean())
-        
-        self.df = df_filled
-        return self
-    
-    def fill_missing_median(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-        
-        df_filled = self.df.copy()
-        for col in columns:
-            if col in df_filled.columns:
-                df_filled[col] = df_filled[col].fillna(df_filled[col].median())
-        
-        self.df = df_filled
-        return self
-    
-    def get_cleaned_data(self):
-        return self.df
-    
-    def get_removed_count(self):
-        return self.original_shape[0] - self.df.shape[0]
-    
-    def get_summary(self):
-        summary = {
-            'original_rows': self.original_shape[0],
-            'cleaned_rows': self.df.shape[0],
-            'removed_rows': self.get_removed_count(),
-            'columns': self.df.shape[1],
-            'missing_values': self.df.isnull().sum().sum()
-        }
-        return summary
-
-def create_sample_data():
-    np.random.seed(42)
-    data = {
-        'feature_a': np.random.normal(100, 15, 1000),
-        'feature_b': np.random.exponential(50, 1000),
-        'feature_c': np.random.uniform(0, 1, 1000),
-        'category': np.random.choice(['A', 'B', 'C'], 1000)
-    }
-    
-    df = pd.DataFrame(data)
-    
-    indices = np.random.choice(df.index, size=50, replace=False)
-    df.loc[indices, 'feature_a'] = np.random.normal(300, 50, 50)
-    
-    missing_indices = np.random.choice(df.index, size=30, replace=False)
-    df.loc[missing_indices, 'feature_b'] = np.nan
-    
-    return df
+    numbers_only = filter_by_type(cleaned_data, int)
+    print("Numbers only:", numbers_only)
 
 if __name__ == "__main__":
-    sample_df = create_sample_data()
-    print("Original data shape:", sample_df.shape)
-    print("Missing values:", sample_df.isnull().sum().sum())
-    
-    cleaner = DataCleaner(sample_df)
-    cleaner.remove_outliers_iqr(['feature_a', 'feature_b'])
-    cleaner.fill_missing_mean(['feature_b'])
-    cleaner.normalize_minmax(['feature_a', 'feature_b', 'feature_c'])
-    
-    cleaned_df = cleaner.get_cleaned_data()
-    summary = cleaner.get_summary()
-    
-    print("\nCleaning Summary:")
-    for key, value in summary.items():
-        print(f"{key}: {value}")
-    
-    print("\nCleaned data shape:", cleaned_df.shape)
-    print("Cleaned data statistics:")
-    print(cleaned_df.describe())
+    main()
