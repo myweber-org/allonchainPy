@@ -102,3 +102,11 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned_df, required_columns=['id', 'value', 'category'], min_rows=3)
     print(f"\nData validation result: {is_valid}")
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
