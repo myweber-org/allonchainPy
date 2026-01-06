@@ -1,17 +1,17 @@
 
-import numpy as np
 import pandas as pd
+import numpy as np
 
 def remove_outliers_iqr(df, column):
     """
     Remove outliers from a DataFrame column using the Interquartile Range method.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to process.
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    pd.DataFrame: DataFrame with outliers removed.
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
@@ -29,14 +29,14 @@ def remove_outliers_iqr(df, column):
 
 def calculate_summary_statistics(df, column):
     """
-    Calculate summary statistics for a column after outlier removal.
+    Calculate summary statistics for a DataFrame column.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to analyze.
     
     Returns:
-    dict: Dictionary containing summary statistics
+    dict: Dictionary containing summary statistics.
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
@@ -47,94 +47,40 @@ def calculate_summary_statistics(df, column):
         'std': df[column].std(),
         'min': df[column].min(),
         'max': df[column].max(),
-        'count': df[column].count()
+        'count': df[column].count(),
+        'missing': df[column].isnull().sum()
     }
     
     return stats
 
-def process_dataframe(df, columns_to_clean):
-    """
-    Process multiple columns for outlier removal and return cleaned DataFrame.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    columns_to_clean (list): List of column names to clean
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    dict: Dictionary of statistics for each cleaned column
-    """
-    cleaned_df = df.copy()
-    all_stats = {}
-    
-    for column in columns_to_clean:
-        if column in cleaned_df.columns:
-            original_count = len(cleaned_df)
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            removed_count = original_count - len(cleaned_df)
-            
-            stats = calculate_summary_statistics(cleaned_df, column)
-            stats['outliers_removed'] = removed_count
-            all_stats[column] = stats
-    
-    return cleaned_df, all_stats
-
-if __name__ == "__main__":
-    sample_data = {
-        'temperature': [22, 23, 24, 25, 26, 100, 27, 28, 29, -10],
-        'humidity': [45, 46, 47, 48, 49, 50, 150, 51, 52, 53],
-        'pressure': [1013, 1014, 1015, 1016, 2000, 1017, 1018, 1019, 500, 1020]
+def main():
+    # Example usage
+    data = {
+        'values': [10, 12, 12, 13, 12, 11, 14, 13, 15, 100, 12, 14, 13, 12, 11, 10, 14, 13, 12, 11]
     }
     
-    df = pd.DataFrame(sample_data)
+    df = pd.DataFrame(data)
     print("Original DataFrame:")
     print(df)
-    print("\n" + "="*50 + "\n")
+    print(f"\nOriginal shape: {df.shape}")
     
-    columns_to_process = ['temperature', 'humidity', 'pressure']
-    cleaned_df, statistics = process_dataframe(df, columns_to_process)
-    
-    print("Cleaned DataFrame:")
+    # Remove outliers
+    cleaned_df = remove_outliers_iqr(df, 'values')
+    print("\nCleaned DataFrame:")
     print(cleaned_df)
-    print("\n" + "="*50 + "\n")
+    print(f"\nCleaned shape: {cleaned_df.shape}")
     
-    print("Summary Statistics:")
-    for column, stats in statistics.items():
-        print(f"\n{column}:")
-        for key, value in stats.items():
-            print(f"  {key}: {value:.2f}" if isinstance(value, float) else f"  {key}: {value}")
-def remove_duplicates(data_list):
-    """
-    Remove duplicate entries from a list while preserving order.
-    Returns a new list with unique elements.
-    """
-    seen = set()
-    unique_list = []
-    for item in data_list:
-        if item not in seen:
-            seen.add(item)
-            unique_list.append(item)
-    return unique_list
-
-def clean_numeric_data(values, default=0):
-    """
-    Clean numeric data by converting strings to floats.
-    Non-numeric values are replaced with the default value.
-    """
-    cleaned = []
-    for val in values:
-        try:
-            cleaned.append(float(val))
-        except (ValueError, TypeError):
-            cleaned.append(default)
-    return cleaned
-
-def filter_by_threshold(data, threshold, key=None):
-    """
-    Filter data based on a threshold value.
-    If key is provided, it should be a function to extract comparison value.
-    """
-    if key is None:
-        key = lambda x: x
+    # Calculate statistics
+    original_stats = calculate_summary_statistics(df, 'values')
+    cleaned_stats = calculate_summary_statistics(cleaned_df, 'values')
     
-    return [item for item in data if key(item) >= threshold]
+    print("\nOriginal Statistics:")
+    for key, value in original_stats.items():
+        print(f"{key}: {value}")
+    
+    print("\nCleaned Statistics:")
+    for key, value in cleaned_stats.items():
+        print(f"{key}: {value}")
+
+if __name__ == "__main__":
+    main()
