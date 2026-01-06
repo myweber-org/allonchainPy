@@ -1,14 +1,14 @@
 
-import numpy as np
 import pandas as pd
+import numpy as np
 
 def remove_outliers_iqr(df, column):
     """
-    Remove outliers from a DataFrame column using the IQR method.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
+    column (str): Column name to process
     
     Returns:
     pd.DataFrame: DataFrame with outliers removed
@@ -27,78 +27,106 @@ def remove_outliers_iqr(df, column):
     
     return filtered_df
 
-def calculate_statistics(df, column):
+def calculate_summary_statistics(df):
     """
-    Calculate basic statistics for a column.
+    Calculate summary statistics for numeric columns.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    column (str): Column name
     
     Returns:
-    dict: Dictionary containing statistics
+    pd.DataFrame: Summary statistics
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
     
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
-    }
+    if len(numeric_cols) == 0:
+        return pd.DataFrame()
+    
+    stats = df[numeric_cols].agg(['mean', 'median', 'std', 'min', 'max'])
+    stats.loc['count'] = df[numeric_cols].count()
     
     return stats
 
-def normalize_column(df, column):
+def clean_missing_values(df, strategy='mean'):
     """
-    Normalize a column using min-max scaling.
+    Handle missing values in numeric columns.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    column (str): Column name to normalize
+    strategy (str): Imputation strategy ('mean', 'median', 'mode', or 'drop')
     
     Returns:
-    pd.DataFrame: DataFrame with normalized column
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'drop':
+        return df.dropna(subset=numeric_cols)
+    
+    df_clean = df.copy()
+    
+    for col in numeric_cols:
+        if strategy == 'mean':
+            fill_value = df[col].mean()
+        elif strategy == 'median':
+            fill_value = df[col].median()
+        elif strategy == 'mode':
+            fill_value = df[col].mode()[0] if not df[col].mode().empty else 0
+        else:
+            raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+        
+        df_clean[col] = df[col].fillna(fill_value)
+    
+    return df_clean
+
+def normalize_data(df, columns=None):
+    """
+    Normalize specified columns using min-max scaling.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of columns to normalize. If None, normalize all numeric columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_normalized = df.copy()
+    
+    for col in columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            min_val = df[col].min()
+            max_val = df[col].max()
+            
+            if max_val > min_val:
+                df_normalized[col] = (df[col] - min_val) / (max_val - min_val)
+    
+    return df_normalized
+
+def detect_anomalies_zscore(df, column, threshold=3):
+    """
+    Detect anomalies using Z-score method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    threshold (float): Z-score threshold for anomaly detection
+    
+    Returns:
+    pd.DataFrame: DataFrame containing detected anomalies
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    df_copy = df.copy()
-    min_val = df_copy[column].min()
-    max_val = df_copy[column].max()
+    mean = df[column].mean()
+    std = df[column].std()
     
-    if max_val == min_val:
-        df_copy[f'{column}_normalized'] = 0.5
-    else:
-        df_copy[f'{column}_normalized'] = (df_copy[column] - min_val) / (max_val - min_val)
+    if std == 0:
+        return pd.DataFrame(columns=df.columns)
     
-    return df_copy
-
-if __name__ == "__main__":
-    # Example usage
-    data = {
-        'values': [10, 12, 12, 13, 12, 14, 15, 100, 12, 14, 13, 12, 11, 10, 200]
-    }
+    z_scores = np.abs((df[column] - mean) / std)
+    anomalies = df[z_scores > threshold]
     
-    df = pd.DataFrame(data)
-    print("Original DataFrame:")
-    print(df)
-    print(f"\nOriginal shape: {df.shape}")
-    
-    # Remove outliers
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    print(f"\nCleaned shape: {cleaned_df.shape}")
-    
-    # Calculate statistics
-    stats = calculate_statistics(cleaned_df, 'values')
-    print("\nStatistics after cleaning:")
-    for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
-    
-    # Normalize column
-    normalized_df = normalize_column(cleaned_df, 'values')
-    print("\nNormalized DataFrame:")
-    print(normalized_df.head())
+    return anomalies
