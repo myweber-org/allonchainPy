@@ -29,4 +29,54 @@ def clean_dataset(input_file, output_file):
         print(f"Error during cleaning: {str(e)}")
 
 if __name__ == "__main__":
-    clean_dataset("raw_data.csv", "cleaned_data.csv")
+    clean_dataset("raw_data.csv", "cleaned_data.csv")import pandas as pd
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing null values and duplicates.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to be cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Remove duplicate rows
+    df_cleaned = df_cleaned.drop_duplicates()
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def filter_by_column(df, column_name, threshold):
+    """
+    Filter DataFrame rows where column value is greater than threshold.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column_name (str): Name of column to filter by.
+        threshold (float): Threshold value.
+    
+    Returns:
+        pd.DataFrame: Filtered DataFrame.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    filtered_df = df[df[column_name] > threshold]
+    return filtered_df.reset_index(drop=True)
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to CSV file.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to save.
+        output_path (str): Path for output CSV file.
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Data saved to {output_path}")
