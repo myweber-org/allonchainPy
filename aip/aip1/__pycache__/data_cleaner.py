@@ -64,3 +64,61 @@ def clean_dataset(df, missing_strategy='mean', outlier_method=None):
         cleaner.remove_outliers(method=outlier_method)
     
     return cleaner.get_cleaned_data()
+import pandas as pd
+import numpy as np
+
+def remove_duplicates(df):
+    """
+    Remove duplicate rows from a DataFrame.
+    """
+    return df.drop_duplicates()
+
+def fill_missing_values(df, strategy='mean'):
+    """
+    Fill missing values in numeric columns.
+    """
+    df_filled = df.copy()
+    numeric_cols = df_filled.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        for col in numeric_cols:
+            df_filled[col].fillna(df_filled[col].mean(), inplace=True)
+    elif strategy == 'median':
+        for col in numeric_cols:
+            df_filled[col].fillna(df_filled[col].median(), inplace=True)
+    elif strategy == 'mode':
+        for col in numeric_cols:
+            df_filled[col].fillna(df_filled[col].mode()[0], inplace=True)
+    
+    return df_filled
+
+def normalize_column(df, column_name):
+    """
+    Normalize a numeric column to range [0, 1].
+    """
+    if column_name in df.columns:
+        col_min = df[column_name].min()
+        col_max = df[column_name].max()
+        
+        if col_max != col_min:
+            df[column_name] = (df[column_name] - col_min) / (col_max - col_min)
+    
+    return df
+
+def clean_dataset(file_path, output_path=None):
+    """
+    Main function to clean a dataset from a CSV file.
+    """
+    df = pd.read_csv(file_path)
+    
+    df = remove_duplicates(df)
+    df = fill_missing_values(df, strategy='median')
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        df = normalize_column(df, col)
+    
+    if output_path:
+        df.to_csv(output_path, index=False)
+    
+    return df
