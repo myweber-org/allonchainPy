@@ -70,3 +70,61 @@ if __name__ == "__main__":
     
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation: {is_valid} - {message}")
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def clean_dataset(file_path, numeric_columns):
+    df = pd.read_csv(file_path)
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            df = remove_outliers_iqr(df, col)
+            df = normalize_minmax(df, col)
+    
+    df = df.dropna()
+    return df
+
+def calculate_statistics(df, column):
+    stats_dict = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'skewness': stats.skew(df[column].dropna()),
+        'kurtosis': stats.kurtosis(df[column].dropna())
+    }
+    return stats_dict
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature1': np.random.normal(100, 15, 1000),
+        'feature2': np.random.exponential(50, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    })
+    
+    sample_data.to_csv('sample_data.csv', index=False)
+    
+    cleaned_df = clean_dataset('sample_data.csv', ['feature1', 'feature2'])
+    
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned_df.shape}")
+    
+    for col in ['feature1', 'feature2']:
+        stats_result = calculate_statistics(cleaned_df, col)
+        print(f"\nStatistics for {col}:")
+        for key, value in stats_result.items():
+            print(f"{key}: {value:.4f}")
