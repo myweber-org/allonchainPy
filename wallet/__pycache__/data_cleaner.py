@@ -498,4 +498,49 @@ if __name__ == "__main__":
     
     validation = validate_data(cleaned, required_columns=['id', 'value'])
     print("\nValidation Results:")
-    print(validation)
+    print(validation)import csv
+import re
+from typing import List, Dict, Any
+
+def clean_string(value: str) -> str:
+    """Remove extra whitespace and normalize string."""
+    if not isinstance(value, str):
+        return str(value)
+    return re.sub(r'\s+', ' ', value.strip())
+
+def clean_numeric(value: str) -> float:
+    """Convert string to float, handling common issues."""
+    if not value:
+        return 0.0
+    cleaned = value.replace(',', '').replace('$', '').strip()
+    try:
+        return float(cleaned)
+    except ValueError:
+        return 0.0
+
+def clean_csv_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Apply cleaning functions to all values in a row."""
+    cleaned_row = {}
+    for key, value in row.items():
+        if isinstance(value, str):
+            if any(char.isdigit() for char in value):
+                cleaned_row[key] = clean_numeric(value)
+            else:
+                cleaned_row[key] = clean_string(value)
+        else:
+            cleaned_row[key] = value
+    return cleaned_row
+
+def process_csv_file(input_path: str, output_path: str) -> None:
+    """Read CSV, clean data, and write to new file."""
+    with open(input_path, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
+        
+        with open(output_path, 'w', newline='', encoding='utf-8') as outfile:
+            writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+            writer.writeheader()
+            
+            for row in reader:
+                cleaned_row = clean_csv_row(row)
+                writer.writerow(cleaned_row)
