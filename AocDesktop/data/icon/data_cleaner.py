@@ -1,89 +1,81 @@
+
 import numpy as np
+import pandas as pd
 
-def remove_outliers_iqr(data, column):
+def remove_outliers_iqr(df, column):
     """
-    Remove outliers from a specified column using the IQR method.
+    Remove outliers from a DataFrame column using the IQR method.
     
     Parameters:
-    data (list or array-like): The dataset
-    column (int or str): Column index or name if using pandas DataFrame
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
     
     Returns:
-    numpy.ndarray: Data with outliers removed
+    pd.DataFrame: DataFrame with outliers removed
     """
-    if isinstance(data, list):
-        data = np.array(data)
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    q1 = np.percentile(data, 25)
-    q3 = np.percentile(data, 75)
-    iqr = q3 - q1
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    lower_bound = q1 - 1.5 * iqr
-    upper_bound = q3 + 1.5 * iqr
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    filtered_data = data[(data >= lower_bound) & (data <= upper_bound)]
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
-    return filtered_data
+    return filtered_df.reset_index(drop=True)
 
-def calculate_basic_stats(data):
+def calculate_summary_stats(df, column):
     """
-    Calculate basic statistics for the data.
+    Calculate summary statistics for a column.
     
     Parameters:
-    data (array-like): Input data
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name
     
     Returns:
-    dict: Dictionary containing mean, median, std, min, max
+    dict: Dictionary containing summary statistics
     """
-    if isinstance(data, list):
-        data = np.array(data)
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
     stats = {
-        'mean': np.mean(data),
-        'median': np.median(data),
-        'std': np.std(data),
-        'min': np.min(data),
-        'max': np.max(data)
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count(),
+        'missing': df[column].isnull().sum()
     }
     
     return stats
 
-def clean_dataset(data, columns=None):
+def example_usage():
     """
-    Clean dataset by removing outliers from specified columns.
-    
-    Parameters:
-    data (array-like): Input dataset
-    columns (list): List of column indices to clean
-    
-    Returns:
-    numpy.ndarray: Cleaned dataset
+    Example usage of the data cleaning functions.
     """
-    if columns is None:
-        columns = range(data.shape[1])
+    np.random.seed(42)
+    data = {
+        'id': range(100),
+        'value': np.random.normal(100, 15, 100)
+    }
     
-    cleaned_data = data.copy()
+    df = pd.DataFrame(data)
     
-    for col in columns:
-        col_data = data[:, col]
-        cleaned_col = remove_outliers_iqr(col_data, col)
-        
-        if len(cleaned_col) < len(col_data):
-            print(f"Removed {len(col_data) - len(cleaned_col)} outliers from column {col}")
-        
-        cleaned_data = cleaned_data[cleaned_data[:, col] >= np.min(cleaned_col)]
-        cleaned_data = cleaned_data[cleaned_data[:, col] <= np.max(cleaned_col)]
+    print("Original DataFrame shape:", df.shape)
+    print("Original summary statistics:")
+    print(calculate_summary_stats(df, 'value'))
     
-    return cleaned_data
+    cleaned_df = remove_outliers_iqr(df, 'value')
+    
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("Cleaned summary statistics:")
+    print(calculate_summary_stats(cleaned_df, 'value'))
+    
+    return cleaned_df
 
 if __name__ == "__main__":
-    sample_data = np.random.randn(100, 3)
-    sample_data[0, 0] = 10
-    sample_data[1, 1] = -8
-    
-    print("Original data shape:", sample_data.shape)
-    print("Sample statistics:", calculate_basic_stats(sample_data[:, 0]))
-    
-    cleaned = clean_dataset(sample_data)
-    print("Cleaned data shape:", cleaned.shape)
-    print("Cleaned statistics:", calculate_basic_stats(cleaned[:, 0]))
+    cleaned_data = example_usage()
