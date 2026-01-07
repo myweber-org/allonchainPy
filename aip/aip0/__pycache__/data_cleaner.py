@@ -1,43 +1,72 @@
-
+import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(data, column):
+def clean_dataframe(df, drop_duplicates=True, fill_missing='mean'):
     """
-    Remove outliers from a pandas DataFrame column using the IQR method.
-    
-    Parameters:
-    data (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    Clean a pandas DataFrame by handling duplicates and missing values.
     """
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    original_shape = df.shape
     
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    if drop_duplicates:
+        df = df.drop_duplicates()
+        print(f"Removed {original_shape[0] - df.shape[0]} duplicate rows.")
+    
+    if fill_missing:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        
+        if fill_missing == 'mean':
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+        elif fill_missing == 'median':
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+        elif fill_missing == 'zero':
+            df[numeric_cols] = df[numeric_cols].fillna(0)
+        
+        missing_count = df.isnull().sum().sum()
+        if missing_count > 0:
+            print(f"Warning: {missing_count} missing values remain in non-numeric columns.")
+    
+    print(f"Data cleaned. Original shape: {original_shape}, New shape: {df.shape}")
+    return df
 
-def calculate_summary_statistics(data, column):
+def validate_dataframe(df, required_columns=None, min_rows=1):
     """
-    Calculate summary statistics for a column after outlier removal.
-    
-    Parameters:
-    data (pd.DataFrame): Input DataFrame
-    column (str): Column name
-    
-    Returns:
-    dict: Dictionary containing summary statistics
+    Validate DataFrame structure and content.
     """
-    stats = {
-        'mean': data[column].mean(),
-        'median': data[column].median(),
-        'std': data[column].std(),
-        'min': data[column].min(),
-        'max': data[column].max(),
-        'count': data[column].count()
+    if df.empty:
+        raise ValueError("DataFrame is empty.")
+    
+    if len(df) < min_rows:
+        raise ValueError(f"DataFrame has fewer than {min_rows} rows.")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+def main():
+    # Example usage
+    data = {
+        'id': [1, 2, 2, 3, 4],
+        'value': [10.5, None, 15.2, None, 20.1],
+        'category': ['A', 'B', 'B', None, 'A']
     }
-    return stats
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned_df = clean_dataframe(df, drop_duplicates=True, fill_missing='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    try:
+        validate_dataframe(cleaned_df, required_columns=['id', 'value'], min_rows=2)
+        print("Data validation passed.")
+    except ValueError as e:
+        print(f"Validation error: {e}")
+
+if __name__ == "__main__":
+    main()
