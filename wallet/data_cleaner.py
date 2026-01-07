@@ -86,4 +86,65 @@ if __name__ == "__main__":
     
     validated = validate_email_column(cleaned, 'email')
     print("DataFrame with email validation:")
-    print(validated)
+    print(validated)import re
+import pandas as pd
+from typing import Union, List, Optional
+
+def validate_email(email: str) -> bool:
+    """
+    Validate an email address format.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def remove_duplicates(data: Union[List, pd.Series]) -> Union[List, pd.Series]:
+    """
+    Remove duplicate values from a list or pandas Series.
+    """
+    if isinstance(data, list):
+        return list(dict.fromkeys(data))
+    elif isinstance(data, pd.Series):
+        return data.drop_duplicates()
+    else:
+        raise TypeError("Input must be a list or pandas Series")
+
+def normalize_string(text: str, case: str = 'lower') -> str:
+    """
+    Normalize string by stripping whitespace and adjusting case.
+    """
+    text = text.strip()
+    if case == 'lower':
+        return text.lower()
+    elif case == 'upper':
+        return text.upper()
+    elif case == 'title':
+        return text.title()
+    else:
+        return text
+
+def fill_missing_values(series: pd.Series, method: str = 'mean', value: Optional[float] = None) -> pd.Series:
+    """
+    Fill missing values in a pandas Series.
+    """
+    if method == 'mean':
+        return series.fillna(series.mean())
+    elif method == 'median':
+        return series.fillna(series.median())
+    elif method == 'mode':
+        return series.fillna(series.mode()[0] if not series.mode().empty else None)
+    elif method == 'constant' and value is not None:
+        return series.fillna(value)
+    else:
+        raise ValueError("Invalid method or missing value for constant fill")
+
+def detect_outliers_iqr(series: pd.Series, multiplier: float = 1.5) -> pd.Series:
+    """
+    Detect outliers using the Interquartile Range (IQR) method.
+    Returns a boolean Series where True indicates an outlier.
+    """
+    Q1 = series.quantile(0.25)
+    Q3 = series.quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    return (series < lower_bound) | (series > upper_bound)
