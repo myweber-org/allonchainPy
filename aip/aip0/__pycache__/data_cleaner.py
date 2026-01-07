@@ -292,4 +292,76 @@ if __name__ == "__main__":
     
     # Validate the cleaned data
     is_valid, message = validate_dataframe(cleaned, required_columns=['id', 'name', 'age', 'score'])
-    print(f"\nValidation: {is_valid} - {message}")
+    print(f"\nValidation: {is_valid} - {message}")import pandas as pd
+
+def clean_dataframe(df, drop_na=True, rename_columns=True):
+    """
+    Clean a pandas DataFrame by removing null values and standardizing column names.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_na (bool): If True, drop rows with any null values.
+    rename_columns (bool): If True, rename columns to lowercase with underscores.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    if drop_na:
+        df_clean = df_clean.dropna()
+    
+    if rename_columns:
+        df_clean.columns = (
+            df_clean.columns
+            .str.lower()
+            .str.replace(r'[^a-z0-9]+', '_', regex=True)
+            .str.strip('_')
+        )
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and required columns.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+if __name__ == "__main__":
+    sample_data = {
+        'First Name': ['Alice', 'Bob', None],
+        'Last Name': ['Smith', None, 'Johnson'],
+        'Age': [25, 30, 35]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print()
+    
+    cleaned_df = clean_dataframe(df)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print()
+    
+    is_valid, message = validate_dataframe(cleaned_df, ['first_name', 'last_name', 'age'])
+    print(f"Validation: {is_valid}")
+    print(f"Message: {message}")
