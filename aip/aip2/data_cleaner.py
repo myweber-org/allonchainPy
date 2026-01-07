@@ -345,3 +345,81 @@ if __name__ == "__main__":
     print(cleaned_df)
     print("\nSummary statistics after cleaning:")
     print(calculate_summary_statistics(cleaned_df, 'temperature'))
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the IQR method.
+    
+    Args:
+        data (list or np.array): Input data array
+        column (int): Column index to process (for 2D arrays)
+        
+    Returns:
+        np.array: Data with outliers removed
+    """
+    if isinstance(data, list):
+        data = np.array(data)
+    
+    if data.ndim == 2:
+        column_data = data[:, column]
+    else:
+        column_data = data
+    
+    q1 = np.percentile(column_data, 25)
+    q3 = np.percentile(column_data, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    if data.ndim == 2:
+        mask = (column_data >= lower_bound) & (column_data <= upper_bound)
+        return data[mask]
+    else:
+        return column_data[(column_data >= lower_bound) & (column_data <= upper_bound)]
+
+def calculate_statistics(data):
+    """
+    Calculate basic statistics for the data.
+    
+    Args:
+        data (np.array): Input data array
+        
+    Returns:
+        dict: Dictionary containing statistics
+    """
+    if isinstance(data, list):
+        data = np.array(data)
+    
+    stats = {
+        'mean': np.mean(data),
+        'median': np.median(data),
+        'std': np.std(data),
+        'min': np.min(data),
+        'max': np.max(data),
+        'count': len(data)
+    }
+    
+    return stats
+
+def clean_dataset(data, column_index=0):
+    """
+    Main function to clean dataset by removing outliers.
+    
+    Args:
+        data (list or np.array): Input dataset
+        column_index (int): Column to check for outliers
+        
+    Returns:
+        tuple: (cleaned_data, removed_count, statistics)
+    """
+    original_count = len(data) if data.ndim == 1 else data.shape[0]
+    
+    cleaned_data = remove_outliers_iqr(data, column_index)
+    
+    removed_count = original_count - (len(cleaned_data) if cleaned_data.ndim == 1 else cleaned_data.shape[0])
+    
+    stats = calculate_statistics(cleaned_data)
+    
+    return cleaned_data, removed_count, stats
