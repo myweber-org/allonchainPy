@@ -1,63 +1,62 @@
+
 import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
-    return df
-
-def clean_dataset(file_path):
-    df = pd.read_csv(file_path)
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        drop_duplicates (bool): Whether to drop duplicate rows
+        fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop')
     
-    for col in numeric_cols:
-        df = remove_outliers_iqr(df, col)
-        df = normalize_minmax(df, col)
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
     
-    df.to_csv('cleaned_data.csv', index=False)
-    return df
-
-if __name__ == "__main__":
-    cleaned_df = clean_dataset('raw_data.csv')
-    print(f"Data cleaning complete. Shape: {cleaned_df.shape}")
-import pandas as pd
-import numpy as np
-
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    return filtered_df
-
-def clean_dataset(input_file, output_file):
-    df = pd.read_csv(input_file)
-    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
     
-    for col in numeric_columns:
-        original_count = len(df)
-        df = remove_outliers_iqr(df, col)
-        removed_count = original_count - len(df)
-        if removed_count > 0:
-            print(f"Removed {removed_count} outliers from column '{col}'")
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+            else:
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    elif fill_missing == 'mode':
+        for col in cleaned_df.columns:
+            mode_value = cleaned_df[col].mode()
+            if not mode_value.empty:
+                cleaned_df[col] = cleaned_df[col].fillna(mode_value[0])
     
-    df.to_csv(output_file, index=False)
-    print(f"Cleaned data saved to {output_file}")
-    return df
+    return cleaned_df
 
-if __name__ == "__main__":
-    cleaned_df = clean_dataset('raw_data.csv', 'cleaned_data.csv')
-    print(f"Original shape: {pd.read_csv('raw_data.csv').shape}")
-    print(f"Cleaned shape: {cleaned_df.shape}")
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+        min_rows (int): Minimum number of rows required
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
