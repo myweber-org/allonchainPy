@@ -40,3 +40,33 @@ if __name__ == "__main__":
     name_prefix = sys.argv[2]
     
     batch_rename(target_directory, name_prefix)
+import os
+import datetime
+
+def rename_files_by_date(directory):
+    files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+    
+    for filename in files:
+        filepath = os.path.join(directory, filename)
+        creation_time = os.path.getctime(filepath)
+        date_str = datetime.datetime.fromtimestamp(creation_time).strftime('%Y%m%d_%H%M%S')
+        
+        name, ext = os.path.splitext(filename)
+        new_filename = f"{date_str}{ext}"
+        new_filepath = os.path.join(directory, new_filename)
+        
+        counter = 1
+        while os.path.exists(new_filepath):
+            new_filename = f"{date_str}_{counter}{ext}"
+            new_filepath = os.path.join(directory, new_filename)
+            counter += 1
+        
+        os.rename(filepath, new_filepath)
+        print(f"Renamed: {filename} -> {new_filename}")
+
+if __name__ == "__main__":
+    target_directory = input("Enter directory path: ")
+    if os.path.isdir(target_directory):
+        rename_files_by_date(target_directory)
+    else:
+        print("Invalid directory path")
