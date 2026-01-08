@@ -1,161 +1,106 @@
-import pandas as pd
 
-def clean_dataset(df, drop_duplicates=True, fill_missing=None):
-    """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean.
-        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
-        fill_missing (str or dict): Method to fill missing values. Can be 'mean', 
-                                   'median', 'mode', or a dictionary of column:value pairs.
-                                   If None, missing values are not filled.
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame.
-    """
-    cleaned_df = df.copy()
-    
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-    
-    if fill_missing is not None:
-        if isinstance(fill_missing, dict):
-            cleaned_df = cleaned_df.fillna(fill_missing)
-        elif fill_missing == 'mean':
-            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
-        elif fill_missing == 'median':
-            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
-        elif fill_missing == 'mode':
-            for col in cleaned_df.columns:
-                if cleaned_df[col].dtype == 'object':
-                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None)
-    
-    return cleaned_df
-
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate a DataFrame for basic integrity checks.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_columns (list): List of column names that must be present.
-    
-    Returns:
-        tuple: (is_valid, error_message)
-    """
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            return False, f"Missing required columns: {missing_cols}"
-    
-    return True, "DataFrame is valid"
-import pandas as pd
 import numpy as np
-from typing import List, Optional
+import pandas as pd
 
-def remove_duplicate_rows(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+def remove_outliers_iqr(df, column):
     """
-    Remove duplicate rows from a DataFrame.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
-    Args:
-        df: Input DataFrame
-        subset: Columns to consider for identifying duplicates
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
     
     Returns:
-        DataFrame with duplicates removed
+    pd.DataFrame: DataFrame with outliers removed
     """
-    return df.drop_duplicates(subset=subset, keep='first')
-
-def normalize_string_columns(df: pd.DataFrame, columns: List[str]) -> pd.DataFrame:
-    """
-    Normalize string columns by stripping whitespace and converting to lowercase.
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    Args:
-        df: Input DataFrame
-        columns: List of column names to normalize
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def calculate_statistics(df, column):
+    """
+    Calculate basic statistics for a column after outlier removal.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
     
     Returns:
-        DataFrame with normalized string columns
+    dict: Dictionary containing statistics
     """
-    df_copy = df.copy()
-    for col in columns:
-        if col in df_copy.columns and df_copy[col].dtype == 'object':
-            df_copy[col] = df_copy[col].astype(str).str.strip().str.lower()
-    return df_copy
-
-def handle_missing_values(df: pd.DataFrame, strategy: str = 'drop', fill_value: Optional[any] = None) -> pd.DataFrame:
-    """
-    Handle missing values in DataFrame.
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    Args:
-        df: Input DataFrame
-        strategy: 'drop' to remove rows, 'fill' to fill values
-        fill_value: Value to fill missing entries with
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
+    
+    return stats
+
+def process_numerical_data(df, columns=None):
+    """
+    Process numerical columns by removing outliers and calculating statistics.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to process. If None, processes all numerical columns.
     
     Returns:
-        DataFrame with handled missing values
+    tuple: (cleaned_df, statistics_dict)
     """
-    if strategy == 'drop':
-        return df.dropna()
-    elif strategy == 'fill' and fill_value is not None:
-        return df.fillna(fill_value)
-    else:
-        raise ValueError("Invalid strategy or missing fill_value")
-
-def clean_dataframe(df: pd.DataFrame, 
-                   deduplicate: bool = True,
-                   normalize_cols: Optional[List[str]] = None,
-                   missing_strategy: str = 'drop',
-                   fill_value: Optional[any] = None) -> pd.DataFrame:
-    """
-    Comprehensive data cleaning pipeline.
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
     
-    Args:
-        df: Input DataFrame
-        deduplicate: Whether to remove duplicates
-        normalize_cols: Columns to normalize
-        missing_strategy: Strategy for handling missing values
-        fill_value: Value to fill missing entries
-    
-    Returns:
-        Cleaned DataFrame
-    """
     cleaned_df = df.copy()
+    statistics = {}
     
-    if deduplicate:
-        cleaned_df = remove_duplicate_rows(cleaned_df)
+    for col in columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            removed_count = original_count - len(cleaned_df)
+            
+            stats = calculate_statistics(cleaned_df, col)
+            stats['outliers_removed'] = removed_count
+            statistics[col] = stats
     
-    if normalize_cols:
-        cleaned_df = normalize_string_columns(cleaned_df, normalize_cols)
-    
-    cleaned_df = handle_missing_values(cleaned_df, missing_strategy, fill_value)
-    
-    return cleaned_df
+    return cleaned_df, statistics
 
 if __name__ == "__main__":
     # Example usage
     sample_data = {
-        'name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson', ''],
-        'age': [25, 30, 25, 35, None],
-        'email': ['JOHN@example.com', 'jane@example.com', 'john@example.com', 'bob@example.com', None]
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.uniform(0, 200, 1000)
     }
     
     df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\n")
+    print("Original DataFrame shape:", df.shape)
     
-    cleaned = clean_dataframe(
-        df,
-        deduplicate=True,
-        normalize_cols=['name', 'email'],
-        missing_strategy='fill',
-        fill_value='unknown'
-    )
+    # Add some outliers
+    df.loc[1000] = [500, 1000, 300]
+    df.loc[1001] = [-100, 2000, -50]
     
-    print("Cleaned DataFrame:")
-    print(cleaned)
+    cleaned_df, stats = process_numerical_data(df)
+    
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("\nStatistics:")
+    for col, col_stats in stats.items():
+        print(f"\n{col}:")
+        for stat_name, stat_value in col_stats.items():
+            print(f"  {stat_name}: {stat_value:.2f}")
