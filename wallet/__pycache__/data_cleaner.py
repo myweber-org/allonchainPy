@@ -93,4 +93,97 @@ if __name__ == "__main__":
     print("Cleaned data shape:", cleaned_df.shape)
     
     stats = calculate_summary_statistics(cleaned_df, 'value')
-    print("Cleaned statistics:", stats)
+    print("Cleaned statistics:", stats)import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Parameters:
+    data (numpy.ndarray): Input data array
+    column (int): Index of column to process
+    
+    Returns:
+    numpy.ndarray: Data with outliers removed
+    """
+    if data.size == 0:
+        return data
+    
+    column_data = data[:, column]
+    q1 = np.percentile(column_data, 25)
+    q3 = np.percentile(column_data, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    mask = (column_data >= lower_bound) & (column_data <= upper_bound)
+    return data[mask]
+
+def calculate_statistics(data):
+    """
+    Calculate basic statistics for the data.
+    
+    Parameters:
+    data (numpy.ndarray): Input data array
+    
+    Returns:
+    dict: Dictionary containing mean, median, and standard deviation
+    """
+    if data.size == 0:
+        return {'mean': 0, 'median': 0, 'std': 0}
+    
+    return {
+        'mean': np.mean(data),
+        'median': np.median(data),
+        'std': np.std(data)
+    }
+
+def validate_data(data, expected_columns):
+    """
+    Validate data shape and check for NaN values.
+    
+    Parameters:
+    data (numpy.ndarray): Input data array
+    expected_columns (int): Expected number of columns
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if data.ndim != 2:
+        return False, f"Expected 2D array, got {data.ndim}D"
+    
+    if data.shape[1] != expected_columns:
+        return False, f"Expected {expected_columns} columns, got {data.shape[1]}"
+    
+    if np.any(np.isnan(data)):
+        return False, "Data contains NaN values"
+    
+    return True, "Data validation passed"
+
+def normalize_data(data, method='minmax'):
+    """
+    Normalize data using specified method.
+    
+    Parameters:
+    data (numpy.ndarray): Input data array
+    method (str): Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+    numpy.ndarray: Normalized data
+    """
+    if data.size == 0:
+        return data
+    
+    if method == 'minmax':
+        data_min = np.min(data, axis=0)
+        data_max = np.max(data, axis=0)
+        return (data - data_min) / (data_max - data_min + 1e-8)
+    
+    elif method == 'zscore':
+        data_mean = np.mean(data, axis=0)
+        data_std = np.std(data, axis=0)
+        return (data - data_mean) / (data_std + 1e-8)
+    
+    else:
+        raise ValueError(f"Unknown normalization method: {method}")
