@@ -396,3 +396,67 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B'], min_rows=3)
     print(f"\nData valid: {is_valid}")
+import pandas as pd
+import numpy as np
+
+def remove_missing_values(df, threshold=0.5):
+    """
+    Remove columns with missing values exceeding threshold percentage.
+    """
+    missing_percent = df.isnull().sum() / len(df)
+    columns_to_drop = missing_percent[missing_percent > threshold].index
+    df_cleaned = df.drop(columns=columns_to_drop)
+    return df_cleaned
+
+def fill_missing_with_median(df, columns=None):
+    """
+    Fill missing values with column median.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_filled = df.copy()
+    for col in columns:
+        if col in df.columns:
+            median_val = df[col].median()
+            df_filled[col].fillna(median_val, inplace=True)
+    return df_filled
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers using IQR method.
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize numeric columns to zero mean and unit variance.
+    """
+    from sklearn.preprocessing import StandardScaler
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    scaler = StandardScaler()
+    df_scaled = df.copy()
+    df_scaled[columns] = scaler.fit_transform(df[columns])
+    return df_scaled
+
+def get_data_summary(df):
+    """
+    Generate summary statistics for the dataframe.
+    """
+    summary = {
+        'shape': df.shape,
+        'missing_values': df.isnull().sum().to_dict(),
+        'data_types': df.dtypes.to_dict(),
+        'numeric_stats': df.describe().to_dict() if df.select_dtypes(include=[np.number]).shape[1] > 0 else {}
+    }
+    return summary
