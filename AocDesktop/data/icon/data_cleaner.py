@@ -208,3 +208,153 @@ def remove_duplicates(seq):
     seen = set()
     seen_add = seen.add
     return [x for x in seq if not (x in seen or seen_add(x))]
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
+def clean_dataframe(df, date_column=None, numeric_columns=None, text_columns=None):
+    """
+    Clean a pandas DataFrame by handling missing values, duplicates,
+    and standardizing data formats.
+    """
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Remove duplicate rows
+    initial_rows = len(cleaned_df)
+    cleaned_df = cleaned_df.drop_duplicates()
+    duplicates_removed = initial_rows - len(cleaned_df)
+    
+    # Standardize column names
+    cleaned_df.columns = cleaned_df.columns.str.strip().str.lower().str.replace(' ', '_')
+    
+    # Handle missing values
+    if numeric_columns:
+        for col in numeric_columns:
+            if col in cleaned_df.columns:
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    
+    if text_columns:
+        for col in text_columns:
+            if col in cleaned_df.columns:
+                cleaned_df[col] = cleaned_df[col].fillna('unknown').str.strip()
+    
+    # Standardize date formats
+    if date_column and date_column in cleaned_df.columns:
+        try:
+            cleaned_df[date_column] = pd.to_datetime(cleaned_df[date_column], errors='coerce')
+        except:
+            print(f"Warning: Could not convert {date_column} to datetime")
+    
+    # Remove outliers using IQR method for numeric columns
+    if numeric_columns:
+        for col in numeric_columns:
+            if col in cleaned_df.columns:
+                Q1 = cleaned_df[col].quantile(0.25)
+                Q3 = cleaned_df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - 1.5 * IQR
+                upper_bound = Q3 + 1.5 * IQR
+                
+                # Cap outliers instead of removing rows
+                cleaned_df[col] = np.where(cleaned_df[col] < lower_bound, lower_bound, cleaned_df[col])
+                cleaned_df[col] = np.where(cleaned_df[col] > upper_bound, upper_bound, cleaned_df[col])
+    
+    # Generate cleaning report
+    report = {
+        'original_rows': len(df),
+        'cleaned_rows': len(cleaned_df),
+        'duplicates_removed': duplicates_removed,
+        'missing_values_filled': df.isnull().sum().sum() - cleaned_df.isnull().sum().sum(),
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+    
+    return cleaned_df, report
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    # Check if DataFrame is empty
+    if len(df) < min_rows:
+        validation_results['is_valid'] = False
+        validation_results['errors'].append(f'DataFrame has fewer than {min_rows} rows')
+    
+    # Check required columns
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f'Missing required columns: {missing_columns}')
+    
+    # Check for excessive missing values
+    missing_percentage = df.isnull().sum() / len(df)
+    high_missing = missing_percentage[missing_percentage > 0.5].index.tolist()
+    if high_missing:
+        validation_results['warnings'].append(f'Columns with >50% missing values: {high_missing}')
+    
+    return validation_results
+
+# Example usage function
+def process_data_file(file_path, output_path=None):
+    """
+    Complete data processing pipeline for a CSV file.
+    """
+    try:
+        # Read data
+        df = pd.read_csv(file_path)
+        
+        # Validate data
+        validation = validate_dataframe(df)
+        if not validation['is_valid']:
+            print("Data validation failed:")
+            for error in validation['errors']:
+                print(f"  - {error}")
+            return None
+        
+        # Clean data
+        cleaned_df, report = clean_dataframe(
+            df,
+            date_column='date',
+            numeric_columns=['price', 'quantity', 'rating'],
+            text_columns=['product_name', 'category', 'supplier']
+        )
+        
+        # Print cleaning report
+        print("Data Cleaning Report:")
+        print(f"  Original rows: {report['original_rows']}")
+        print(f"  Cleaned rows: {report['cleaned_rows']}")
+        print(f"  Duplicates removed: {report['duplicates_removed']}")
+        print(f"  Missing values filled: {report['missing_values_filled']}")
+        print(f"  Cleaning timestamp: {report['timestamp']}")
+        
+        # Save cleaned data
+        if output_path:
+            cleaned_df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return cleaned_df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error processing file: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    # This would be used when running the script directly
+    import sys
+    
+    if len(sys.argv) > 1:
+        input_file = sys.argv[1]
+        output_file = 'cleaned_data.csv' if len(sys.argv) < 3 else sys.argv[2]
+        process_data_file(input_file, output_file)
+    else:
+        print("Usage: python data_cleaner.py <input_file> [output_file]")
