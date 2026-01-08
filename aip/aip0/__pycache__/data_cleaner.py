@@ -1,60 +1,44 @@
+
 import pandas as pd
+import numpy as np
+from scipy import stats
 
-def clean_dataframe(df):
-    """
-    Remove rows with null values and standardize column names.
+def load_and_clean_data(filepath):
+    df = pd.read_csv(filepath)
     
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean.
+    # Remove duplicates
+    df = df.drop_duplicates()
     
-    Returns:
-        pd.DataFrame: Cleaned DataFrame.
-    """
-    # Remove rows with any null values
-    df_cleaned = df.dropna()
+    # Handle missing values
+    for column in df.select_dtypes(include=[np.number]).columns:
+        df[column].fillna(df[column].median(), inplace=True)
     
-    # Standardize column names: lowercase and replace spaces with underscores
-    df_cleaned.columns = df_cleaned.columns.str.lower().str.replace(' ', '_')
+    # Remove outliers using z-score
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    z_scores = np.abs(stats.zscore(df[numeric_cols]))
+    df = df[(z_scores < 3).all(axis=1)]
     
-    return df_cleaned
+    # Normalize numeric columns
+    for column in numeric_cols:
+        if df[column].std() != 0:
+            df[column] = (df[column] - df[column].mean()) / df[column].std()
+    
+    return df
 
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate DataFrame structure and required columns.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_columns (list): List of required column names.
-    
-    Returns:
-        bool: True if validation passes, False otherwise.
-    """
-    if df.empty:
-        return False
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            print(f"Missing required columns: {missing_columns}")
-            return False
-    
-    return True
+def save_cleaned_data(df, output_path):
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
 
 if __name__ == "__main__":
-    # Example usage
-    sample_data = {
-        'Product Name': ['Widget A', 'Widget B', None, 'Widget C'],
-        'Price': [10.99, 15.49, 12.99, None],
-        'Quantity': [100, 150, 200, 50]
-    }
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\nCleaned DataFrame:")
-    cleaned_df = clean_dataframe(df)
-    print(cleaned_df)
-    
-    # Validate the cleaned DataFrame
-    is_valid = validate_dataframe(cleaned_df, required_columns=['product_name', 'price', 'quantity'])
-    print(f"\nDataFrame validation passed: {is_valid}")
+    try:
+        cleaned_df = load_and_clean_data(input_file)
+        save_cleaned_data(cleaned_df, output_file)
+        print(f"Original shape: {pd.read_csv(input_file).shape}")
+        print(f"Cleaned shape: {cleaned_df.shape}")
+    except FileNotFoundError:
+        print(f"Error: {input_file} not found")
+    except Exception as e:
+        print(f"Error during processing: {str(e)}")
