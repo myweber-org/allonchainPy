@@ -117,4 +117,94 @@ if __name__ == "__main__":
     print(cleaned_df)
     
     is_valid = validate_data(cleaned_df, required_columns=['A', 'B', 'C'])
-    print(f"\nData is valid: {is_valid}")
+    print(f"\nData is valid: {is_valid}")import pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_columns = df.columns.tolist()
+    
+    def remove_missing(self, threshold=0.3):
+        missing_percent = self.df.isnull().sum() / len(self.df)
+        columns_to_drop = missing_percent[missing_percent > threshold].index
+        self.df = self.df.drop(columns=columns_to_drop)
+        return self
+    
+    def fill_numeric_missing(self, method='median'):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols:
+            if self.df[col].isnull().any():
+                if method == 'median':
+                    fill_value = self.df[col].median()
+                elif method == 'mean':
+                    fill_value = self.df[col].mean()
+                elif method == 'mode':
+                    fill_value = self.df[col].mode()[0]
+                else:
+                    fill_value = 0
+                
+                self.df[col] = self.df[col].fillna(fill_value)
+        
+        return self
+    
+    def remove_outliers_zscore(self, threshold=3):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols:
+            z_scores = np.abs(stats.zscore(self.df[col]))
+            self.df = self.df[z_scores < threshold]
+        
+        return self
+    
+    def normalize_numeric(self, method='minmax'):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols:
+            if method == 'minmax':
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val > min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+            elif method == 'zscore':
+                mean_val = self.df[col].mean()
+                std_val = self.df[col].std()
+                if std_val > 0:
+                    self.df[col] = (self.df[col] - mean_val) / std_val
+        
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def get_summary(self):
+        summary = {
+            'original_rows': len(self.df),
+            'cleaned_rows': len(self.df),
+            'original_columns': len(self.original_columns),
+            'cleaned_columns': len(self.df.columns),
+            'missing_values': self.df.isnull().sum().sum(),
+            'numeric_columns': len(self.df.select_dtypes(include=[np.number]).columns),
+            'categorical_columns': len(self.df.select_dtypes(include=['object']).columns)
+        }
+        return summary
+
+def clean_dataset(df, config=None):
+    if config is None:
+        config = {
+            'missing_threshold': 0.3,
+            'fill_method': 'median',
+            'outlier_threshold': 3,
+            'normalize_method': 'minmax'
+        }
+    
+    cleaner = DataCleaner(df)
+    
+    cleaner.remove_missing(threshold=config['missing_threshold'])
+    cleaner.fill_numeric_missing(method=config['fill_method'])
+    cleaner.remove_outliers_zscore(threshold=config['outlier_threshold'])
+    cleaner.normalize_numeric(method=config['normalize_method'])
+    
+    return cleaner.get_cleaned_data(), cleaner.get_summary()
