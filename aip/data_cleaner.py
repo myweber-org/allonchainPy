@@ -3,89 +3,31 @@ import pandas as pd
 import numpy as np
 
 def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to process
-    
-    Returns:
-        pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
     Q1 = df[column].quantile(0.25)
     Q3 = df[column].quantile(0.75)
     IQR = Q3 - Q1
-    
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
 
-def clean_dataset(df, numeric_columns=None):
-    """
-    Clean dataset by removing outliers from all numeric columns.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        numeric_columns (list): List of numeric column names. If None, uses all numeric columns.
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame
-    """
-    if numeric_columns is None:
-        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
-    
-    cleaned_df = df.copy()
-    
-    for column in numeric_columns:
-        if column in df.columns:
-            try:
-                cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            except Exception as e:
-                print(f"Warning: Could not process column '{column}': {e}")
-    
-    return cleaned_df
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
 
-def get_outlier_statistics(df, column):
-    """
-    Calculate outlier statistics for a column.
+def clean_dataset(file_path, numeric_columns):
+    df = pd.read_csv(file_path)
     
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name
+    for col in numeric_columns:
+        if col in df.columns:
+            df = remove_outliers_iqr(df, col)
+            df = normalize_minmax(df, col)
     
-    Returns:
-        dict: Dictionary containing outlier statistics
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)]
-    
-    stats = {
-        'total_rows': len(df),
-        'outlier_count': len(outliers),
-        'outlier_percentage': (len(outliers) / len(df)) * 100,
-        'lower_bound': lower_bound,
-        'upper_bound': upper_bound,
-        'min_value': df[column].min(),
-        'max_value': df[column].max(),
-        'Q1': Q1,
-        'Q3': Q3,
-        'IQR': IQR
-    }
-    
-    return stats
+    return df
+
+if __name__ == "__main__":
+    cleaned_data = clean_dataset('sample_data.csv', ['age', 'income', 'score'])
+    cleaned_data.to_csv('cleaned_data.csv', index=False)
+    print(f"Data cleaned. Original shape: {pd.read_csv('sample_data.csv').shape}")
+    print(f"Cleaned shape: {cleaned_data.shape}")
