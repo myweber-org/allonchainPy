@@ -113,4 +113,98 @@ def validate_dataframe(df, required_columns=None, min_rows=1):
 #     
 #     # Validate the cleaned data
 #     validation_result = validate_dataframe(cleaned, required_columns=['id', 'value'], min_rows=3)
-#     print(f"\nValidation result: {validation_result}")
+#     print(f"\nValidation result: {validation_result}")import pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_columns = df.columns.tolist()
+    
+    def remove_duplicates(self):
+        self.df = self.df.drop_duplicates()
+        return self
+    
+    def handle_missing_values(self, strategy='mean', fill_value=None):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if strategy == 'mean':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mean())
+        elif strategy == 'median':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].median())
+        elif strategy == 'mode':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mode().iloc[0])
+        elif strategy == 'constant' and fill_value is not None:
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(fill_value)
+        
+        categorical_cols = self.df.select_dtypes(include=['object']).columns
+        self.df[categorical_cols] = self.df[categorical_cols].fillna('Unknown')
+        
+        return self
+    
+    def remove_outliers(self, method='zscore', threshold=3):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if method == 'zscore':
+            z_scores = np.abs(stats.zscore(self.df[numeric_cols]))
+            self.df = self.df[(z_scores < threshold).all(axis=1)]
+        elif method == 'iqr':
+            for col in numeric_cols:
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - 1.5 * IQR
+                upper_bound = Q3 + 1.5 * IQR
+                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+        
+        return self
+    
+    def normalize_data(self, method='minmax'):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if method == 'minmax':
+            for col in numeric_cols:
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val != min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        elif method == 'standard':
+            for col in numeric_cols:
+                mean_val = self.df[col].mean()
+                std_val = self.df[col].std()
+                if std_val != 0:
+                    self.df[col] = (self.df[col] - mean_val) / std_val
+        
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def get_summary(self):
+        summary = {
+            'original_rows': len(self.df),
+            'cleaned_rows': len(self.df),
+            'missing_values': self.df.isnull().sum().sum(),
+            'numeric_columns': self.df.select_dtypes(include=[np.number]).columns.tolist(),
+            'categorical_columns': self.df.select_dtypes(include=['object']).columns.tolist()
+        }
+        return summary
+
+def clean_dataset(df, remove_dups=True, handle_missing=True, 
+                  outlier_method=None, normalize_method=None):
+    cleaner = DataCleaner(df)
+    
+    if remove_dups:
+        cleaner.remove_duplicates()
+    
+    if handle_missing:
+        cleaner.handle_missing_values(strategy='mean')
+    
+    if outlier_method:
+        cleaner.remove_outliers(method=outlier_method)
+    
+    if normalize_method:
+        cleaner.normalize_data(method=normalize_method)
+    
+    return cleaner.get_cleaned_data(), cleaner.get_summary()
