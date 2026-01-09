@@ -2,102 +2,98 @@
 import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(df, column):
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop').
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    pd.DataFrame: Cleaned DataFrame.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    cleaned_df = df.copy()
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
+            elif fill_missing == 'median':
+                cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
+    elif fill_missing == 'mode':
+        for col in cleaned_df.columns:
+            cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 0, inplace=True)
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
+    return cleaned_df
 
-def detect_outliers_iqr(df, column):
+def remove_outliers(df, columns=None, method='iqr', threshold=1.5):
     """
-    Detect outliers in a DataFrame column using IQR method.
+    Remove outliers from specified columns using IQR or Z-score method.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    df (pd.DataFrame): Input DataFrame.
+    columns (list): List of column names to process. If None, process all numeric columns.
+    method (str): 'iqr' for Interquartile Range or 'zscore' for Z-score method.
+    threshold (float): Threshold multiplier for IQR or Z-score cutoff.
     
     Returns:
-    pd.Series: Boolean series indicating outliers (True = outlier)
+    pd.DataFrame: DataFrame with outliers removed.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    df_clean = df.copy()
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    for col in columns:
+        if method == 'iqr':
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+        elif method == 'zscore':
+            from scipy import stats
+            z_scores = np.abs(stats.zscore(df_clean[col].dropna()))
+            df_clean = df_clean[(z_scores < threshold) | (df_clean[col].isna())]
     
-    outliers = (df[column] < lower_bound) | (df[column] > upper_bound)
-    
-    return outliers
+    return df_clean.reset_index(drop=True)
 
-def calculate_outlier_statistics(df, column):
+def normalize_data(df, columns=None, method='minmax'):
     """
-    Calculate outlier statistics for a DataFrame column.
+    Normalize specified columns in the DataFrame.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    df (pd.DataFrame): Input DataFrame.
+    columns (list): List of column names to normalize. If None, normalize all numeric columns.
+    method (str): Normalization method ('minmax' or 'standard').
     
     Returns:
-    dict: Dictionary containing outlier statistics
+    pd.DataFrame: DataFrame with normalized columns.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
     
-    outliers = detect_outliers_iqr(df, column)
-    total_count = len(df)
-    outlier_count = outliers.sum()
+    df_norm = df.copy()
     
-    stats = {
-        'total_samples': total_count,
-        'outlier_count': int(outlier_count),
-        'outlier_percentage': round((outlier_count / total_count) * 100, 2),
-        'min_value': float(df[column].min()),
-        'max_value': float(df[column].max()),
-        'mean': float(df[column].mean()),
-        'median': float(df[column].median()),
-        'std_dev': float(df[column].std())
-    }
+    for col in columns:
+        if method == 'minmax':
+            min_val = df_norm[col].min()
+            max_val = df_norm[col].max()
+            if max_val != min_val:
+                df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+        elif method == 'standard':
+            mean_val = df_norm[col].mean()
+            std_val = df_norm[col].std()
+            if std_val != 0:
+                df_norm[col] = (df_norm[col] - mean_val) / std_val
     
-    return stats
-
-if __name__ == "__main__":
-    # Example usage
-    np.random.seed(42)
-    data = pd.DataFrame({
-        'values': np.concatenate([
-            np.random.normal(100, 15, 95),
-            np.random.normal(300, 50, 5)
-        ])
-    })
-    
-    print("Original data shape:", data.shape)
-    print("\nOutlier statistics:")
-    stats = calculate_outlier_statistics(data, 'values')
-    for key, value in stats.items():
-        print(f"{key}: {value}")
-    
-    cleaned_data = remove_outliers_iqr(data, 'values')
-    print("\nCleaned data shape:", cleaned_data.shape)
+    return df_norm
