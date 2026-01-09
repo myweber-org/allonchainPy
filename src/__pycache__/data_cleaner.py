@@ -177,4 +177,132 @@ def clean_numeric_data(df, columns=None):
             removed_count = original_len - len(cleaned_df)
             print(f"Removed {removed_count} outliers from column '{column}'")
     
+    return cleaned_dfimport pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        subset (list, optional): Columns to consider for duplicates
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def fill_missing_values(df, strategy='mean', columns=None):
+    """
+    Fill missing values in DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        strategy (str): 'mean', 'median', 'mode', or 'constant'
+        columns (list): Specific columns to fill
+    
+    Returns:
+        pd.DataFrame: DataFrame with filled values
+    """
+    df_filled = df.copy()
+    
+    if columns is None:
+        columns = df.columns
+    
+    for col in columns:
+        if df[col].isnull().any():
+            if strategy == 'mean':
+                df_filled[col] = df[col].fillna(df[col].mean())
+            elif strategy == 'median':
+                df_filled[col] = df[col].fillna(df[col].median())
+            elif strategy == 'mode':
+                df_filled[col] = df[col].fillna(df[col].mode()[0])
+            elif strategy == 'constant':
+                df_filled[col] = df[col].fillna(0)
+    
+    return df_filled
+
+def normalize_columns(df, columns=None):
+    """
+    Normalize specified columns to range [0, 1].
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): Columns to normalize
+    
+    Returns:
+        pd.DataFrame: DataFrame with normalized columns
+    """
+    df_normalized = df.copy()
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in df.columns and df[col].dtype in [np.float64, np.int64]:
+            col_min = df[col].min()
+            col_max = df[col].max()
+            if col_max != col_min:
+                df_normalized[col] = (df[col] - col_min) / (col_max - col_min)
+    
+    return df_normalized
+
+def detect_outliers(df, column, method='iqr'):
+    """
+    Detect outliers in a column.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to check
+        method (str): 'iqr' or 'zscore'
+    
+    Returns:
+        pd.Series: Boolean mask of outliers
+    """
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        return (df[column] < lower_bound) | (df[column] > upper_bound)
+    
+    elif method == 'zscore':
+        mean = df[column].mean()
+        std = df[column].std()
+        z_scores = (df[column] - mean) / std
+        return np.abs(z_scores) > 3
+    
+    return pd.Series(False, index=df.index)
+
+def clean_dataset(df, config):
+    """
+    Apply multiple cleaning operations based on configuration.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        config (dict): Cleaning configuration
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if config.get('remove_duplicates'):
+        cleaned_df = remove_duplicates(cleaned_df, config.get('duplicate_columns'))
+    
+    if config.get('fill_missing'):
+        cleaned_df = fill_missing_values(
+            cleaned_df, 
+            config.get('fill_strategy', 'mean'),
+            config.get('fill_columns')
+        )
+    
+    if config.get('normalize'):
+        cleaned_df = normalize_columns(
+            cleaned_df,
+            config.get('normalize_columns')
+        )
+    
     return cleaned_df
