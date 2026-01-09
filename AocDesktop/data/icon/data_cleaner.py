@@ -227,3 +227,11 @@ if __name__ == "__main__":
     print("\nSummary Statistics:")
     for key, value in stats.items():
         print(f"{key}: {value}")
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
