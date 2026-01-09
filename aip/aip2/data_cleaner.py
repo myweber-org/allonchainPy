@@ -42,3 +42,42 @@ def clean_dataset(file_path, output_path=None):
         return df
     except Exception as e:
         return f"Error cleaning dataset: {str(e)}"
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns
+        
+    def remove_outliers_zscore(self, threshold=3):
+        z_scores = np.abs(stats.zscore(self.df[self.numeric_columns]))
+        filtered_entries = (z_scores < threshold).all(axis=1)
+        self.df = self.df[filtered_entries]
+        return self
+    
+    def normalize_minmax(self):
+        for col in self.numeric_columns:
+            min_val = self.df[col].min()
+            max_val = self.df[col].max()
+            if max_val > min_val:
+                self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        return self
+    
+    def fill_missing_median(self):
+        for col in self.numeric_columns:
+            self.df[col].fillna(self.df[col].median(), inplace=True)
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df.copy()
+
+def process_dataset(filepath):
+    raw_data = pd.read_csv(filepath)
+    cleaner = DataCleaner(raw_data)
+    cleaned = (cleaner.fill_missing_median()
+                      .remove_outliers_zscore()
+                      .normalize_minmax()
+                      .get_cleaned_data())
+    return cleaned
