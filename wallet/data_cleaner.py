@@ -1,67 +1,61 @@
-
 import pandas as pd
 import numpy as np
+from typing import List, Optional
 
-def remove_outliers_iqr(df, column):
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def normalize_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """
+    Normalize specified column to range [0, 1].
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    col_min = df[column].min()
+    col_max = df[column].max()
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    if col_max == col_min:
+        df[column] = 0.5
+    else:
+        df[column] = (df[column] - col_min) / (col_max - col_min)
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    return df
 
-def clean_numeric_data(df, columns=None):
+def handle_missing_values(df: pd.DataFrame, strategy: str = 'mean') -> pd.DataFrame:
     """
-    Clean numeric columns by removing outliers and handling missing values.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    columns (list): List of column names to clean. If None, clean all numeric columns.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
+    Handle missing values using specified strategy.
     """
-    if columns is None:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        columns = numeric_cols
-    
+    if strategy == 'mean':
+        return df.fillna(df.mean(numeric_only=True))
+    elif strategy == 'median':
+        return df.fillna(df.median(numeric_only=True))
+    elif strategy == 'mode':
+        return df.fillna(df.mode().iloc[0])
+    elif strategy == 'drop':
+        return df.dropna()
+    else:
+        raise ValueError(f"Unknown strategy: {strategy}")
+
+def clean_dataframe(df: pd.DataFrame, 
+                   deduplicate: bool = True,
+                   normalize_cols: Optional[List[str]] = None,
+                   missing_strategy: str = 'mean') -> pd.DataFrame:
+    """
+    Comprehensive data cleaning pipeline.
+    """
     cleaned_df = df.copy()
     
-    for col in columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if normalize_cols:
+        for col in normalize_cols:
+            cleaned_df = normalize_column(cleaned_df, col)
+    
+    cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
     
     return cleaned_df
-
-if __name__ == "__main__":
-    sample_data = {
-        'A': [1, 2, 3, 4, 5, 100],
-        'B': [10, 20, 30, 40, 50, 200],
-        'C': [1.1, 2.2, 3.3, 4.4, 5.5, 1000]
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    
-    cleaned = clean_numeric_data(df)
-    print("\nCleaned DataFrame:")
-    print(cleaned)
