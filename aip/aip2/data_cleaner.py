@@ -1,31 +1,44 @@
 import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+def remove_duplicates(df):
+    """Remove duplicate rows from DataFrame."""
+    return df.drop_duplicates()
 
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+def fill_missing_values(df, strategy='mean'):
+    """Fill missing values using specified strategy."""
+    if strategy == 'mean':
+        return df.fillna(df.mean(numeric_only=True))
+    elif strategy == 'median':
+        return df.fillna(df.median(numeric_only=True))
+    elif strategy == 'mode':
+        return df.fillna(df.mode().iloc[0])
+    else:
+        return df.fillna(0)
+
+def normalize_column(df, column_name):
+    """Normalize specified column to range [0,1]."""
+    if column_name in df.columns:
+        col_min = df[column_name].min()
+        col_max = df[column_name].max()
+        if col_max != col_min:
+            df[column_name] = (df[column_name] - col_min) / (col_max - col_min)
     return df
 
-def clean_dataset(file_path):
-    df = pd.read_csv(file_path)
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    
-    for col in numeric_cols:
-        df = remove_outliers_iqr(df, col)
-        df = normalize_minmax(df, col)
-    
-    return df
-
-if __name__ == "__main__":
-    cleaned_df = clean_dataset('sample_data.csv')
-    cleaned_df.to_csv('cleaned_data.csv', index=False)
-    print("Data cleaning completed. Saved to cleaned_data.csv")
+def clean_dataset(file_path, output_path=None):
+    """Main function to clean dataset with default operations."""
+    try:
+        df = pd.read_csv(file_path)
+        df = remove_duplicates(df)
+        df = fill_missing_values(df, strategy='mean')
+        
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df = normalize_column(df, col)
+        
+        if output_path:
+            df.to_csv(output_path, index=False)
+            return f"Cleaned data saved to {output_path}"
+        return df
+    except Exception as e:
+        return f"Error cleaning dataset: {str(e)}"
