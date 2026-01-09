@@ -203,3 +203,72 @@ if __name__ == "__main__":
     if cleaned_df is not None:
         is_valid = validate_dataframe(cleaned_df, ['id', 'value', 'category'])
         print(f"Data validation result: {is_valid}")
+import csv
+import re
+
+def clean_csv(input_file, output_file):
+    """
+    Clean a CSV file by removing rows with missing values,
+    stripping whitespace, and converting text to lowercase.
+    """
+    cleaned_rows = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.reader(infile)
+        header = next(reader)
+        cleaned_rows.append(header)
+        
+        for row in reader:
+            # Skip rows with missing values
+            if any(cell.strip() == '' for cell in row):
+                continue
+            
+            # Clean each cell
+            cleaned_row = []
+            for cell in row:
+                # Strip whitespace
+                cell = cell.strip()
+                # Convert to lowercase
+                cell = cell.lower()
+                # Remove extra spaces
+                cell = re.sub(r'\s+', ' ', cell)
+                cleaned_row.append(cell)
+            
+            cleaned_rows.append(cleaned_row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.writer(outfile)
+        writer.writerows(cleaned_rows)
+    
+    return len(cleaned_rows) - 1  # Return number of cleaned rows (excluding header)
+
+def validate_email(email):
+    """
+    Validate email format using regex.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def remove_duplicates(input_file, output_file, key_column=0):
+    """
+    Remove duplicate rows based on a specified column.
+    """
+    seen = set()
+    unique_rows = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.reader(infile)
+        header = next(reader)
+        unique_rows.append(header)
+        
+        for row in reader:
+            key = row[key_column]
+            if key not in seen:
+                seen.add(key)
+                unique_rows.append(row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.writer(outfile)
+        writer.writerows(unique_rows)
+    
+    return len(unique_rows) - 1
