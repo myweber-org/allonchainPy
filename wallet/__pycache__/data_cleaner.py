@@ -596,3 +596,88 @@ def remove_duplicates_preserve_order(sequence):
             seen.add(item)
             result.append(item)
     return result
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, data):
+        self.data = data
+        self.original_data = data.copy()
+    
+    def remove_outliers_iqr(self, column, multiplier=1.5):
+        q1 = self.data[column].quantile(0.25)
+        q3 = self.data[column].quantile(0.75)
+        iqr = q3 - q1
+        lower_bound = q1 - multiplier * iqr
+        upper_bound = q3 + multiplier * iqr
+        self.data = self.data[(self.data[column] >= lower_bound) & (self.data[column] <= upper_bound)]
+        return self.data
+    
+    def remove_outliers_zscore(self, column, threshold=3):
+        z_scores = np.abs(stats.zscore(self.data[column]))
+        self.data = self.data[z_scores < threshold]
+        return self.data
+    
+    def normalize_minmax(self, column):
+        min_val = self.data[column].min()
+        max_val = self.data[column].max()
+        self.data[column] = (self.data[column] - min_val) / (max_val - min_val)
+        return self.data
+    
+    def normalize_zscore(self, column):
+        mean_val = self.data[column].mean()
+        std_val = self.data[column].std()
+        self.data[column] = (self.data[column] - mean_val) / std_val
+        return self.data
+    
+    def fill_missing_mean(self, column):
+        mean_val = self.data[column].mean()
+        self.data[column].fillna(mean_val, inplace=True)
+        return self.data
+    
+    def fill_missing_median(self, column):
+        median_val = self.data[column].median()
+        self.data[column].fillna(median_val, inplace=True)
+        return self.data
+    
+    def reset_data(self):
+        self.data = self.original_data.copy()
+        return self.data
+    
+    def get_summary(self):
+        summary = {
+            'original_rows': len(self.original_data),
+            'current_rows': len(self.data),
+            'removed_rows': len(self.original_data) - len(self.data),
+            'columns': list(self.data.columns),
+            'missing_values': self.data.isnull().sum().to_dict(),
+            'data_types': self.data.dtypes.to_dict()
+        }
+        return summary
+
+def clean_dataset(df, config):
+    cleaner = DataCleaner(df)
+    
+    for column in config.get('outlier_columns', []):
+        method = config.get('outlier_method', 'iqr')
+        if method == 'iqr':
+            cleaner.remove_outliers_iqr(column)
+        elif method == 'zscore':
+            cleaner.remove_outliers_zscore(column)
+    
+    for column in config.get('normalize_columns', []):
+        method = config.get('normalize_method', 'minmax')
+        if method == 'minmax':
+            cleaner.normalize_minmax(column)
+        elif method == 'zscore':
+            cleaner.normalize_zscore(column)
+    
+    for column in config.get('fill_missing_columns', []):
+        method = config.get('fill_method', 'mean')
+        if method == 'mean':
+            cleaner.fill_missing_mean(column)
+        elif method == 'median':
+            cleaner.fill_missing_median(column)
+    
+    return cleaner.data, cleaner.get_summary()
