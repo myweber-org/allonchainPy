@@ -1,55 +1,54 @@
+import pandas as pd
 
-def remove_duplicates_preserve_order(input_list):
-    seen = set()
-    result = []
-    for item in input_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return resultdef remove_duplicates(input_list):
+def clean_dataset(df):
     """
-    Remove duplicate elements from a list while preserving order.
-    Returns a new list with unique elements.
-    """
-    seen = set()
-    result = []
-    for item in input_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
-
-def clean_numeric_strings(string_list):
-    """
-    Clean a list of strings by removing non-numeric characters
-    and converting to integers where possible.
-    """
-    cleaned = []
-    for s in string_list:
-        numeric_part = ''.join(filter(str.isdigit, s))
-        if numeric_part:
-            cleaned.append(int(numeric_part))
-    return cleaned
-
-def validate_email_format(email_list):
-    """
-    Validate email formats in a list and return only valid emails.
-    Basic validation checking for '@' and '.' in the domain.
-    """
-    valid_emails = []
-    for email in email_list:
-        if '@' in email and '.' in email.split('@')[-1]:
-            valid_emails.append(email.strip().lower())
-    return valid_emails
-
-if __name__ == "__main__":
-    # Example usage
-    sample_data = [1, 2, 2, 3, 4, 4, 5]
-    print("Original:", sample_data)
-    print("Cleaned:", remove_duplicates(sample_data))
+    Clean a pandas DataFrame by removing null values and duplicates.
     
-    sample_strings = ["abc123", "456def", "ghi789", "jkl"]
-    print("Numeric strings cleaned:", clean_numeric_strings(sample_strings))
+    Args:
+        df (pd.DataFrame): Input DataFrame to be cleaned.
     
-    emails = ["test@example.com", "invalid-email", "user@domain.org"]
-    print("Valid emails:", validate_email_format(emails))
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Remove duplicate rows
+    df_cleaned = df_cleaned.drop_duplicates()
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def clean_dataset_with_threshold(df, null_threshold=0.5):
+    """
+    Clean DataFrame with configurable null threshold for column removal.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        null_threshold (float): Threshold for null percentage to drop column.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    # Calculate null percentage per column
+    null_percentages = df.isnull().sum() / len(df)
+    
+    # Drop columns with null percentage above threshold
+    columns_to_drop = null_percentages[null_percentages > null_threshold].index
+    df_cleaned = df.drop(columns=columns_to_drop)
+    
+    # Fill remaining null values with column mean for numeric columns
+    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+    
+    # Fill remaining null values with mode for categorical columns
+    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown')
+    
+    # Remove duplicates
+    df_cleaned = df_cleaned.drop_duplicates()
+    
+    return df_cleaned.reset_index(drop=True)
