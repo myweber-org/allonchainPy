@@ -79,4 +79,81 @@ def filter_valid_emails(input_file, output_file, email_column_index):
 if __name__ == "__main__":
     # Example usage
     clean_csv("raw_data.csv", "cleaned_data.csv")
-    filter_valid_emails("cleaned_data.csv", "valid_emails.csv", 2)
+    filter_valid_emails("cleaned_data.csv", "valid_emails.csv", 2)import pandas as pd
+import numpy as np
+
+def clean_dataset(df, strategy='mean', outlier_threshold=3):
+    """
+    Clean dataset by handling missing values and removing outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    strategy (str): Imputation strategy ('mean', 'median', 'mode')
+    outlier_threshold (float): Z-score threshold for outlier detection
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    
+    df_clean = df.copy()
+    
+    # Handle missing values
+    for column in df_clean.columns:
+        if df_clean[column].isnull().any():
+            if strategy == 'mean':
+                df_clean[column].fillna(df_clean[column].mean(), inplace=True)
+            elif strategy == 'median':
+                df_clean[column].fillna(df_clean[column].median(), inplace=True)
+            elif strategy == 'mode':
+                df_clean[column].fillna(df_clean[column].mode()[0], inplace=True)
+    
+    # Remove outliers using Z-score method
+    numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    z_scores = np.abs((df_clean[numeric_cols] - df_clean[numeric_cols].mean()) / 
+                      df_clean[numeric_cols].std())
+    
+    outlier_mask = (z_scores < outlier_threshold).all(axis=1)
+    df_clean = df_clean[outlier_mask].reset_index(drop=True)
+    
+    return df_clean
+
+def validate_dataframe(df):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): Dataframe to validate
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'data_types': df.dtypes.to_dict()
+    }
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 100],
+        'B': [5, 6, 7, np.nan, 8],
+        'C': [9, 10, 11, 12, 13]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataset(df, strategy='median', outlier_threshold=2)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    validation = validate_dataframe(cleaned_df)
+    print("\nValidation Results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
