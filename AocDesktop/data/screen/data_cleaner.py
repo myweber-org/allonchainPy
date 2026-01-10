@@ -134,3 +134,77 @@ if __name__ == "__main__":
     
     cleaned_df = cleaner.get_cleaned_data()
     print(f"\nCleaned data shape: {cleaned_df.shape}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, key_columns=None, date_columns=None):
+    """
+    Clean dataset by removing duplicates, handling missing values,
+    and standardizing column formats.
+    """
+    cleaned_df = df.copy()
+    
+    if key_columns:
+        cleaned_df = cleaned_df.drop_duplicates(subset=key_columns)
+    else:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    for col in cleaned_df.columns:
+        if cleaned_df[col].dtype == 'object':
+            cleaned_df[col] = cleaned_df[col].str.strip().str.lower()
+    
+    if date_columns:
+        for date_col in date_columns:
+            if date_col in cleaned_df.columns:
+                cleaned_df[date_col] = pd.to_datetime(
+                    cleaned_df[date_col], errors='coerce'
+                )
+    
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(
+        cleaned_df[numeric_cols].median()
+    )
+    
+    categorical_cols = cleaned_df.select_dtypes(include=['object']).columns
+    cleaned_df[categorical_cols] = cleaned_df[categorical_cols].fillna('unknown')
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate dataset structure and content.
+    """
+    if len(df) < min_rows:
+        raise ValueError(f"Dataset must have at least {min_rows} rows")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'id': [1, 2, 2, 3, 4],
+        'name': [' John ', 'Alice', 'alice', 'Bob', None],
+        'value': [10, 20, None, 30, 40],
+        'date': ['2023-01-01', '2023-01-02', 'invalid', '2023-01-03', '2023-01-04']
+    })
+    
+    cleaned = clean_dataset(
+        sample_data,
+        key_columns=['id'],
+        date_columns=['date']
+    )
+    
+    print("Original dataset:")
+    print(sample_data)
+    print("\nCleaned dataset:")
+    print(cleaned)
+    
+    try:
+        validate_data(cleaned, required_columns=['id', 'name'], min_rows=3)
+        print("\nData validation passed")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
