@@ -247,3 +247,121 @@ if __name__ == "__main__":
                   .normalize_data(method='minmax')
                   .get_cleaned_data())
     print("Data cleaning completed successfully")
+import pandas as pd
+import numpy as np
+
+def clean_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): Strategy for imputation - 'mean', 'median', 'mode', or 'drop'
+    columns (list): List of columns to process, None for all columns
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        columns = df_clean.columns
+    
+    for col in columns:
+        if df_clean[col].isnull().any():
+            if strategy == 'drop':
+                df_clean = df_clean.dropna(subset=[col])
+            elif strategy == 'mean':
+                df_clean[col].fillna(df_clean[col].mean(), inplace=True)
+            elif strategy == 'median':
+                df_clean[col].fillna(df_clean[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df_clean[col].fillna(df_clean[col].mode()[0], inplace=True)
+    
+    return df_clean
+
+def remove_outliers_iqr(df, columns=None, threshold=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of columns to check for outliers
+    threshold (float): IQR multiplier threshold
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col in df_clean.columns and pd.api.types.is_numeric_dtype(df_clean[col]):
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & 
+                               (df_clean[col] <= upper_bound)]
+    
+    return df_clean.reset_index(drop=True)
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize numeric columns to have zero mean and unit variance.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of columns to standardize
+    
+    Returns:
+    pd.DataFrame: DataFrame with standardized columns
+    """
+    df_standardized = df.copy()
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in df_standardized.columns and pd.api.types.is_numeric_dtype(df_standardized[col]):
+            mean_val = df_standardized[col].mean()
+            std_val = df_standardized[col].std()
+            
+            if std_val > 0:
+                df_standardized[col] = (df_standardized[col] - mean_val) / std_val
+    
+    return df_standardized
+
+def clean_dataset(df, missing_strategy='mean', outlier_threshold=1.5, standardize=True):
+    """
+    Complete data cleaning pipeline.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    missing_strategy (str): Strategy for handling missing values
+    outlier_threshold (float): IQR threshold for outlier removal
+    standardize (bool): Whether to standardize numeric columns
+    
+    Returns:
+    pd.DataFrame: Cleaned and processed DataFrame
+    """
+    print(f"Original shape: {df.shape}")
+    
+    # Handle missing values
+    df_clean = clean_missing_values(df, strategy=missing_strategy)
+    print(f"After missing value handling: {df_clean.shape}")
+    
+    # Remove outliers
+    df_clean = remove_outliers_iqr(df_clean, threshold=outlier_threshold)
+    print(f"After outlier removal: {df_clean.shape}")
+    
+    # Standardize if requested
+    if standardize:
+        df_clean = standardize_columns(df_clean)
+        print("Columns standardized")
+    
+    return df_clean
