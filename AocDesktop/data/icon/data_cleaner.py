@@ -308,3 +308,57 @@ def validate_data(df, required_columns, numeric_columns):
                 print(f"Warning: Column {col} contains missing values")
     
     return True
+import pandas as pd
+import numpy as np
+
+def clean_data(df):
+    """
+    Clean the input DataFrame by removing duplicates and handling missing values.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing numeric values with column median
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].median())
+    
+    # Fill missing categorical values with mode
+    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown')
+    
+    return df_cleaned
+
+def validate_data(df):
+    """
+    Validate the cleaned DataFrame for any remaining issues.
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'duplicate_rows': df.duplicated().sum(),
+        'missing_values': df.isnull().sum().sum(),
+        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(df.select_dtypes(include=['object']).columns)
+    }
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = pd.DataFrame({
+        'id': [1, 2, 2, 3, 4],
+        'value': [10.5, np.nan, 15.0, 20.0, np.nan],
+        'category': ['A', 'B', 'B', None, 'C']
+    })
+    
+    print("Original data:")
+    print(sample_data)
+    
+    cleaned_data = clean_data(sample_data)
+    print("\nCleaned data:")
+    print(cleaned_data)
+    
+    validation = validate_data(cleaned_data)
+    print("\nValidation results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
