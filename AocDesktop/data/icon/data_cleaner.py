@@ -521,4 +521,116 @@ if __name__ == "__main__":
     print(f"\nData validation result: {is_valid}")
     
     df_no_outliers = remove_outliers(cleaned_df, 'B', method='iqr', threshold=1.5)
-    print(f"\nDataFrame after outlier removal: {len(df_no_outliers)} rows")
+    print(f"\nDataFrame after outlier removal: {len(df_no_outliers)} rows")import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        subset (list, optional): Columns to consider for duplicates.
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed.
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def fill_missing_values(df, strategy='mean', columns=None):
+    """
+    Fill missing values in specified columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        strategy (str): 'mean', 'median', 'mode', or 'constant'.
+        columns (list): Columns to fill. If None, all columns are processed.
+    
+    Returns:
+        pd.DataFrame: DataFrame with missing values filled.
+    """
+    df_filled = df.copy()
+    
+    if columns is None:
+        columns = df.columns
+    
+    for col in columns:
+        if df[col].dtype in [np.float64, np.int64]:
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0]
+            elif strategy == 'constant':
+                fill_value = 0
+            else:
+                raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'constant'")
+            
+            df_filled[col] = df[col].fillna(fill_value)
+    
+    return df_filled
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a column using specified method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column (str): Column name to normalize.
+        method (str): 'minmax' or 'zscore'.
+    
+    Returns:
+        pd.DataFrame: DataFrame with normalized column.
+    """
+    df_normalized = df.copy()
+    
+    if method == 'minmax':
+        min_val = df[column].min()
+        max_val = df[column].max()
+        if max_val != min_val:
+            df_normalized[column] = (df[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = df[column].mean()
+        std_val = df[column].std()
+        if std_val != 0:
+            df_normalized[column] = (df[column] - mean_val) / std_val
+    
+    else:
+        raise ValueError("Method must be 'minmax' or 'zscore'")
+    
+    return df_normalized
+
+def clean_dataframe(df, operations):
+    """
+    Apply multiple cleaning operations to a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        operations (list): List of dictionaries specifying operations.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    for op in operations:
+        if op['type'] == 'remove_duplicates':
+            cleaned_df = remove_duplicates(cleaned_df, op.get('subset'))
+        
+        elif op['type'] == 'fill_missing':
+            cleaned_df = fill_missing_values(
+                cleaned_df,
+                op.get('strategy', 'mean'),
+                op.get('columns')
+            )
+        
+        elif op['type'] == 'normalize':
+            cleaned_df = normalize_column(
+                cleaned_df,
+                op['column'],
+                op.get('method', 'minmax')
+            )
+    
+    return cleaned_df
