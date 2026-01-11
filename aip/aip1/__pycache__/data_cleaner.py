@@ -110,3 +110,149 @@ def validate_dataframe(df: pd.DataFrame) -> dict:
         validation_results['numeric_stats'] = df[numeric_cols].describe().to_dict()
     
     return validation_results
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, threshold=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    outliers_removed = len(data) - len(filtered_data)
+    
+    return filtered_data, outliers_removed
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean'):
+    """
+    Handle missing values in numeric columns
+    """
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        for col in numeric_cols:
+            data[col] = data[col].fillna(data[col].mean())
+    elif strategy == 'median':
+        for col in numeric_cols:
+            data[col] = data[col].fillna(data[col].median())
+    elif strategy == 'mode':
+        for col in numeric_cols:
+            data[col] = data[col].fillna(data[col].mode()[0])
+    elif strategy == 'drop':
+        data = data.dropna(subset=numeric_cols)
+    else:
+        raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+    
+    return data
+
+def create_clean_dataframe(data, outlier_columns=None, normalize_columns=None, 
+                          standardize_columns=None, missing_strategy='mean'):
+    """
+    Create a cleaned dataframe with multiple preprocessing steps
+    """
+    cleaned_data = data.copy()
+    
+    if missing_strategy:
+        cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy)
+    
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in cleaned_data.columns:
+                cleaned_data, _ = remove_outliers_iqr(cleaned_data, col)
+    
+    if normalize_columns:
+        for col in normalize_columns:
+            if col in cleaned_data.columns:
+                cleaned_data[f'{col}_normalized'] = normalize_minmax(cleaned_data, col)
+    
+    if standardize_columns:
+        for col in standardize_columns:
+            if col in cleaned_data.columns:
+                cleaned_data[f'{col}_standardized'] = standardize_zscore(cleaned_data, col)
+    
+    return cleaned_data
+
+def calculate_statistics(data, column):
+    """
+    Calculate basic statistics for a column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats_dict = {
+        'mean': data[column].mean(),
+        'median': data[column].median(),
+        'std': data[column].std(),
+        'min': data[column].min(),
+        'max': data[column].max(),
+        'q1': data[column].quantile(0.25),
+        'q3': data[column].quantile(0.75),
+        'skewness': data[column].skew(),
+        'kurtosis': data[column].kurtosis()
+    }
+    
+    return stats_dict
+
+def detect_anomalies(data, column, method='zscore', threshold=3):
+    """
+    Detect anomalies in data
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if method == 'zscore':
+        z_scores = np.abs(stats.zscore(data[column].dropna()))
+        anomalies = data[z_scores > threshold]
+    elif method == 'iqr':
+        Q1 = data[column].quantile(0.25)
+        Q3 = data[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        anomalies = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    else:
+        raise ValueError("Method must be 'zscore' or 'iqr'")
+    
+    return anomalies
