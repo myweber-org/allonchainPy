@@ -328,3 +328,93 @@ def remove_outliers(df, column, threshold=3):
     z_scores = np.abs(stats.zscore(df[column].dropna()))
     mask = z_scores < threshold
     return df[mask].reset_index(drop=True)
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def calculate_summary_statistics(df):
+    """
+    Calculate summary statistics for numeric columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+        pd.DataFrame: Summary statistics
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    summary = df[numeric_cols].describe()
+    return summary
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
+
+def main():
+    """
+    Example usage of data cleaning functions.
+    """
+    np.random.seed(42)
+    data = {
+        'id': range(100),
+        'value': np.random.normal(100, 15, 100)
+    }
+    
+    df = pd.DataFrame(data)
+    df.loc[95:99, 'value'] = [500, 600, 700, 800, 900]
+    
+    print("Original DataFrame shape:", df.shape)
+    print("Original summary statistics:")
+    print(calculate_summary_statistics(df))
+    
+    cleaned_df = remove_outliers_iqr(df, 'value')
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("Cleaned summary statistics:")
+    print(calculate_summary_statistics(cleaned_df))
+    
+    is_valid, message = validate_dataframe(cleaned_df, ['id', 'value'])
+    print(f"\nData validation: {message}")
+
+if __name__ == "__main__":
+    main()
