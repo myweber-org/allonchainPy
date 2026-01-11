@@ -140,3 +140,57 @@ if __name__ == "__main__":
     df_normalized = normalize_data(df_clean, method='minmax')
     print("\nNormalized DataFrame:")
     print(df_normalized)
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def clean_dataset(df, numeric_columns):
+    original_shape = df.shape
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+    
+    removed_count = original_shape[0] - cleaned_df.shape[0]
+    print(f"Removed {removed_count} outliers from dataset")
+    print(f"Original shape: {original_shape}, Cleaned shape: {cleaned_df.shape}")
+    
+    return cleaned_df
+
+def validate_data(df, required_columns):
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    null_counts = df.isnull().sum()
+    if null_counts.any():
+        print("Warning: Dataset contains null values")
+        print(null_counts[null_counts > 0])
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.uniform(0, 200, 1000)
+    })
+    
+    sample_data.loc[::100, 'feature_a'] = np.random.uniform(500, 1000, 10)
+    
+    print("Sample dataset created")
+    print(f"Original statistics:\n{sample_data.describe()}")
+    
+    numeric_cols = ['feature_a', 'feature_b', 'feature_c']
+    cleaned_data = clean_dataset(sample_data, numeric_cols)
+    
+    print(f"\nCleaned statistics:\n{cleaned_data.describe()}")
