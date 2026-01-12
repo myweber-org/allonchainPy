@@ -188,3 +188,100 @@ if __name__ == "__main__":
     if cleaned_df is not None:
         is_valid = validate_dataframe(cleaned_df)
         print(f"Data validation result: {'Passed' if is_valid else 'Failed'}")
+import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    subset (list, optional): Column labels to consider for duplicates
+    keep (str, optional): Which duplicates to keep - 'first', 'last', or False
+    
+    Returns:
+    pd.DataFrame: DataFrame with duplicates removed
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    return df.drop_duplicates(subset=subset, keep=keep, inplace=False)
+
+def clean_numeric_columns(df, columns):
+    """
+    Clean numeric columns by removing non-numeric characters and converting to float.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to clean
+    
+    Returns:
+    pd.DataFrame: DataFrame with cleaned numeric columns
+    """
+    cleaned_df = df.copy()
+    
+    for col in columns:
+        if col in cleaned_df.columns:
+            cleaned_df[col] = pd.to_numeric(
+                cleaned_df[col].astype(str).str.replace(r'[^\d.-]', '', regex=True),
+                errors='coerce'
+            )
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and required columns.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list, optional): List of required column names
+    
+    Returns:
+    tuple: (bool, str) - Validation result and message
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame validation passed"
+
+def sample_data_cleaning_pipeline():
+    """
+    Example pipeline demonstrating data cleaning operations.
+    """
+    data = {
+        'id': [1, 2, 3, 2, 4],
+        'name': ['Alice', 'Bob', 'Charlie', 'Bob', 'David'],
+        'age': ['25', '30', '35', '30', '40'],
+        'salary': ['$50,000', '$60,000', '$70,000', '$60,000', '$80,000']
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50)
+    
+    df_clean = remove_duplicates(df, subset=['id', 'name'])
+    print("After removing duplicates:")
+    print(df_clean)
+    print("\n" + "="*50)
+    
+    df_clean = clean_numeric_columns(df_clean, ['age', 'salary'])
+    print("After cleaning numeric columns:")
+    print(df_clean)
+    print("\n" + "="*50)
+    
+    is_valid, message = validate_dataframe(df_clean, required_columns=['id', 'name', 'age'])
+    print(f"Validation result: {is_valid}")
+    print(f"Validation message: {message}")
+
+if __name__ == "__main__":
+    sample_data_cleaning_pipeline()
