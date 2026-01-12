@@ -73,3 +73,87 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataframe(cleaned)
     print(f"\nValidation: {message}")
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+def remove_duplicate_rows(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        subset: Columns to consider for identifying duplicates
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def normalize_string_columns(df: pd.DataFrame, columns: List[str]) -> pd.DataFrame:
+    """
+    Normalize string columns by stripping whitespace and converting to lowercase.
+    
+    Args:
+        df: Input DataFrame
+        columns: List of column names to normalize
+    
+    Returns:
+        DataFrame with normalized string columns
+    """
+    df_copy = df.copy()
+    for col in columns:
+        if col in df_copy.columns and df_copy[col].dtype == 'object':
+            df_copy[col] = df_copy[col].astype(str).str.strip().str.lower()
+    return df_copy
+
+def clean_numeric_outliers(df: pd.DataFrame, columns: List[str], 
+                          method: str = 'iqr', threshold: float = 1.5) -> pd.DataFrame:
+    """
+    Clean outliers in numeric columns using specified method.
+    
+    Args:
+        df: Input DataFrame
+        columns: List of numeric column names
+        method: 'iqr' for interquartile range or 'zscore' for standard deviation
+        threshold: Threshold multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers replaced by NaN
+    """
+    df_copy = df.copy()
+    
+    for col in columns:
+        if col not in df_copy.columns or not np.issubdtype(df_copy[col].dtype, np.number):
+            continue
+            
+        if method == 'iqr':
+            Q1 = df_copy[col].quantile(0.25)
+            Q3 = df_copy[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            mask = (df_copy[col] < lower_bound) | (df_copy[col] > upper_bound)
+            
+        elif method == 'zscore':
+            mean = df_copy[col].mean()
+            std = df_copy[col].std()
+            z_scores = np.abs((df_copy[col] - mean) / std)
+            mask = z_scores > threshold
+            
+        df_copy.loc[mask, col] = np.nan
+    
+    return df_copy
+
+def validate_dataframe(df: pd.DataFrame, required_columns: List[str]) -> bool:
+    """
+    Validate that DataFrame contains all required columns.
+    
+    Args:
+        df: DataFrame to validate
+        required_columns: List of required column names
+    
+    Returns:
+        True if all required columns are present, False otherwise
+    """
+    return all(col in df.columns for col in required_columns)
