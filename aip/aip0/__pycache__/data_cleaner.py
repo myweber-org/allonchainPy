@@ -482,4 +482,75 @@ def validate_dataset(df, required_columns=None):
         if missing_cols:
             return False, f"Missing required columns: {missing_cols}"
     
-    return True, "Dataset is valid"
+    return True, "Dataset is valid"import pandas as pd
+import numpy as np
+
+def detect_outliers_iqr(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
+
+def remove_outliers_iqr(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    min_val = data[column].min()
+    max_val = data[column].max()
+    if max_val == min_val:
+        return data[column]
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    if std_val == 0:
+        return data[column]
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_mean(data, column):
+    mean_val = data[column].mean()
+    filled_data = data[column].fillna(mean_val)
+    return filled_data
+
+def handle_missing_median(data, column):
+    median_val = data[column].median()
+    filled_data = data[column].fillna(median_val)
+    return filled_data
+
+def clean_dataset(data, numeric_columns):
+    cleaned_data = data.copy()
+    for col in numeric_columns:
+        if col in cleaned_data.columns:
+            cleaned_data = remove_outliers_iqr(cleaned_data, col)
+            cleaned_data[col] = handle_missing_mean(cleaned_data, col)
+            cleaned_data[col] = normalize_minmax(cleaned_data, col)
+    return cleaned_data
+
+def summarize_cleaning(data, cleaned_data, numeric_columns):
+    summary = {}
+    for col in numeric_columns:
+        if col in data.columns:
+            original_count = len(data)
+            cleaned_count = len(cleaned_data)
+            removed_count = original_count - cleaned_count
+            missing_original = data[col].isna().sum()
+            missing_cleaned = cleaned_data[col].isna().sum()
+            summary[col] = {
+                'original_samples': original_count,
+                'cleaned_samples': cleaned_count,
+                'outliers_removed': removed_count,
+                'missing_filled': missing_original - missing_cleaned
+            }
+    return summary
