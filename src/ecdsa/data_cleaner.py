@@ -1,90 +1,104 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+from scipy import stats
 
-def clean_missing_data(file_path, strategy='mean', columns=None):
+def remove_outliers_iqr(data, column, factor=1.5):
     """
-    Load a CSV file and handle missing values using specified strategy.
-    
-    Args:
-        file_path (str): Path to the CSV file
-        strategy (str): Method for handling missing values ('mean', 'median', 'mode', 'drop')
-        columns (list): Specific columns to clean, if None cleans all columns
-    
-    Returns:
-        pd.DataFrame: Cleaned dataframe
+    Remove outliers using the Interquartile Range method.
     """
-    try:
-        df = pd.read_csv(file_path)
-        
-        if columns is None:
-            columns = df.columns
-        
-        for col in columns:
-            if col in df.columns:
-                if df[col].isnull().any():
-                    if strategy == 'mean':
-                        df[col].fillna(df[col].mean(), inplace=True)
-                    elif strategy == 'median':
-                        df[col].fillna(df[col].median(), inplace=True)
-                    elif strategy == 'mode':
-                        df[col].fillna(df[col].mode()[0], inplace=True)
-                    elif strategy == 'drop':
-                        df.dropna(subset=[col], inplace=True)
-        
-        return df
-    
-    except FileNotFoundError:
-        print(f"Error: File not found at {file_path}")
-        return None
-    except Exception as e:
-        print(f"Error processing file: {str(e)}")
-        return None
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
 
-def validate_dataframe(df, required_columns=None):
+def remove_outliers_zscore(data, column, threshold=3):
     """
-    Validate dataframe structure and content.
-    
-    Args:
-        df (pd.DataFrame): Dataframe to validate
-        required_columns (list): List of required column names
-    
-    Returns:
-        bool: True if validation passes, False otherwise
+    Remove outliers using Z-score method.
     """
-    if df is None or df.empty:
-        return False
-    
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            print(f"Missing required columns: {missing_cols}")
-            return False
-    
-    return True
+    z_scores = np.abs(stats.zscore(data[column]))
+    return data[z_scores < threshold]
 
-def save_cleaned_data(df, output_path):
+def normalize_minmax(data, column):
     """
-    Save cleaned dataframe to CSV file.
+    Normalize data using Min-Max scaling.
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    return data
+
+def normalize_zscore(data, column):
+    """
+    Normalize data using Z-score standardization.
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    data[column + '_standardized'] = (data[column] - mean_val) / std_val
+    return data
+
+def clean_dataset(df, numeric_columns, method='iqr', normalization=None):
+    """
+    Main cleaning function that handles outliers and optional normalization.
+    """
+    cleaned_df = df.copy()
     
-    Args:
-        df (pd.DataFrame): Cleaned dataframe
-        output_path (str): Path to save the cleaned CSV file
+    for col in numeric_columns:
+        if method == 'iqr':
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+        elif method == 'zscore':
+            cleaned_df = remove_outliers_zscore(cleaned_df, col)
+        
+        if normalization == 'minmax':
+            cleaned_df = normalize_minmax(cleaned_df, col)
+        elif normalization == 'zscore':
+            cleaned_df = normalize_zscore(cleaned_df, col)
+    
+    return cleaned_df
+
+def validate_data(df, numeric_columns):
     """
-    try:
-        df.to_csv(output_path, index=False)
-        print(f"Cleaned data saved to: {output_path}")
-    except Exception as e:
-        print(f"Error saving file: {str(e)}")
+    Validate data by checking for missing values and infinite values.
+    """
+    validation_report = {}
+    
+    for col in numeric_columns:
+        validation_report[col] = {
+            'missing_values': df[col].isnull().sum(),
+            'infinite_values': np.isinf(df[col]).sum(),
+            'mean': df[col].mean(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            'max': df[col].max()
+        }
+    
+    return pd.DataFrame(validation_report).T
 
 if __name__ == "__main__":
     # Example usage
-    input_file = "raw_data.csv"
-    output_file = "cleaned_data.csv"
+    sample_data = pd.DataFrame({
+        'feature1': np.random.normal(100, 15, 1000),
+        'feature2': np.random.exponential(50, 1000),
+        'feature3': np.random.uniform(0, 200, 1000)
+    })
     
-    cleaned_df = clean_missing_data(input_file, strategy='median')
+    # Add some outliers
+    sample_data.loc[1000] = [500, 1000, 300]
+    sample_data.loc[1001] = [-100, -50, -10]
     
-    if validate_dataframe(cleaned_df):
-        save_cleaned_data(cleaned_df, output_file)
-        print("Data cleaning completed successfully.")
-    else:
-        print("Data validation failed.")
+    print("Original data shape:", sample_data.shape)
+    print("\nOriginal statistics:")
+    print(validate_data(sample_data, ['feature1', 'feature2', 'feature3']))
+    
+    # Clean data
+    cleaned_data = clean_dataset(
+        sample_data, 
+        ['feature1', 'feature2', 'feature3'], 
+        method='iqr', 
+        normalization='zscore'
+    )
+    
+    print("\nCleaned data shape:", cleaned_data.shape)
+    print("\nCleaned statistics:")
+    print(validate_data(cleaned_data, ['feature1', 'feature2', 'feature3']))
