@@ -1,76 +1,91 @@
 
-import csv
-import sys
-from pathlib import Path
+import pandas as pd
+import numpy as np
 
-def remove_duplicates(input_file, output_file=None, key_column=None):
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_strategy='mean'):
     """
-    Remove duplicate rows from a CSV file.
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
     Args:
-        input_file (str): Path to input CSV file
-        output_file (str, optional): Path for output CSV file. 
-                                     If None, creates input_file_cleaned.csv
-        key_column (str, optional): Column name to identify duplicates.
-                                    If None, uses entire row for comparison.
+        df: pandas DataFrame to clean
+        drop_duplicates: Whether to remove duplicate rows
+        fill_missing: Whether to fill missing values
+        fill_strategy: Strategy for filling missing values ('mean', 'median', 'mode', or 'constant')
     
     Returns:
-        int: Number of duplicate rows removed
+        Cleaned pandas DataFrame
     """
-    if not Path(input_file).exists():
-        raise FileNotFoundError(f"Input file not found: {input_file}")
+    cleaned_df = df.copy()
     
-    if output_file is None:
-        input_path = Path(input_file)
-        output_file = input_path.parent / f"{input_path.stem}_cleaned.csv"
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
     
-    seen_rows = set()
-    unique_rows = []
-    duplicates_removed = 0
-    
-    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
-        reader = csv.DictReader(infile)
-        fieldnames = reader.fieldnames
+    if fill_missing and cleaned_df.isnull().sum().any():
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
         
-        for row in reader:
-            if key_column:
-                key = row.get(key_column)
-                if key in seen_rows:
-                    duplicates_removed += 1
-                    continue
-                seen_rows.add(key)
-            else:
-                row_tuple = tuple(row.items())
-                if row_tuple in seen_rows:
-                    duplicates_removed += 1
-                    continue
-                seen_rows.add(row_tuple)
-            
-            unique_rows.append(row)
+        for col in numeric_cols:
+            if cleaned_df[col].isnull().any():
+                if fill_strategy == 'mean':
+                    fill_value = cleaned_df[col].mean()
+                elif fill_strategy == 'median':
+                    fill_value = cleaned_df[col].median()
+                elif fill_strategy == 'mode':
+                    fill_value = cleaned_df[col].mode()[0]
+                elif fill_strategy == 'constant':
+                    fill_value = 0
+                else:
+                    fill_value = cleaned_df[col].mean()
+                
+                cleaned_df[col] = cleaned_df[col].fillna(fill_value)
+                print(f"Filled missing values in column '{col}' with {fill_strategy}: {fill_value}")
     
-    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
-        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(unique_rows)
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None):
+    """
+    Validate dataset structure and content.
     
-    return duplicates_removed
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: List of required column names
+    
+    Returns:
+        Boolean indicating if dataset is valid
+    """
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Missing required columns: {missing_cols}")
+            return False
+    
+    if df.empty:
+        print("Dataset is empty")
+        return False
+    
+    return True
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python data_cleaner.py <input_file> [output_file] [key_column]")
-        sys.exit(1)
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'value': [10.5, 20.3, 20.3, None, 40.1, None],
+        'category': ['A', 'B', 'B', 'C', 'A', 'B']
+    }
     
-    input_file = sys.argv[1]
-    output_file = sys.argv[2] if len(sys.argv) > 2 else None
-    key_column = sys.argv[3] if len(sys.argv) > 3 else None
+    df = pd.DataFrame(sample_data)
+    print("Original dataset:")
+    print(df)
+    print("\nDataset info:")
+    print(df.info())
     
-    try:
-        removed = remove_duplicates(input_file, output_file, key_column)
-        print(f"Successfully removed {removed} duplicate rows")
-        print(f"Cleaned data saved to: {output_file if output_file else 'input_file_cleaned.csv'}")
-    except Exception as e:
-        print(f"Error: {e}")
-        sys.exit(1)
+    cleaned_df = clean_dataset(df, fill_strategy='median')
+    print("\nCleaned dataset:")
+    print(cleaned_df)
+    
+    is_valid = validate_dataset(cleaned_df, required_columns=['id', 'value'])
+    print(f"\nDataset validation: {is_valid}")
 
 if __name__ == "__main__":
     main()
