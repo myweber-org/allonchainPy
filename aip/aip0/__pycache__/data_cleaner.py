@@ -1,16 +1,17 @@
+
 import numpy as np
 import pandas as pd
 
 def remove_outliers_iqr(df, column):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Remove outliers from a DataFrame column using the IQR method.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to process
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
     
     Returns:
-        pd.DataFrame: DataFrame with outliers removed
+    pd.DataFrame: DataFrame with outliers removed
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
@@ -26,16 +27,16 @@ def remove_outliers_iqr(df, column):
     
     return filtered_df
 
-def calculate_summary_statistics(df, column):
+def calculate_summary_stats(df, column):
     """
-    Calculate summary statistics for a column after outlier removal.
+    Calculate summary statistics for a column.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to analyze
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name
     
     Returns:
-        dict: Dictionary containing summary statistics
+    dict: Dictionary containing summary statistics
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
@@ -51,40 +52,27 @@ def calculate_summary_statistics(df, column):
     
     return stats
 
-def process_numerical_data(df, columns):
+def example_usage():
     """
-    Process multiple numerical columns by removing outliers.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        columns (list): List of column names to process
-    
-    Returns:
-        pd.DataFrame: Processed DataFrame
+    Example usage of the data cleaning functions.
     """
-    result_df = df.copy()
-    
-    for col in columns:
-        if col in result_df.columns and pd.api.types.is_numeric_dtype(result_df[col]):
-            result_df = remove_outliers_iqr(result_df, col)
-    
-    return result_df
-
-if __name__ == "__main__":
-    sample_data = {
-        'A': np.random.normal(100, 15, 1000),
-        'B': np.random.exponential(50, 1000),
-        'C': np.random.uniform(0, 200, 1000)
+    np.random.seed(42)
+    data = {
+        'values': np.random.normal(100, 15, 1000)
     }
     
-    df = pd.DataFrame(sample_data)
+    df = pd.DataFrame(data)
+    df.loc[10:15, 'values'] = 500
+    
     print("Original DataFrame shape:", df.shape)
+    print("Original summary stats:", calculate_summary_stats(df, 'values'))
     
-    processed_df = process_numerical_data(df, ['A', 'B', 'C'])
-    print("Processed DataFrame shape:", processed_df.shape)
+    cleaned_df = remove_outliers_iqr(df, 'values')
     
-    for col in ['A', 'B', 'C']:
-        stats = calculate_summary_statistics(processed_df, col)
-        print(f"\nStatistics for column {col}:")
-        for key, value in stats.items():
-            print(f"  {key}: {value:.2f}")
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("Cleaned summary stats:", calculate_summary_stats(cleaned_df, 'values'))
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    cleaned_data = example_usage()
