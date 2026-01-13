@@ -1,46 +1,143 @@
 
+import numpy as np
 import pandas as pd
 
-def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+def remove_outliers_iqr(dataframe, column, multiplier=1.5):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Remove outliers from a DataFrame column using the IQR method.
     
     Args:
-        df (pd.DataFrame): Input DataFrame to clean
-        drop_duplicates (bool): Whether to drop duplicate rows
-        fill_missing (bool): Whether to fill missing values
-        fill_value: Value to use for filling missing data
+        dataframe: pandas DataFrame
+        column: Column name to process
+        multiplier: IQR multiplier (default 1.5)
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame
+        DataFrame with outliers removed
     """
-    cleaned_df = df.copy()
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
     
-    if fill_missing:
-        cleaned_df = cleaned_df.fillna(fill_value)
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
     
-    return cleaned_df
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df.copy()
 
-def validate_data(df, required_columns=None):
+def normalize_minmax(dataframe, columns=None):
     """
-    Validate that DataFrame meets basic requirements.
+    Normalize specified columns using min-max scaling.
     
     Args:
-        df (pd.DataFrame): DataFrame to validate
-        required_columns (list): List of required column names
+        dataframe: pandas DataFrame
+        columns: List of columns to normalize (default: all numeric columns)
     
     Returns:
-        tuple: (is_valid, error_message)
+        DataFrame with normalized columns
     """
-    if df.empty:
-        return False, "DataFrame is empty"
+    if columns is None:
+        columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
     
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
+    result_df = dataframe.copy()
     
-    return True, "Data validation passed"
+    for col in columns:
+        if col in dataframe.columns and np.issubdtype(dataframe[col].dtype, np.number):
+            col_min = dataframe[col].min()
+            col_max = dataframe[col].max()
+            
+            if col_max - col_min > 0:
+                result_df[col] = (dataframe[col] - col_min) / (col_max - col_min)
+            else:
+                result_df[col] = 0
+    
+    return result_df
+
+def standardize_zscore(dataframe, columns=None):
+    """
+    Standardize specified columns using z-score normalization.
+    
+    Args:
+        dataframe: pandas DataFrame
+        columns: List of columns to standardize (default: all numeric columns)
+    
+    Returns:
+        DataFrame with standardized columns
+    """
+    if columns is None:
+        columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    result_df = dataframe.copy()
+    
+    for col in columns:
+        if col in dataframe.columns and np.issubdtype(dataframe[col].dtype, np.number):
+            col_mean = dataframe[col].mean()
+            col_std = dataframe[col].std()
+            
+            if col_std > 0:
+                result_df[col] = (dataframe[col] - col_mean) / col_std
+            else:
+                result_df[col] = 0
+    
+    return result_df
+
+def handle_missing_values(dataframe, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns.
+    
+    Args:
+        dataframe: pandas DataFrame
+        strategy: 'mean', 'median', 'mode', or 'drop'
+        columns: List of columns to process (default: all columns)
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = dataframe.columns.tolist()
+    
+    result_df = dataframe.copy()
+    
+    for col in columns:
+        if col in dataframe.columns and dataframe[col].isnull().any():
+            if strategy == 'mean' and np.issubdtype(dataframe[col].dtype, np.number):
+                result_df[col].fillna(dataframe[col].mean(), inplace=True)
+            elif strategy == 'median' and np.issubdtype(dataframe[col].dtype, np.number):
+                result_df[col].fillna(dataframe[col].median(), inplace=True)
+            elif strategy == 'mode':
+                result_df[col].fillna(dataframe[col].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                result_df = result_df.dropna(subset=[col])
+    
+    return result_df
+
+def create_data_summary(dataframe):
+    """
+    Create a summary statistics DataFrame.
+    
+    Args:
+        dataframe: pandas DataFrame
+    
+    Returns:
+        DataFrame with summary statistics
+    """
+    numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+    
+    summary_data = []
+    for col in numeric_cols:
+        summary_data.append({
+            'column': col,
+            'mean': dataframe[col].mean(),
+            'median': dataframe[col].median(),
+            'std': dataframe[col].std(),
+            'min': dataframe[col].min(),
+            'max': dataframe[col].max(),
+            'missing': dataframe[col].isnull().sum(),
+            'missing_pct': (dataframe[col].isnull().sum() / len(dataframe)) * 100
+        })
+    
+    return pd.DataFrame(summary_data)
