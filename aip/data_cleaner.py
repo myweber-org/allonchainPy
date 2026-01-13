@@ -218,3 +218,6 @@ def clean_dataset(df, outlier_threshold=1.5, normalize=True, fill_missing=True):
         cleaner.normalize_minmax()
         
     return cleaner.get_cleaned_data(), cleaner.get_removed_count()
+def deduplicate_list(seq):
+    seen = set()
+    return [x for x in seq if not (x in seen or seen.add(x))]
