@@ -1,147 +1,104 @@
-
 import pandas as pd
 import numpy as np
+from typing import List, Optional
 
-def remove_outliers_iqr(df, column):
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Remove duplicate rows from DataFrame.
     
     Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to process
+        df: Input DataFrame
+        subset: Columns to consider for identifying duplicates
     
     Returns:
-        pd.DataFrame: DataFrame with outliers removed
+        DataFrame with duplicates removed
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    return df.drop_duplicates(subset=subset, keep='first')
 
-def calculate_summary_stats(df, column):
+def normalize_column(df: pd.DataFrame, column: str, method: str = 'minmax') -> pd.DataFrame:
     """
-    Calculate summary statistics for a column.
+    Normalize specified column using selected method.
     
     Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to analyze
+        df: Input DataFrame
+        column: Column name to normalize
+        method: Normalization method ('minmax' or 'zscore')
     
     Returns:
-        dict: Dictionary containing summary statistics
+        DataFrame with normalized column
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    df_copy = df.copy()
     
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count(),
-        'missing': df[column].isnull().sum()
-    }
+    if method == 'minmax':
+        min_val = df_copy[column].min()
+        max_val = df_copy[column].max()
+        if max_val > min_val:
+            df_copy[column] = (df_copy[column] - min_val) / (max_val - min_val)
     
-    return stats
+    elif method == 'zscore':
+        mean_val = df_copy[column].mean()
+        std_val = df_copy[column].std()
+        if std_val > 0:
+            df_copy[column] = (df_copy[column] - mean_val) / std_val
+    
+    return df_copy
 
-def main():
-    # Example usage
-    data = {
-        'values': [10, 12, 12, 13, 12, 11, 14, 13, 15, 100, 12, 14, 13, 12, 11]
-    }
-    
-    df = pd.DataFrame(data)
-    
-    print("Original DataFrame:")
-    print(df)
-    print()
-    
-    print("Summary statistics before cleaning:")
-    stats_before = calculate_summary_stats(df, 'values')
-    for key, value in stats_before.items():
-        print(f"{key}: {value}")
-    print()
-    
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    
-    print("Cleaned DataFrame:")
-    print(cleaned_df)
-    print()
-    
-    print("Summary statistics after cleaning:")
-    stats_after = calculate_summary_stats(cleaned_df, 'values')
-    for key, value in stats_after.items():
-        print(f"{key}: {value}")
-    
-    print(f"\nRows removed: {len(df) - len(cleaned_df)}")
-
-if __name__ == "__main__":
-    main()import pandas as pd
-import sys
-
-def remove_duplicates(input_file, output_file=None, subset=None, keep='first'):
+def handle_missing_values(df: pd.DataFrame, strategy: str = 'mean') -> pd.DataFrame:
     """
-    Remove duplicate rows from a CSV file.
+    Handle missing values in numeric columns.
     
     Args:
-        input_file (str): Path to input CSV file
-        output_file (str, optional): Path to output CSV file. If None, overwrites input file
-        subset (list, optional): Columns to consider for identifying duplicates
-        keep (str): Which duplicates to keep - 'first', 'last', or False to drop all
-        
+        df: Input DataFrame
+        strategy: Imputation strategy ('mean', 'median', or 'drop')
+    
     Returns:
-        int: Number of duplicate rows removed
+        DataFrame with handled missing values
     """
-    try:
-        df = pd.read_csv(input_file)
-        initial_count = len(df)
-        
-        df_clean = df.drop_duplicates(subset=subset, keep=keep)
-        final_count = len(df_clean)
-        
-        duplicates_removed = initial_count - final_count
-        
-        if output_file is None:
-            output_file = input_file
+    df_copy = df.copy()
+    numeric_cols = df_copy.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'drop':
+        return df_copy.dropna(subset=numeric_cols)
+    
+    for col in numeric_cols:
+        if df_copy[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df_copy[col].mean()
+            elif strategy == 'median':
+                fill_value = df_copy[col].median()
+            else:
+                continue
             
-        df_clean.to_csv(output_file, index=False)
-        
-        print(f"Removed {duplicates_removed} duplicate rows")
-        print(f"Original rows: {initial_count}, Cleaned rows: {final_count}")
-        print(f"Saved to: {output_file}")
-        
-        return duplicates_removed
-        
-    except FileNotFoundError:
-        print(f"Error: File '{input_file}' not found")
-        return -1
-    except pd.errors.EmptyDataError:
-        print(f"Error: File '{input_file}' is empty")
-        return -1
-    except Exception as e:
-        print(f"Error processing file: {str(e)}")
-        return -1
+            df_copy[col] = df_copy[col].fillna(fill_value)
+    
+    return df_copy
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python data_cleaner.py <input_file> [output_file]")
-        sys.exit(1)
+def clean_dataframe(df: pd.DataFrame, 
+                   deduplicate: bool = True,
+                   normalize_cols: Optional[List[str]] = None,
+                   missing_strategy: str = 'mean') -> pd.DataFrame:
+    """
+    Comprehensive data cleaning pipeline.
     
-    input_file = sys.argv[1]
-    output_file = sys.argv[2] if len(sys.argv) > 2 else None
+    Args:
+        df: Input DataFrame
+        deduplicate: Whether to remove duplicates
+        normalize_cols: Columns to normalize
+        missing_strategy: Strategy for handling missing values
     
-    result = remove_duplicates(input_file, output_file)
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
     
-    if result >= 0:
-        sys.exit(0)
-    else:
-        sys.exit(1)
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
+    
+    if normalize_cols:
+        for col in normalize_cols:
+            if col in cleaned_df.columns:
+                cleaned_df = normalize_column(cleaned_df, col)
+    
+    return cleaned_df
