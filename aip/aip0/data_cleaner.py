@@ -68,3 +68,11 @@ def normalize_column(df, column_name):
         normalized_df[column_name] = (normalized_df[column_name] - col_min) / (col_max - col_min)
     
     return normalized_df
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
