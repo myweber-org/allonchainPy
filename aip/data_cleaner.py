@@ -221,3 +221,106 @@ def clean_dataset(df, outlier_threshold=1.5, normalize=True, fill_missing=True):
 def deduplicate_list(seq):
     seen = set()
     return [x for x in seq if not (x in seen or seen.add(x))]
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
+
+def detect_outliers_iqr(df, column):
+    """
+    Detect outliers in a DataFrame column using IQR method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.Series: Boolean series indicating outliers
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    outliers = (df[column] < lower_bound) | (df[column] > upper_bound)
+    
+    return outliers
+
+def calculate_outlier_statistics(df, column):
+    """
+    Calculate outlier statistics for a DataFrame column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    dict: Dictionary containing outlier statistics
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    outliers = detect_outliers_iqr(df, column)
+    
+    stats = {
+        'total_count': len(df),
+        'outlier_count': outliers.sum(),
+        'outlier_percentage': (outliers.sum() / len(df)) * 100,
+        'min_value': df[column].min(),
+        'max_value': df[column].max(),
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std_dev': df[column].std()
+    }
+    
+    return stats
+
+if __name__ == "__main__":
+    # Example usage
+    np.random.seed(42)
+    data = {
+        'id': range(100),
+        'value': np.concatenate([
+            np.random.normal(50, 10, 90),
+            np.random.normal(150, 30, 10)
+        ])
+    }
+    
+    df = pd.DataFrame(data)
+    
+    print("Original DataFrame shape:", df.shape)
+    print("\nOutlier statistics:")
+    stats = calculate_outlier_statistics(df, 'value')
+    for key, value in stats.items():
+        print(f"{key}: {value:.2f}")
+    
+    cleaned_df = remove_outliers_iqr(df, 'value')
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)
