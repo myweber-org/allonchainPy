@@ -347,4 +347,89 @@ def _example_usage():
     is_valid, message = validate_data(cleaned_df, numeric_cols)
     print(f"Validation: {is_valid} - {message}")
     
-    return cleaned_df
+    return cleaned_dfimport pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, output_path=None):
+    """
+    Load a CSV file, perform basic cleaning operations,
+    and save the cleaned data.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Fill missing numeric values with column mean
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].mean())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+        
+        # Remove rows where all values are NaN
+        df = df.dropna(how='all')
+        
+        # Reset index after cleaning
+        df = df.reset_index(drop=True)
+        
+        # Save cleaned data
+        if output_path:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        else:
+            base_name = file_path.rsplit('.', 1)[0]
+            new_path = f"{base_name}_cleaned.csv"
+            df.to_csv(new_path, index=False)
+            print(f"Cleaned data saved to: {new_path}")
+        
+        return df
+    
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except pd.errors.EmptyDataError:
+        print("Error: The CSV file is empty")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_dataframe(df):
+    """
+    Perform basic validation on a DataFrame.
+    """
+    if df is None or df.empty:
+        print("DataFrame is empty or None")
+        return False
+    
+    print(f"DataFrame shape: {df.shape}")
+    print(f"Columns: {list(df.columns)}")
+    print(f"Missing values per column:")
+    print(df.isnull().sum())
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 3, 4, 5, 5],
+        'name': ['Alice', 'Bob', None, 'David', 'Eve', 'Eve'],
+        'age': [25, 30, None, 35, 40, 40],
+        'score': [85.5, 92.0, 78.5, None, 88.0, 88.0]
+    }
+    
+    # Create a test DataFrame
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    # Clean the data
+    cleaned_df = clean_csv_data('test_data.csv', 'cleaned_test_data.csv')
+    
+    # Validate the cleaned data
+    if cleaned_df is not None:
+        validate_dataframe(cleaned_df)
