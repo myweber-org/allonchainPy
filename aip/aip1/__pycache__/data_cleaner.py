@@ -233,4 +233,66 @@ if __name__ == "__main__":
     
     normalized_df = normalize_columns(cleaned_df, method='minmax')
     print("\nNormalized DataFrame:")
-    print(normalized_df)
+    print(normalized_df)import pandas as pd
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and
+    filling missing numeric values with column mean.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing numeric values with column mean
+    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+    
+    # For categorical columns, fill with mode
+    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if df_cleaned[col].isnull().any():
+            mode_value = df_cleaned[col].mode()[0]
+            df_cleaned[col] = df_cleaned[col].fillna(mode_value)
+    
+    return df_cleaned
+
+def validate_data(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    return True, "Data validation passed"
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     sample_data = pd.DataFrame({
+#         'A': [1, 2, 2, None, 5],
+#         'B': ['x', 'y', 'x', None, 'z'],
+#         'C': [10.5, None, 10.5, 15.2, 12.3]
+#     })
+#     
+#     cleaned_data = clean_dataset(sample_data)
+#     print("Original data shape:", sample_data.shape)
+#     print("Cleaned data shape:", cleaned_data.shape)
+#     print("\nCleaned data:")
+#     print(cleaned_data)
