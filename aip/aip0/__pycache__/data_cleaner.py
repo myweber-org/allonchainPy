@@ -432,4 +432,116 @@ if __name__ == "__main__":
     
     # Validate the cleaned data
     if cleaned_df is not None:
-        validate_dataframe(cleaned_df)
+        validate_dataframe(cleaned_df)import pandas as pd
+import hashlib
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        subset: column label or sequence of labels to consider for identifying duplicates
+        keep: {'first', 'last', False} determines which duplicates to keep
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def generate_hash(row):
+    """
+    Generate a hash for a row to identify duplicates.
+    
+    Args:
+        row: pandas Series representing a row
+    
+    Returns:
+        MD5 hash string
+    """
+    row_string = str(row.values).encode('utf-8')
+    return hashlib.md5(row_string).hexdigest()
+
+def clean_dataframe(df, columns_to_check=None):
+    """
+    Comprehensive data cleaning function.
+    
+    Args:
+        df: pandas DataFrame
+        columns_to_check: list of columns to check for duplicates
+    
+    Returns:
+        Cleaned DataFrame and statistics
+    """
+    original_shape = df.shape
+    
+    # Remove exact duplicates
+    df_clean = remove_duplicates(df, subset=columns_to_check)
+    
+    # Add hash column for tracking
+    df_clean['row_hash'] = df_clean.apply(generate_hash, axis=1)
+    
+    # Remove rows with hash duplicates
+    df_clean = remove_duplicates(df_clean, subset=['row_hash'])
+    
+    # Remove the hash column
+    df_clean = df_clean.drop(columns=['row_hash'])
+    
+    cleaned_shape = df_clean.shape
+    rows_removed = original_shape[0] - cleaned_shape[0]
+    
+    stats = {
+        'original_rows': original_shape[0],
+        'cleaned_rows': cleaned_shape[0],
+        'rows_removed': rows_removed,
+        'removal_percentage': (rows_removed / original_shape[0]) * 100 if original_shape[0] > 0 else 0
+    }
+    
+    return df_clean, stats
+
+def save_cleaned_data(df, output_path, format='csv'):
+    """
+    Save cleaned DataFrame to file.
+    
+    Args:
+        df: pandas DataFrame
+        output_path: path to save the file
+        format: output format ('csv', 'excel', 'json')
+    """
+    if format == 'csv':
+        df.to_csv(output_path, index=False)
+    elif format == 'excel':
+        df.to_excel(output_path, index=False)
+    elif format == 'json':
+        df.to_json(output_path, orient='records')
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    data = {
+        'id': [1, 2, 3, 1, 2, 4, 5, 3],
+        'name': ['Alice', 'Bob', 'Charlie', 'Alice', 'Bob', 'David', 'Eve', 'Charlie'],
+        'value': [10, 20, 30, 10, 20, 40, 50, 30]
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print(f"\nOriginal shape: {df.shape}")
+    
+    # Clean the data
+    cleaned_df, stats = clean_dataframe(df, columns_to_check=['id', 'name'])
+    
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    print(f"\nCleaned shape: {cleaned_df.shape}")
+    
+    print("\nCleaning Statistics:")
+    for key, value in stats.items():
+        print(f"{key}: {value}")
+    
+    # Save cleaned data
+    save_cleaned_data(cleaned_df, 'cleaned_data.csv', format='csv')
+    print("\nCleaned data saved to 'cleaned_data.csv'")
