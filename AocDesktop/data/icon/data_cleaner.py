@@ -1,38 +1,75 @@
-import re
+import pandas as pd
 
-def clean_string(text):
+def remove_duplicates(df, subset=None, keep='first'):
     """
-    Cleans a string by:
-    1. Stripping leading/trailing whitespace.
-    2. Replacing multiple spaces/newlines/tabs with a single space.
-    3. Converting to lowercase.
-    Returns an empty string if input is not a string.
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        subset (list, optional): Column labels to consider for duplicates
+        keep (str, optional): Which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed
     """
-    if not isinstance(text, str):
-        return ''
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
     
-    # Strip leading/trailing whitespace
-    text = text.strip()
-    
-    # Replace any sequence of whitespace characters with a single space
-    text = re.sub(r'\s+', ' ', text)
-    
-    # Convert to lowercase
-    text = text.lower()
-    
-    return text
+    return df.drop_duplicates(subset=subset, keep=keep)
 
-def normalize_data(data):
+def clean_numeric_column(df, column_name, fill_method='mean'):
     """
-    Accepts a list of strings or a single string.
-    Returns a list of cleaned strings.
+    Clean numeric column by handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column_name (str): Name of column to clean
+        fill_method (str): Method to fill missing values ('mean', 'median', 'zero')
+    
+    Returns:
+        pd.DataFrame: DataFrame with cleaned column
     """
-    if isinstance(data, str):
-        data = [data]
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
     
-    cleaned_list = []
-    for item in data:
-        cleaned_item = clean_string(item)
-        cleaned_list.append(cleaned_item)
+    if not pd.api.types.is_numeric_dtype(df[column_name]):
+        raise TypeError(f"Column '{column_name}' must be numeric")
     
-    return cleaned_list
+    df_clean = df.copy()
+    
+    if fill_method == 'mean':
+        fill_value = df_clean[column_name].mean()
+    elif fill_method == 'median':
+        fill_value = df_clean[column_name].median()
+    elif fill_method == 'zero':
+        fill_value = 0
+    else:
+        raise ValueError("fill_method must be 'mean', 'median', or 'zero'")
+    
+    df_clean[column_name] = df_clean[column_name].fillna(fill_value)
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list, optional): List of required column names
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
