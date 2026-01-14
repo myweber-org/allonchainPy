@@ -1,71 +1,76 @@
 import pandas as pd
-import numpy as np
 
-def remove_outliers_iqr(df, column):
+def clean_dataset(df, drop_duplicates=True, fill_missing=None):
     """
-    Remove outliers from a specified column in a DataFrame using the IQR method.
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
     Parameters:
-    df (pd.DataFrame): The input DataFrame.
-    column (str): The column name to clean.
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_missing (str or dict): Strategy to fill missing values.
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed.
+    pd.DataFrame: Cleaned DataFrame.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    cleaned_df = df.copy()
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    if fill_missing is not None:
+        if isinstance(fill_missing, str):
+            if fill_missing == 'mean':
+                cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+            elif fill_missing == 'median':
+                cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+            elif fill_missing == 'mode':
+                cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
+            elif fill_missing == 'ffill':
+                cleaned_df = cleaned_df.fillna(method='ffill')
+            elif fill_missing == 'bfill':
+                cleaned_df = cleaned_df.fillna(method='bfill')
+        elif isinstance(fill_missing, dict):
+            cleaned_df = cleaned_df.fillna(fill_missing)
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
+    return cleaned_df
 
-def calculate_summary_statistics(df, column):
+def validate_dataset(df, required_columns=None, min_rows=1):
     """
-    Calculate summary statistics for a column after outlier removal.
+    Validate a DataFrame for required columns and minimum row count.
     
     Parameters:
-    df (pd.DataFrame): The input DataFrame.
-    column (str): The column name to analyze.
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    min_rows (int): Minimum number of rows required.
     
     Returns:
-    dict: Dictionary containing summary statistics.
+    tuple: (is_valid, error_message)
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if len(df) < min_rows:
+        return False, f"Dataset must have at least {min_rows} rows"
     
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
-    }
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
     
-    return stats
+    return True, "Dataset is valid"
 
 if __name__ == "__main__":
-    sample_data = {'values': [10, 12, 12, 13, 14, 15, 15, 100, 16, 17, 18, 19, 20, 200]}
-    df = pd.DataFrame(sample_data)
+    # Example usage
+    sample_data = {
+        'A': [1, 2, None, 4, 1],
+        'B': [5, None, 7, 8, 5],
+        'C': ['x', 'y', 'z', 'x', 'x']
+    }
     
+    df = pd.DataFrame(sample_data)
     print("Original DataFrame:")
     print(df)
-    print(f"\nOriginal shape: {df.shape}")
     
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    
+    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
     print("\nCleaned DataFrame:")
-    print(cleaned_df)
-    print(f"\nCleaned shape: {cleaned_df.shape}")
+    print(cleaned)
     
-    stats = calculate_summary_statistics(cleaned_df, 'values')
-    print("\nSummary Statistics:")
-    for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+    is_valid, message = validate_dataset(cleaned, required_columns=['A', 'B', 'C'])
+    print(f"\nValidation: {message}")
