@@ -331,3 +331,99 @@ if __name__ == "__main__":
         email_column='email'
     )
     print(cleaned_df)
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, fill_strategy='mean', drop_threshold=0.5):
+    """
+    Load and clean CSV data by handling missing values.
+    
+    Parameters:
+    filepath (str): Path to the CSV file.
+    fill_strategy (str): Strategy for filling missing values.
+                         Options: 'mean', 'median', 'mode', 'zero'.
+    drop_threshold (float): Drop columns with missing ratio above this threshold.
+    
+    Returns:
+    pandas.DataFrame: Cleaned DataFrame.
+    """
+    
+    df = pd.read_csv(filepath)
+    
+    missing_ratio = df.isnull().sum() / len(df)
+    columns_to_drop = missing_ratio[missing_ratio > drop_threshold].index
+    df = df.drop(columns=columns_to_drop)
+    
+    for column in df.columns:
+        if df[column].dtype in ['int64', 'float64']:
+            if fill_strategy == 'mean':
+                fill_value = df[column].mean()
+            elif fill_strategy == 'median':
+                fill_value = df[column].median()
+            elif fill_strategy == 'mode':
+                fill_value = df[column].mode()[0]
+            elif fill_strategy == 'zero':
+                fill_value = 0
+            else:
+                fill_value = df[column].mean()
+            
+            df[column] = df[column].fillna(fill_value)
+        else:
+            df[column] = df[column].fillna(df[column].mode()[0])
+    
+    return df
+
+def detect_outliers_iqr(df, column):
+    """
+    Detect outliers using the Interquartile Range method.
+    
+    Parameters:
+    df (pandas.DataFrame): Input DataFrame.
+    column (str): Column name to check for outliers.
+    
+    Returns:
+    pandas.Series: Boolean series indicating outliers.
+    """
+    if df[column].dtype not in ['int64', 'float64']:
+        return pd.Series([False] * len(df))
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    return (df[column] < lower_bound) | (df[column] > upper_bound)
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Parameters:
+    df (pandas.DataFrame): Input DataFrame.
+    subset (list): Columns to consider for duplicates.
+    keep (str): Which duplicates to keep.
+    
+    Returns:
+    pandas.DataFrame: DataFrame with duplicates removed.
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, 2, 3, np.nan, 5],
+        'C': [1, 1, 1, 1, 1],
+        'D': [10, 20, 30, 40, 50]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.to_csv('sample_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('sample_data.csv', fill_strategy='median')
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    
+    outliers = detect_outliers_iqr(cleaned_df, 'D')
+    print(f"\nOutliers in column D: {outliers.sum()}")
