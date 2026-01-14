@@ -461,3 +461,101 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
         raise ValueError("Method must be 'iqr' or 'zscore'")
     
     return df[mask]
+import pandas as pd
+
+def clean_dataset(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        column_mapping (dict, optional): Dictionary mapping original column names to new names.
+        drop_duplicates (bool): Whether to remove duplicate rows.
+        normalize_text (bool): Whether to normalize text columns (strip, lower case).
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    # Rename columns if mapping is provided
+    if column_mapping:
+        df_clean = df_clean.rename(columns=column_mapping)
+    
+    # Remove duplicate rows
+    if drop_duplicates:
+        initial_rows = len(df_clean)
+        df_clean = df_clean.drop_duplicates()
+        removed = initial_rows - len(df_clean)
+        print(f"Removed {removed} duplicate rows")
+    
+    # Normalize text columns
+    if normalize_text:
+        text_columns = df_clean.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            df_clean[col] = df_clean[col].astype(str).str.strip().str.lower()
+        print(f"Normalized {len(text_columns)} text columns")
+    
+    # Reset index after cleaning
+    df_clean = df_clean.reset_index(drop=True)
+    
+    return df_clean
+
+def validate_data(df, required_columns=None, check_missing=True):
+    """
+    Validate DataFrame for required columns and missing values.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+        check_missing (bool): Whether to check for missing values.
+    
+    Returns:
+        dict: Dictionary with validation results.
+    """
+    validation_results = {
+        'is_valid': True,
+        'missing_columns': [],
+        'missing_values': {},
+        'total_rows': len(df)
+    }
+    
+    # Check required columns
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            validation_results['missing_columns'] = missing_cols
+            validation_results['is_valid'] = False
+    
+    # Check missing values
+    if check_missing:
+        missing_counts = df.isnull().sum()
+        columns_with_missing = missing_counts[missing_counts > 0]
+        if not columns_with_missing.empty:
+            validation_results['missing_values'] = columns_with_missing.to_dict()
+            validation_results['is_valid'] = False
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'Name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson', ''],
+        'Email': ['john@example.com', 'jane@example.com', 'john@example.com', 'bob@example.com', None],
+        'Age': [25, 30, 25, 35, 40]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned_df = clean_dataset(df, drop_duplicates=True, normalize_text=True)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    
+    # Validate the cleaned data
+    validation = validate_data(cleaned_df, required_columns=['Name', 'Email', 'Age'])
+    print("\nValidation Results:")
+    print(validation)
