@@ -60,3 +60,11 @@ if __name__ == "__main__":
     print("Without duplicates:", remove_duplicates(sample_data))
     print("Cleaned numeric strings:", clean_numeric_strings(sample_data))
     print("Integers only:", filter_by_type(sample_data, int))
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
