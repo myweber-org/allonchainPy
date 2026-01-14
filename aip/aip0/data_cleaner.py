@@ -1,70 +1,71 @@
+import pandas as pd
+import numpy as np
 
-def remove_duplicates(data_list):
+def remove_outliers_iqr(df, column):
     """
-    Remove duplicate entries from a list while preserving order.
+    Remove outliers from a specified column in a DataFrame using the IQR method.
     
-    Args:
-        data_list (list): Input list potentially containing duplicates.
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to clean.
     
     Returns:
-        list: List with duplicates removed.
+    pd.DataFrame: DataFrame with outliers removed.
     """
-    seen = set()
-    result = []
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    for item in data_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    return result
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
 
-def clean_numeric_strings(data_list):
+def calculate_summary_statistics(df, column):
     """
-    Clean list by converting numeric strings to integers.
+    Calculate summary statistics for a column after outlier removal.
     
-    Args:
-        data_list (list): List containing mixed string and numeric values.
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to analyze.
     
     Returns:
-        list: List with numeric strings converted to integers.
+    dict: Dictionary containing summary statistics.
     """
-    cleaned = []
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    for item in data_list:
-        if isinstance(item, str) and item.isdigit():
-            cleaned.append(int(item))
-        else:
-            cleaned.append(item)
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
     
-    return cleaned
-
-def filter_by_type(data_list, data_type):
-    """
-    Filter list to include only items of specified type.
-    
-    Args:
-        data_list (list): Input list with mixed types.
-        data_type (type): Type to filter by.
-    
-    Returns:
-        list: Filtered list containing only items of specified type.
-    """
-    return [item for item in data_list if isinstance(item, data_type)]
+    return stats
 
 if __name__ == "__main__":
-    # Example usage
-    sample_data = [1, 2, 2, 3, "4", "4", 5, "hello", 5]
+    sample_data = {'values': [10, 12, 12, 13, 14, 15, 15, 100, 16, 17, 18, 19, 20, 200]}
+    df = pd.DataFrame(sample_data)
     
-    print("Original:", sample_data)
-    print("Without duplicates:", remove_duplicates(sample_data))
-    print("Cleaned numeric strings:", clean_numeric_strings(sample_data))
-    print("Integers only:", filter_by_type(sample_data, int))
-def remove_duplicates_preserve_order(sequence):
-    seen = set()
-    result = []
-    for item in sequence:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
+    print("Original DataFrame:")
+    print(df)
+    print(f"\nOriginal shape: {df.shape}")
+    
+    cleaned_df = remove_outliers_iqr(df, 'values')
+    
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    print(f"\nCleaned shape: {cleaned_df.shape}")
+    
+    stats = calculate_summary_statistics(cleaned_df, 'values')
+    print("\nSummary Statistics:")
+    for key, value in stats.items():
+        print(f"{key}: {value:.2f}")
