@@ -1,202 +1,62 @@
-import pandas as pd
 
-def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+def remove_duplicates(data_list):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Remove duplicate entries from a list while preserving order.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to drop duplicate rows.
-    fill_missing (bool): Whether to fill missing values.
-    fill_value: Value to use for filling missing data.
+    Args:
+        data_list (list): Input list potentially containing duplicates.
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame.
+        list: List with duplicates removed.
     """
-    cleaned_df = df.copy()
-    
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-    
-    if fill_missing:
-        cleaned_df = cleaned_df.fillna(fill_value)
-    
-    return cleaned_df
-
-def validate_data(df, required_columns=None):
-    """
-    Validate DataFrame structure and content.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of required column names.
-    
-    Returns:
-    tuple: (is_valid, error_message)
-    """
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            return False, f"Missing required columns: {missing_cols}"
-    
-    return True, "Data validation passed"
-
-def normalize_column(df, column_name):
-    """
-    Normalize a column to have values between 0 and 1.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    column_name (str): Name of column to normalize.
-    
-    Returns:
-    pd.DataFrame: DataFrame with normalized column.
-    """
-    if column_name not in df.columns:
-        raise ValueError(f"Column '{column_name}' not found in DataFrame")
-    
-    normalized_df = df.copy()
-    col_min = normalized_df[column_name].min()
-    col_max = normalized_df[column_name].max()
-    
-    if col_max == col_min:
-        normalized_df[column_name] = 0.5
-    else:
-        normalized_df[column_name] = (normalized_df[column_name] - col_min) / (col_max - col_min)
-    
-    return normalized_df
-def remove_duplicates_preserve_order(sequence):
     seen = set()
     result = []
-    for item in sequence:
+    
+    for item in data_list:
         if item not in seen:
             seen.add(item)
             result.append(item)
+    
     return result
-import pandas as pd
-import numpy as np
-from scipy import stats
 
-def remove_outliers_iqr(df, columns):
-    cleaned_df = df.copy()
-    for col in columns:
-        Q1 = cleaned_df[col].quantile(0.25)
-        Q3 = cleaned_df[col].quantile(0.75)
-        IQR = Q3 - Q1
-        lower_bound = Q1 - 1.5 * IQR
-        upper_bound = Q3 + 1.5 * IQR
-        cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
-    return cleaned_df
+def clean_numeric_strings(data_list):
+    """
+    Clean list by converting numeric strings to integers.
+    
+    Args:
+        data_list (list): List containing mixed string and numeric values.
+    
+    Returns:
+        list: List with numeric strings converted to integers.
+    """
+    cleaned = []
+    
+    for item in data_list:
+        if isinstance(item, str) and item.isdigit():
+            cleaned.append(int(item))
+        else:
+            cleaned.append(item)
+    
+    return cleaned
 
-def normalize_minmax(df, columns):
-    normalized_df = df.copy()
-    for col in columns:
-        min_val = normalized_df[col].min()
-        max_val = normalized_df[col].max()
-        if max_val != min_val:
-            normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
-    return normalized_df
-
-def clean_dataset(input_path, output_path, numeric_columns):
-    try:
-        df = pd.read_csv(input_path)
-        df_cleaned = remove_outliers_iqr(df, numeric_columns)
-        df_normalized = normalize_minmax(df_cleaned, numeric_columns)
-        df_normalized.to_csv(output_path, index=False)
-        print(f"Data cleaned and saved to {output_path}")
-        print(f"Original rows: {len(df)}, Cleaned rows: {len(df_normalized)}")
-        return df_normalized
-    except Exception as e:
-        print(f"Error during cleaning: {e}")
-        return None
+def filter_by_type(data_list, data_type):
+    """
+    Filter list to include only items of specified type.
+    
+    Args:
+        data_list (list): Input list with mixed types.
+        data_type (type): Type to filter by.
+    
+    Returns:
+        list: Filtered list containing only items of specified type.
+    """
+    return [item for item in data_list if isinstance(item, data_type)]
 
 if __name__ == "__main__":
-    input_file = "raw_data.csv"
-    output_file = "cleaned_data.csv"
-    numeric_cols = ["age", "income", "score"]
-    clean_dataset(input_file, output_file, numeric_cols)import pandas as pd
-import re
-
-def clean_text_column(df, column_name):
-    """Standardize text by lowercasing and removing extra whitespace."""
-    if column_name in df.columns:
-        df[column_name] = df[column_name].astype(str).str.lower()
-        df[column_name] = df[column_name].apply(lambda x: re.sub(r'\s+', ' ', x).strip())
-    return df
-
-def remove_duplicates(df, subset=None):
-    """Remove duplicate rows from the DataFrame."""
-    return df.drop_duplicates(subset=subset, keep='first')
-
-def main():
     # Example usage
-    data = {
-        'name': ['Alice', 'alice', 'Bob  ', 'bob', 'Charlie'],
-        'email': ['alice@example.com', 'alice@example.com', 'bob@example.com', 'bob@example.com', 'charlie@example.com']
-    }
-    df = pd.DataFrame(data)
+    sample_data = [1, 2, 2, 3, "4", "4", 5, "hello", 5]
     
-    print("Original DataFrame:")
-    print(df)
-    
-    df = clean_text_column(df, 'name')
-    df = remove_duplicates(df, subset=['email'])
-    
-    print("\nCleaned DataFrame:")
-    print(df)
-
-if __name__ == "__main__":
-    main()
-import pandas as pd
-import re
-
-def clean_text_column(series):
-    """Standardize text: lowercase, strip whitespace, remove extra spaces."""
-    if series.dtype == 'object':
-        series = series.str.lower()
-        series = series.str.strip()
-        series = series.apply(lambda x: re.sub(r'\s+', ' ', str(x)) if pd.notnull(x) else x)
-    return series
-
-def remove_duplicates(df, subset=None, keep='first'):
-    """Remove duplicate rows from DataFrame."""
-    return df.drop_duplicates(subset=subset, keep=keep)
-
-def clean_dataframe(df, text_columns=None):
-    """Apply cleaning functions to DataFrame."""
-    df_clean = df.copy()
-    
-    if text_columns:
-        for col in text_columns:
-            if col in df_clean.columns:
-                df_clean[col] = clean_text_column(df_clean[col])
-    else:
-        for col in df_clean.select_dtypes(include=['object']).columns:
-            df_clean[col] = clean_text_column(df_clean[col])
-    
-    df_clean = remove_duplicates(df_clean)
-    return df_clean
-
-def save_cleaned_data(df, input_path, suffix='_cleaned'):
-    """Save cleaned DataFrame with modified filename."""
-    if isinstance(input_path, str):
-        output_path = input_path.replace('.csv', f'{suffix}.csv')
-        df.to_csv(output_path, index=False)
-        return output_path
-    return None
-
-if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'name': ['  John DOE  ', 'Jane SMITH', '  John DOE  ', 'Alice   Brown'],
-        'email': ['JOHN@email.com', 'jane@email.com', 'JOHN@email.com', 'alice@email.com'],
-        'age': [25, 30, 25, 28]
-    })
-    
-    print("Original data:")
-    print(sample_data)
-    print("\nCleaned data:")
-    cleaned = clean_dataframe(sample_data)
-    print(cleaned)
+    print("Original:", sample_data)
+    print("Without duplicates:", remove_duplicates(sample_data))
+    print("Cleaned numeric strings:", clean_numeric_strings(sample_data))
+    print("Integers only:", filter_by_type(sample_data, int))
