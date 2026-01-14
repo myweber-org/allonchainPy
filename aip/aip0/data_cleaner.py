@@ -117,4 +117,36 @@ if __name__ == "__main__":
     input_file = "raw_data.csv"
     output_file = "cleaned_data.csv"
     numeric_cols = ["age", "income", "score"]
-    clean_dataset(input_file, output_file, numeric_cols)
+    clean_dataset(input_file, output_file, numeric_cols)import pandas as pd
+import re
+
+def clean_text_column(df, column_name):
+    """Standardize text by lowercasing and removing extra whitespace."""
+    if column_name in df.columns:
+        df[column_name] = df[column_name].astype(str).str.lower()
+        df[column_name] = df[column_name].apply(lambda x: re.sub(r'\s+', ' ', x).strip())
+    return df
+
+def remove_duplicates(df, subset=None):
+    """Remove duplicate rows from the DataFrame."""
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def main():
+    # Example usage
+    data = {
+        'name': ['Alice', 'alice', 'Bob  ', 'bob', 'Charlie'],
+        'email': ['alice@example.com', 'alice@example.com', 'bob@example.com', 'bob@example.com', 'charlie@example.com']
+    }
+    df = pd.DataFrame(data)
+    
+    print("Original DataFrame:")
+    print(df)
+    
+    df = clean_text_column(df, 'name')
+    df = remove_duplicates(df, subset=['email'])
+    
+    print("\nCleaned DataFrame:")
+    print(df)
+
+if __name__ == "__main__":
+    main()
