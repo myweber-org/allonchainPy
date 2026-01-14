@@ -150,3 +150,53 @@ def main():
 
 if __name__ == "__main__":
     main()
+import pandas as pd
+import re
+
+def clean_text_column(series):
+    """Standardize text: lowercase, strip whitespace, remove extra spaces."""
+    if series.dtype == 'object':
+        series = series.str.lower()
+        series = series.str.strip()
+        series = series.apply(lambda x: re.sub(r'\s+', ' ', str(x)) if pd.notnull(x) else x)
+    return series
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """Remove duplicate rows from DataFrame."""
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def clean_dataframe(df, text_columns=None):
+    """Apply cleaning functions to DataFrame."""
+    df_clean = df.copy()
+    
+    if text_columns:
+        for col in text_columns:
+            if col in df_clean.columns:
+                df_clean[col] = clean_text_column(df_clean[col])
+    else:
+        for col in df_clean.select_dtypes(include=['object']).columns:
+            df_clean[col] = clean_text_column(df_clean[col])
+    
+    df_clean = remove_duplicates(df_clean)
+    return df_clean
+
+def save_cleaned_data(df, input_path, suffix='_cleaned'):
+    """Save cleaned DataFrame with modified filename."""
+    if isinstance(input_path, str):
+        output_path = input_path.replace('.csv', f'{suffix}.csv')
+        df.to_csv(output_path, index=False)
+        return output_path
+    return None
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'name': ['  John DOE  ', 'Jane SMITH', '  John DOE  ', 'Alice   Brown'],
+        'email': ['JOHN@email.com', 'jane@email.com', 'JOHN@email.com', 'alice@email.com'],
+        'age': [25, 30, 25, 28]
+    })
+    
+    print("Original data:")
+    print(sample_data)
+    print("\nCleaned data:")
+    cleaned = clean_dataframe(sample_data)
+    print(cleaned)
