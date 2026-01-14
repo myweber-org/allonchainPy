@@ -128,3 +128,11 @@ def clean_dataset(df, method='iqr', normalize=False, fill_missing=True):
         cleaner.normalize_minmax()
         
     return cleaner.get_cleaned_data(), cleaner.get_summary()
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
