@@ -274,3 +274,60 @@ def example_usage():
 
 if __name__ == "__main__":
     cleaned_data = example_usage()
+import pandas as pd
+import re
+
+def clean_text_column(df, column_name):
+    """
+    Standardize text by converting to lowercase and removing extra whitespace.
+    """
+    if column_name in df.columns:
+        df[column_name] = df[column_name].astype(str).str.lower()
+        df[column_name] = df[column_name].str.strip()
+        df[column_name] = df[column_name].replace(r'\s+', ' ', regex=True)
+    return df
+
+def remove_duplicate_rows(df, subset=None):
+    """
+    Remove duplicate rows from the DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def validate_email_format(df, email_column):
+    """
+    Validate email format using a simple regex pattern.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if email_column in df.columns:
+        df['email_valid'] = df[email_column].str.match(pattern)
+    return df
+
+def clean_dataset(df, text_columns=None, deduplicate_subset=None, email_column=None):
+    """
+    Main function to clean dataset by applying multiple cleaning steps.
+    """
+    if text_columns:
+        for col in text_columns:
+            df = clean_text_column(df, col)
+    
+    if deduplicate_subset:
+        df = remove_duplicate_rows(df, subset=deduplicate_subset)
+    
+    if email_column:
+        df = validate_email_format(df, email_column)
+    
+    return df
+
+if __name__ == "__main__":
+    sample_data = {
+        'name': ['Alice', 'Bob  ', 'Alice', 'Charlie  '],
+        'email': ['alice@example.com', 'invalid-email', 'alice@example.com', 'charlie@test.org']
+    }
+    df = pd.DataFrame(sample_data)
+    cleaned_df = clean_dataset(
+        df,
+        text_columns=['name'],
+        deduplicate_subset=['name', 'email'],
+        email_column='email'
+    )
+    print(cleaned_df)
