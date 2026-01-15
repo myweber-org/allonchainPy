@@ -156,3 +156,11 @@ def validate_data(data, required_columns, numeric_columns):
                 return False, f"Column '{column}' contains only null values"
     
     return True, "Data validation passed"
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
