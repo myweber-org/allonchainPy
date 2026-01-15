@@ -340,3 +340,103 @@ if __name__ == "__main__":
     print("\nCleaned data shape:", cleaned_df.shape)
     print("\nFirst 5 rows of cleaned data:")
     print(cleaned_df.head())
+import pandas as pd
+import numpy as np
+from typing import Optional
+
+def clean_csv_data(input_path: str, output_path: Optional[str] = None) -> pd.DataFrame:
+    """
+    Load and clean CSV data by handling missing values and converting data types.
+    """
+    try:
+        df = pd.read_csv(input_path)
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Fill missing numeric values with median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].median())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+        
+        # Convert date columns if present
+        date_columns = [col for col in df.columns if 'date' in col.lower() or 'time' in col.lower()]
+        for col in date_columns:
+            try:
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+            except:
+                pass
+        
+        # Remove outliers using IQR method for numeric columns
+        for col in numeric_cols:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df = df[(df[col] >= lower_bound) & (df[col] <= upper_bound)]
+        
+        # Reset index after cleaning
+        df = df.reset_index(drop=True)
+        
+        # Save cleaned data if output path provided
+        if output_path:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to {output_path}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {input_path}")
+        raise
+    except pd.errors.EmptyDataError:
+        print("Error: The CSV file is empty")
+        raise
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        raise
+
+def validate_dataframe(df: pd.DataFrame) -> bool:
+    """
+    Validate that dataframe meets basic quality criteria.
+    """
+    if df.empty:
+        return False
+    
+    # Check for remaining null values
+    if df.isnull().sum().sum() > 0:
+        print("Warning: Dataframe contains null values after cleaning")
+        return False
+    
+    # Check for infinite values
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if np.isinf(df[col]).any():
+            print(f"Warning: Column {col} contains infinite values")
+            return False
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    try:
+        cleaned_data = clean_csv_data(input_file, output_file)
+        
+        if validate_dataframe(cleaned_data):
+            print("Data cleaning completed successfully")
+            print(f"Original shape: Not available (file loaded successfully)")
+            print(f"Cleaned shape: {cleaned_data.shape}")
+            print(f"Column dtypes:\n{cleaned_data.dtypes}")
+        else:
+            print("Data validation failed")
+            
+    except Exception as e:
+        print(f"Data cleaning failed: {e}")
