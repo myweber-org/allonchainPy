@@ -133,3 +133,84 @@ def clean_dataset(df, remove_dup=True, fill_na=True, remove_out=True, standardiz
         df_clean = standardize_columns(df_clean)
     
     return df_clean
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the IQR method.
+    
+    Parameters:
+    data (list or array-like): The dataset.
+    column (int or str): The column index or name to process.
+    
+    Returns:
+    numpy.ndarray: Data with outliers removed.
+    """
+    if isinstance(data, list):
+        data = np.array(data)
+    
+    if isinstance(column, str):
+        try:
+            column_index = data.dtype.names.index(column)
+            column_data = data[column]
+        except (AttributeError, ValueError):
+            raise ValueError("Column name not found in structured array")
+    else:
+        column_data = data[:, column]
+    
+    q1 = np.percentile(column_data, 25)
+    q3 = np.percentile(column_data, 75)
+    iqr = q3 - q1
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    mask = (column_data >= lower_bound) & (column_data <= upper_bound)
+    return data[mask]
+
+def calculate_basic_stats(data, column):
+    """
+    Calculate basic statistics for a column.
+    
+    Parameters:
+    data (numpy.ndarray): The dataset.
+    column (int or str): The column index or name.
+    
+    Returns:
+    dict: Dictionary containing mean, median, and standard deviation.
+    """
+    if isinstance(column, str):
+        try:
+            column_data = data[column]
+        except (TypeError, ValueError):
+            raise ValueError("Invalid column name")
+    else:
+        column_data = data[:, column]
+    
+    stats = {
+        'mean': np.mean(column_data),
+        'median': np.median(column_data),
+        'std': np.std(column_data)
+    }
+    return stats
+
+if __name__ == "__main__":
+    sample_data = np.array([
+        [1.2, 150],
+        [2.5, 200],
+        [3.1, 180],
+        [100.0, 5000],
+        [4.2, 210],
+        [5.7, 190]
+    ])
+    
+    print("Original data:")
+    print(sample_data)
+    
+    cleaned_data = remove_outliers_iqr(sample_data, 0)
+    print("\nCleaned data (after removing outliers from column 0):")
+    print(cleaned_data)
+    
+    stats = calculate_basic_stats(cleaned_data, 0)
+    print("\nStatistics for column 0:")
+    for key, value in stats.items():
+        print(f"{key}: {value:.2f}")
