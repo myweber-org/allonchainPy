@@ -87,3 +87,139 @@ if __name__ == "__main__":
             print("Data cleaning completed successfully")
         else:
             print("Data validation failed")
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+def clean_column(df: pd.DataFrame, column_name: str, 
+                 remove_duplicates: bool = True,
+                 case_sensitive: bool = False,
+                 strip_whitespace: bool = True) -> pd.DataFrame:
+    """
+    Clean a specified column in a DataFrame.
+    
+    Parameters:
+    df: Input DataFrame
+    column_name: Name of column to clean
+    remove_duplicates: Remove duplicate values
+    case_sensitive: Case sensitivity for duplicate detection
+    strip_whitespace: Remove leading/trailing whitespace
+    
+    Returns:
+    Cleaned DataFrame
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    df_clean = df.copy()
+    
+    if strip_whitespace:
+        df_clean[column_name] = df_clean[column_name].astype(str).str.strip()
+    
+    if not case_sensitive:
+        df_clean[column_name] = df_clean[column_name].str.lower()
+    
+    if remove_duplicates:
+        df_clean = df_clean.drop_duplicates(subset=[column_name], keep='first')
+    
+    return df_clean
+
+def normalize_numeric(df: pd.DataFrame, column_name: str,
+                      scale_range: Optional[tuple] = None) -> pd.DataFrame:
+    """
+    Normalize numeric column to specified range or 0-1.
+    
+    Parameters:
+    df: Input DataFrame
+    column_name: Numeric column to normalize
+    scale_range: Target range as (min, max), defaults to (0, 1)
+    
+    Returns:
+    DataFrame with normalized column
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    if not pd.api.types.is_numeric_dtype(df[column_name]):
+        raise TypeError(f"Column '{column_name}' must be numeric")
+    
+    df_norm = df.copy()
+    col_data = df_norm[column_name]
+    
+    if scale_range is None:
+        scale_range = (0, 1)
+    
+    min_val, max_val = scale_range
+    col_min = col_data.min()
+    col_max = col_data.max()
+    
+    if col_max == col_min:
+        df_norm[f"{column_name}_normalized"] = min_val
+    else:
+        normalized = min_val + (col_data - col_min) * (max_val - min_val) / (col_max - col_min)
+        df_norm[f"{column_name}_normalized"] = normalized
+    
+    return df_norm
+
+def validate_dataframe(df: pd.DataFrame, 
+                       required_columns: List[str] = None) -> dict:
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df: DataFrame to validate
+    required_columns: List of required column names
+    
+    Returns:
+    Dictionary with validation results
+    """
+    validation_result = {
+        'is_valid': True,
+        'missing_columns': [],
+        'null_counts': {},
+        'data_types': {}
+    }
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            validation_result['is_valid'] = False
+            validation_result['missing_columns'] = missing
+    
+    for column in df.columns:
+        null_count = df[column].isnull().sum()
+        validation_result['null_counts'][column] = null_count
+        validation_result['data_types'][column] = str(df[column].dtype)
+    
+    return validation_result
+
+def example_usage():
+    """Example demonstrating the data cleaning utilities."""
+    sample_data = {
+        'name': ['  Alice  ', 'bob', 'Alice', 'Charlie', '  BOB  '],
+        'age': [25, 30, 25, 35, 30],
+        'score': [85, 92, 78, 88, 95]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_column(df, 'name', remove_duplicates=True, case_sensitive=False)
+    print("After cleaning 'name' column:")
+    print(cleaned_df)
+    print("\n" + "="*50 + "\n")
+    
+    normalized_df = normalize_numeric(cleaned_df, 'score', scale_range=(0, 100))
+    print("After normalizing 'score' column:")
+    print(normalized_df)
+    print("\n" + "="*50 + "\n")
+    
+    validation = validate_dataframe(normalized_df, required_columns=['name', 'age', 'score'])
+    print("Validation results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
+
+if __name__ == "__main__":
+    example_usage()
