@@ -102,3 +102,131 @@ def get_data_summary(df):
     }
     
     return summary
+import pandas as pd
+import numpy as np
+
+def remove_missing_rows(df, columns=None):
+    """
+    Remove rows with missing values from DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list, optional): Specific columns to check for missing values.
+                                 If None, checks all columns.
+    
+    Returns:
+        pd.DataFrame: DataFrame with rows containing missing values removed
+    """
+    if columns is None:
+        return df.dropna()
+    else:
+        return df.dropna(subset=columns)
+
+def fill_missing_with_mean(df, columns):
+    """
+    Fill missing values in specified columns with column mean.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of column names to fill
+    
+    Returns:
+        pd.DataFrame: DataFrame with missing values filled
+    """
+    df_filled = df.copy()
+    for col in columns:
+        if col in df.columns:
+            df_filled[col] = df_filled[col].fillna(df_filled[col].mean())
+    return df_filled
+
+def detect_outliers_iqr(df, column):
+    """
+    Detect outliers using Interquartile Range (IQR) method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to check for outliers
+    
+    Returns:
+        pd.DataFrame: DataFrame containing only outlier rows
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)]
+    return outliers
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers using Interquartile Range (IQR) method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to remove outliers from
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def standardize_column(df, column):
+    """
+    Standardize a column using z-score normalization.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to standardize
+    
+    Returns:
+        pd.DataFrame: DataFrame with standardized column
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_standardized = df.copy()
+    mean_val = df_standardized[column].mean()
+    std_val = df_standardized[column].std()
+    
+    if std_val > 0:
+        df_standardized[column] = (df_standardized[column] - mean_val) / std_val
+    
+    return df_standardized
+
+def get_data_summary(df):
+    """
+    Generate a summary of data quality metrics.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+        dict: Dictionary containing data quality metrics
+    """
+    summary = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'missing_percentage': (df.isnull().sum().sum() / (len(df) * len(df.columns))) * 100,
+        'duplicate_rows': df.duplicated().sum(),
+        'data_types': df.dtypes.to_dict(),
+        'numeric_columns': df.select_dtypes(include=[np.number]).columns.tolist(),
+        'categorical_columns': df.select_dtypes(include=['object']).columns.tolist()
+    }
+    return summary
