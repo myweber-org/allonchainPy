@@ -1,113 +1,63 @@
 
-def remove_duplicates_preserve_order(sequence):
-    seen = set()
-    result = []
-    for item in sequence:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
 import pandas as pd
-import numpy as np
-from scipy import stats
 
-class DataCleaner:
-    def __init__(self, df):
-        self.df = df.copy()
-        self.original_shape = df.shape
-        
-    def remove_duplicates(self):
-        self.df = self.df.drop_duplicates()
-        return self
+def clean_dataset(df, drop_duplicates=True, fill_method=None):
+    """
+    Clean a pandas DataFrame by handling missing values and duplicates.
     
-    def handle_missing_values(self, strategy='mean', columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        for col in columns:
-            if col in self.df.columns:
-                if strategy == 'mean':
-                    self.df[col].fillna(self.df[col].mean(), inplace=True)
-                elif strategy == 'median':
-                    self.df[col].fillna(self.df[col].median(), inplace=True)
-                elif strategy == 'mode':
-                    self.df[col].fillna(self.df[col].mode()[0], inplace=True)
-                elif strategy == 'drop':
-                    self.df = self.df.dropna(subset=[col])
-        return self
+    Args:
+        df: pandas DataFrame to clean
+        drop_duplicates: If True, remove duplicate rows
+        fill_method: Method to fill missing values ('mean', 'median', 'mode', or None)
     
-    def remove_outliers_iqr(self, columns=None, threshold=1.5):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        for col in columns:
-            if col in self.df.columns:
-                Q1 = self.df[col].quantile(0.25)
-                Q3 = self.df[col].quantile(0.75)
-                IQR = Q3 - Q1
-                lower_bound = Q1 - threshold * IQR
-                upper_bound = Q3 + threshold * IQR
-                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
-        return self
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
     
-    def remove_outliers_zscore(self, columns=None, threshold=3):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        for col in columns:
-            if col in self.df.columns:
-                z_scores = np.abs(stats.zscore(self.df[col]))
-                self.df = self.df[z_scores < threshold]
-        return self
+    # Handle missing values
+    if fill_method is not None:
+        if fill_method == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_method == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        elif fill_method == 'mode':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
     
-    def normalize_data(self, columns=None, method='minmax'):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        for col in columns:
-            if col in self.df.columns:
-                if method == 'minmax':
-                    min_val = self.df[col].min()
-                    max_val = self.df[col].max()
-                    if max_val != min_val:
-                        self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
-                elif method == 'zscore':
-                    mean_val = self.df[col].mean()
-                    std_val = self.df[col].std()
-                    if std_val != 0:
-                        self.df[col] = (self.df[col] - mean_val) / std_val
-        return self
+    # Remove duplicates
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
     
-    def get_cleaned_data(self):
-        return self.df
-    
-    def get_summary(self):
-        cleaned_shape = self.df.shape
-        rows_removed = self.original_shape[0] - cleaned_shape[0]
-        cols_removed = self.original_shape[1] - cleaned_shape[1]
-        
-        summary = {
-            'original_rows': self.original_shape[0],
-            'original_columns': self.original_shape[1],
-            'cleaned_rows': cleaned_shape[0],
-            'cleaned_columns': cleaned_shape[1],
-            'rows_removed': rows_removed,
-            'columns_removed': cols_removed
-        }
-        return summary
+    return cleaned_df
 
-def clean_dataset(df, missing_strategy='mean', outlier_method='iqr', normalize=False):
-    cleaner = DataCleaner(df)
+def validate_data(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
     
-    cleaner.remove_duplicates()
-    cleaner.handle_missing_values(strategy=missing_strategy)
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: List of column names that must be present
     
-    if outlier_method == 'iqr':
-        cleaner.remove_outliers_iqr()
-    elif outlier_method == 'zscore':
-        cleaner.remove_outliers_zscore()
+    Returns:
+        Dictionary with validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'missing_columns': [],
+        'null_counts': {},
+        'row_count': len(df),
+        'column_count': len(df.columns)
+    }
     
-    if normalize:
-        cleaner.normalize_data()
+    # Check required columns
+    if required_columns is not None:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            validation_results['missing_columns'] = missing
+            validation_results['is_valid'] = False
     
-    return cleaner.get_cleaned_data(), cleaner.get_summary()
+    # Count null values
+    null_counts = df.isnull().sum()
+    validation_results['null_counts'] = null_counts.to_dict()
+    
+    return validation_results
