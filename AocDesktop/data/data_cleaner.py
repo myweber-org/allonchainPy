@@ -1,109 +1,59 @@
+
 import pandas as pd
-import numpy as np
 
-def clean_csv_data(input_path, output_path, missing_strategy='mean'):
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     """
-    Clean a CSV file by handling missing values and removing duplicates.
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
     Parameters:
-    input_path (str): Path to the input CSV file.
-    output_path (str): Path to save the cleaned CSV file.
-    missing_strategy (str): Strategy for handling missing values.
-                            Options: 'mean', 'median', 'drop', 'zero'.
-    """
-    try:
-        df = pd.read_csv(input_path)
-        
-        # Remove duplicate rows
-        initial_rows = df.shape[0]
-        df.drop_duplicates(inplace=True)
-        duplicates_removed = initial_rows - df.shape[0]
-        
-        # Handle missing values
-        numeric_cols = df.select_dtypes(include=[np.number]).columns
-        
-        if missing_strategy == 'mean':
-            for col in numeric_cols:
-                df[col].fillna(df[col].mean(), inplace=True)
-        elif missing_strategy == 'median':
-            for col in numeric_cols:
-                df[col].fillna(df[col].median(), inplace=True)
-        elif missing_strategy == 'zero':
-            df.fillna(0, inplace=True)
-        elif missing_strategy == 'drop':
-            df.dropna(inplace=True)
-        
-        # Clean string columns by stripping whitespace
-        string_cols = df.select_dtypes(include=['object']).columns
-        for col in string_cols:
-            df[col] = df[col].str.strip()
-        
-        # Save cleaned data
-        df.to_csv(output_path, index=False)
-        
-        # Return cleaning statistics
-        stats = {
-            'original_rows': initial_rows,
-            'cleaned_rows': df.shape[0],
-            'duplicates_removed': duplicates_removed,
-            'columns_cleaned': len(numeric_cols) + len(string_cols)
-        }
-        
-        return stats
-        
-    except FileNotFoundError:
-        raise FileNotFoundError(f"Input file not found: {input_path}")
-    except pd.errors.EmptyDataError:
-        raise ValueError("The input CSV file is empty")
-    except Exception as e:
-        raise RuntimeError(f"Error during data cleaning: {str(e)}")
-
-def validate_csv_structure(file_path, required_columns=None):
-    """
-    Validate the structure of a CSV file.
-    
-    Parameters:
-    file_path (str): Path to the CSV file.
-    required_columns (list): List of required column names.
+    df (pd.DataFrame): Input DataFrame to clean
+    drop_duplicates (bool): Whether to drop duplicate rows
+    fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop')
     
     Returns:
-    dict: Validation results.
+    pd.DataFrame: Cleaned DataFrame
     """
-    try:
-        df = pd.read_csv(file_path, nrows=1)  # Read only header
-        
-        validation_result = {
-            'file_exists': True,
-            'total_columns': len(df.columns),
-            'columns': list(df.columns),
-            'has_required_columns': True
-        }
-        
-        if required_columns:
-            missing_columns = [col for col in required_columns if col not in df.columns]
-            validation_result['has_required_columns'] = len(missing_columns) == 0
-            validation_result['missing_columns'] = missing_columns
-        
-        return validation_result
-        
-    except FileNotFoundError:
-        return {'file_exists': False, 'error': 'File not found'}
-    except pd.errors.EmptyDataError:
-        return {'file_exists': True, 'error': 'File is empty'}
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+            else:
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    elif fill_missing == 'mode':
+        for col in cleaned_df.columns:
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None)
+    
+    return cleaned_df
 
-if __name__ == "__main__":
-    # Example usage
-    input_file = "raw_data.csv"
-    output_file = "cleaned_data.csv"
+def validate_dataset(df, required_columns=None, min_rows=1):
+    """
+    Validate dataset structure and content.
     
-    # Validate first
-    validation = validate_csv_structure(input_file)
-    print(f"Validation result: {validation}")
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
     
-    if validation.get('file_exists'):
-        try:
-            stats = clean_csv_data(input_file, output_file, missing_strategy='mean')
-            print(f"Cleaning completed successfully!")
-            print(f"Statistics: {stats}")
-        except Exception as e:
-            print(f"Error during cleaning: {e}")
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Dataset is valid"
