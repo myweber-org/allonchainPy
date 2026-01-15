@@ -1,77 +1,35 @@
 import pandas as pd
+import numpy as np
+from scipy import stats
 
-def remove_duplicates(df, subset=None, keep='first'):
-    """
-    Remove duplicate rows from a DataFrame.
+def load_and_clean_data(filepath):
+    """Load CSV data and perform cleaning operations."""
+    df = pd.read_csv(filepath)
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    subset (list, optional): Column labels to consider for duplicates.
-    keep (str, optional): Which duplicates to keep.
+    # Remove duplicates
+    df = df.drop_duplicates()
     
-    Returns:
-    pd.DataFrame: DataFrame with duplicates removed.
-    """
-    if df.empty:
-        return df
+    # Handle missing values
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
     
-    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
-    return cleaned_df
-
-def clean_numeric_columns(df, columns):
-    """
-    Clean numeric columns by converting to appropriate dtype and handling errors.
+    # Remove outliers using z-score
+    z_scores = np.abs(stats.zscore(df[numeric_cols]))
+    df = df[(z_scores < 3).all(axis=1)]
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    columns (list): List of column names to clean.
+    # Normalize numeric columns
+    df[numeric_cols] = (df[numeric_cols] - df[numeric_cols].min()) / (df[numeric_cols].max() - df[numeric_cols].min())
     
-    Returns:
-    pd.DataFrame: DataFrame with cleaned numeric columns.
-    """
-    for col in columns:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
     return df
 
-def validate_dataframe(df, required_columns):
-    """
-    Validate that DataFrame contains required columns.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    required_columns (list): List of required column names.
-    
-    Returns:
-    bool: True if all required columns are present.
-    """
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    
-    if missing_columns:
-        print(f"Missing columns: {missing_columns}")
-        return False
-    
-    return True
+def save_cleaned_data(df, output_path):
+    """Save cleaned dataframe to CSV."""
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
 
-def get_data_summary(df):
-    """
-    Generate a summary of the DataFrame.
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    
-    Returns:
-    dict: Dictionary containing summary statistics.
-    """
-    summary = {
-        'rows': len(df),
-        'columns': len(df.columns),
-        'missing_values': df.isnull().sum().to_dict(),
-        'dtypes': df.dtypes.to_dict()
-    }
-    
-    numeric_cols = df.select_dtypes(include=['number']).columns
-    if len(numeric_cols) > 0:
-        summary['numeric_stats'] = df[numeric_cols].describe().to_dict()
-    
-    return summary
+    cleaned_df = load_and_clean_data(input_file)
+    save_cleaned_data(cleaned_df, output_file)
