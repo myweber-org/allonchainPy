@@ -155,3 +155,105 @@ def remove_outliers_iqr(df, column, multiplier=1.5):
     filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
     return filtered_df
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, columns=None):
+    """
+    Remove outliers from DataFrame using Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to process. If None, process all numeric columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        
+        mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+        df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def calculate_summary_statistics(df, columns=None):
+    """
+    Calculate summary statistics for numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to process. If None, process all numeric columns.
+    
+    Returns:
+    pd.DataFrame: Summary statistics
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    stats = pd.DataFrame()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        col_stats = {
+            'mean': df[col].mean(),
+            'median': df[col].median(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            'max': df[col].max(),
+            'q1': df[col].quantile(0.25),
+            'q3': df[col].quantile(0.75),
+            'count': df[col].count(),
+            'missing': df[col].isnull().sum()
+        }
+        
+        stats[col] = pd.Series(col_stats)
+    
+    return stats
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
+    columns (list): List of column names to process. If None, process all columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = df.columns.tolist()
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        if strategy == 'drop':
+            df_clean = df_clean.dropna(subset=[col])
+        elif strategy == 'mean' and pd.api.types.is_numeric_dtype(df[col]):
+            df_clean[col] = df_clean[col].fillna(df_clean[col].mean())
+        elif strategy == 'median' and pd.api.types.is_numeric_dtype(df[col]):
+            df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+        elif strategy == 'mode':
+            df_clean[col] = df_clean[col].fillna(df_clean[col].mode()[0] if not df_clean[col].mode().empty else None)
+    
+    return df_clean.reset_index(drop=True)
