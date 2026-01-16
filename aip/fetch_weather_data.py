@@ -240,4 +240,37 @@ def main():
     display_weather(weather_data)
 
 if __name__ == "__main__":
-    main()
+    main()import requests
+import json
+
+def get_weather(city_name, api_key):
+    base_url = "http://api.openweathermap.org/data/2.5/weather?"
+    complete_url = f"{base_url}appid={api_key}&q={city_name}&units=metric"
+    
+    response = requests.get(complete_url)
+    data = response.json()
+    
+    if data["cod"] != "404":
+        main = data["main"]
+        weather = data["weather"][0]
+        
+        temperature = main["temp"]
+        pressure = main["pressure"]
+        humidity = main["humidity"]
+        description = weather["description"]
+        
+        result = {
+            "temperature": temperature,
+            "pressure": pressure,
+            "humidity": humidity,
+            "description": description
+        }
+        return result
+    else:
+        return {"error": "City not found"}
+
+if __name__ == "__main__":
+    API_KEY = "your_api_key_here"
+    city = "London"
+    weather_info = get_weather(city, API_KEY)
+    print(json.dumps(weather_info, indent=2))
