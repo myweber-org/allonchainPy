@@ -218,3 +218,11 @@ def validate_data(data, required_columns=None, check_missing=True, check_duplica
     validation_report['numeric_statistics'] = numeric_stats
     
     return validation_report
+def deduplicate_list(original_list):
+    seen = set()
+    deduplicated = []
+    for item in original_list:
+        if item not in seen:
+            seen.add(item)
+            deduplicated.append(item)
+    return deduplicated
