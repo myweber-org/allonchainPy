@@ -1,89 +1,100 @@
-import pandas as pd
 
-def clean_dataframe(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to drop duplicate rows.
-    fill_missing (bool): Whether to fill missing values.
-    fill_value: Value to use for filling missing data.
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame.
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
+
+def calculate_summary_statistics(df, column):
+    """
+    Calculate summary statistics for a column after outlier removal.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
+    
+    return stats
+
+def process_dataframe(df, columns_to_clean):
+    """
+    Process multiple columns for outlier removal and return cleaned DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns_to_clean (list): List of column names to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    dict: Dictionary of statistics for each cleaned column
     """
     cleaned_df = df.copy()
+    statistics = {}
     
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
+    for column in columns_to_clean:
+        if column in cleaned_df.columns:
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            removed_count = original_count - len(cleaned_df)
+            
+            stats = calculate_summary_statistics(cleaned_df, column)
+            stats['outliers_removed'] = removed_count
+            statistics[column] = stats
     
-    if fill_missing:
-        cleaned_df = cleaned_df.fillna(fill_value)
-    
-    return cleaned_df
-
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate DataFrame structure and content.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of column names that must be present.
-    
-    Returns:
-    tuple: (is_valid, error_message)
-    """
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
-    
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    return True, "DataFrame is valid"
-
-def process_data_file(file_path, output_path=None):
-    """
-    Process a data file by cleaning and validating it.
-    
-    Parameters:
-    file_path (str): Path to input data file.
-    output_path (str): Path to save cleaned data.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
-    """
-    try:
-        df = pd.read_csv(file_path)
-    except Exception as e:
-        raise ValueError(f"Failed to read file: {e}")
-    
-    is_valid, message = validate_dataframe(df)
-    if not is_valid:
-        raise ValueError(f"Data validation failed: {message}")
-    
-    cleaned_df = clean_dataframe(df)
-    
-    if output_path:
-        cleaned_df.to_csv(output_path, index=False)
-    
-    return cleaned_df
+    return cleaned_df, statistics
 
 if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'A': [1, 2, 2, None, 5],
-        'B': [None, 2, 2, 4, 5],
-        'C': [1, 2, 3, 4, 5]
-    })
+    sample_data = {
+        'temperature': np.random.normal(25, 5, 1000).tolist() + [100, -20, 150],
+        'humidity': np.random.normal(60, 10, 1000).tolist() + [200, -10],
+        'pressure': np.random.normal(1013, 5, 1002)
+    }
     
-    print("Original DataFrame:")
-    print(sample_data)
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame shape:", df.shape)
     
-    cleaned = clean_dataframe(sample_data)
-    print("\nCleaned DataFrame:")
-    print(cleaned)
+    columns_to_process = ['temperature', 'humidity', 'pressure']
+    cleaned_df, stats = process_dataframe(df, columns_to_process)
     
-    is_valid, message = validate_dataframe(cleaned, ['A', 'B', 'C'])
-    print(f"\nValidation: {message}")
+    print("Cleaned DataFrame shape:", cleaned_df.shape)
+    print("\nStatistics:")
+    for col, col_stats in stats.items():
+        print(f"\n{col}:")
+        for stat_name, stat_value in col_stats.items():
+            print(f"  {stat_name}: {stat_value:.2f}")
