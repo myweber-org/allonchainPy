@@ -79,3 +79,83 @@ if __name__ == "__main__":
     
     validation = validate_dataframe(cleaned_df)
     print(f"Data cleaning completed. Validation results: {validation}")
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by removing duplicates and standardizing column names.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Standardize column names: lowercase and replace spaces with underscores
+    df_cleaned.columns = df_cleaned.columns.str.lower().str.replace(' ', '_')
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def handle_missing_values(df, strategy='mean'):
+    """
+    Handle missing values in numeric columns.
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    elif strategy == 'median':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+    elif strategy == 'mode':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mode().iloc[0])
+    
+    return df
+
+def validate_dataframe(df):
+    """
+    Perform basic validation on DataFrame.
+    """
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if df.isnull().all().any():
+        raise ValueError("DataFrame contains columns with all missing values")
+    
+    return True
+
+def main():
+    # Example usage
+    data = {
+        'Name': ['Alice', 'Bob', 'Alice', 'Charlie', None],
+        'Age': [25, 30, 25, 35, 40],
+        'Salary': [50000, 60000, 50000, 70000, 80000],
+        'Department': ['HR', 'IT', 'HR', 'Finance', 'IT']
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    # Clean the data
+    df_cleaned = clean_dataframe(df)
+    print("After cleaning:")
+    print(df_cleaned)
+    print("\n")
+    
+    # Handle missing values
+    df_filled = handle_missing_values(df_cleaned, strategy='mean')
+    print("After handling missing values:")
+    print(df_filled)
+    print("\n")
+    
+    # Validate
+    try:
+        validate_dataframe(df_filled)
+        print("Data validation passed")
+    except ValueError as e:
+        print(f"Data validation failed: {e}")
+
+if __name__ == "__main__":
+    main()
