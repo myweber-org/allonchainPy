@@ -1,190 +1,79 @@
 
-import numpy as np
 import pandas as pd
-from scipy import stats
 
-def remove_outliers_iqr(data, column):
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-
-def remove_outliers_zscore(data, column, threshold=3):
-    z_scores = np.abs(stats.zscore(data[column]))
-    return data[z_scores < threshold]
-
-def normalize_minmax(data, column):
-    min_val = data[column].min()
-    max_val = data[column].max()
-    data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
-    return data
-
-def normalize_zscore(data, column):
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    data[column + '_standardized'] = (data[column] - mean_val) / std_val
-    return data
-
-def handle_missing_values(data, strategy='mean'):
-    if strategy == 'mean':
-        return data.fillna(data.mean())
-    elif strategy == 'median':
-        return data.fillna(data.median())
-    elif strategy == 'mode':
-        return data.fillna(data.mode().iloc[0])
-    elif strategy == 'drop':
-        return data.dropna()
-    else:
-        raise ValueError("Invalid strategy. Choose from 'mean', 'median', 'mode', or 'drop'")
-
-def clean_dataset(data, numeric_columns, outlier_method='iqr', normalize_method='minmax', missing_strategy='mean'):
-    cleaned_data = data.copy()
-    
-    for col in numeric_columns:
-        if outlier_method == 'iqr':
-            cleaned_data = remove_outliers_iqr(cleaned_data, col)
-        elif outlier_method == 'zscore':
-            cleaned_data = remove_outliers_zscore(cleaned_data, col)
-    
-    cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy)
-    
-    for col in numeric_columns:
-        if normalize_method == 'minmax':
-            cleaned_data = normalize_minmax(cleaned_data, col)
-        elif normalize_method == 'zscore':
-            cleaned_data = normalize_zscore(cleaned_data, col)
-    
-    return cleaned_data
-
-def validate_data(data, numeric_columns):
-    validation_report = {}
-    
-    for col in numeric_columns:
-        validation_report[col] = {
-            'missing_count': data[col].isnull().sum(),
-            'missing_percentage': (data[col].isnull().sum() / len(data)) * 100,
-            'mean': data[col].mean(),
-            'std': data[col].std(),
-            'min': data[col].min(),
-            'max': data[col].max(),
-            'skewness': data[col].skew(),
-            'kurtosis': data[col].kurtosis()
-        }
-    
-    return pd.DataFrame(validation_report).T
-
-def export_cleaned_data(data, filename, format='csv'):
-    if format == 'csv':
-        data.to_csv(filename, index=False)
-    elif format == 'excel':
-        data.to_excel(filename, index=False)
-    elif format == 'json':
-        data.to_json(filename, orient='records')
-    else:
-        raise ValueError("Invalid format. Choose from 'csv', 'excel', or 'json'")
-import pandas as pd
-import numpy as np
-from typing import List, Optional
-
-def clean_dataframe(df: pd.DataFrame, 
-                    drop_duplicates: bool = True,
-                    columns_to_standardize: Optional[List[str]] = None,
-                    date_columns: Optional[List[str]] = None) -> pd.DataFrame:
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     """
-    Clean a pandas DataFrame by removing duplicates, standardizing text columns,
-    and converting date columns to datetime format.
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    fill_missing (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'. Default is 'mean'.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
     """
-    df_clean = df.copy()
+    cleaned_df = df.copy()
     
     if drop_duplicates:
-        initial_rows = len(df_clean)
-        df_clean = df_clean.drop_duplicates()
-        removed = initial_rows - len(df_clean)
-        print(f"Removed {removed} duplicate rows")
+        cleaned_df = cleaned_df.drop_duplicates()
+        print(f"Removed {len(df) - len(cleaned_df)} duplicate rows.")
     
-    if columns_to_standardize:
-        for col in columns_to_standardize:
-            if col in df_clean.columns:
-                df_clean[col] = df_clean[col].astype(str).str.strip().str.lower()
-                df_clean[col] = df_clean[col].replace(['nan', 'none', ''], np.nan)
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+        print("Removed rows with missing values.")
+    elif fill_missing in ['mean', 'median', 'mode']:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
+            elif fill_missing == 'median':
+                cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
+            elif fill_missing == 'mode':
+                cleaned_df[col].fillna(cleaned_df[col].mode()[0], inplace=True)
+        print(f"Filled missing values using {fill_missing}.")
     
-    if date_columns:
-        for col in date_columns:
-            if col in df_clean.columns:
-                df_clean[col] = pd.to_datetime(df_clean[col], errors='coerce')
-    
-    missing_values = df_clean.isnull().sum().sum()
-    if missing_values > 0:
-        print(f"Warning: DataFrame contains {missing_values} missing values")
-    
-    return df_clean
+    return cleaned_df
 
-def validate_email_column(df: pd.DataFrame, email_column: str) -> pd.Series:
+def validate_data(df, required_columns=None, min_rows=1):
     """
-    Validate email addresses in a specified column and return a boolean series.
-    """
-    if email_column not in df.columns:
-        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+    Validate the DataFrame structure and content.
     
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return df[email_column].str.match(email_pattern, na=False)
-
-def remove_outliers_iqr(df: pd.DataFrame, 
-                       numeric_columns: List[str],
-                       multiplier: float = 1.5) -> pd.DataFrame:
-    """
-    Remove outliers from numeric columns using the Interquartile Range method.
-    """
-    df_filtered = df.copy()
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
+    min_rows (int): Minimum number of rows required.
     
-    for col in numeric_columns:
-        if col in df_filtered.columns and pd.api.types.is_numeric_dtype(df_filtered[col]):
-            Q1 = df_filtered[col].quantile(0.25)
-            Q3 = df_filtered[col].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - multiplier * IQR
-            upper_bound = Q3 + multiplier * IQR
-            
-            initial_count = len(df_filtered)
-            df_filtered = df_filtered[(df_filtered[col] >= lower_bound) & 
-                                     (df_filtered[col] <= upper_bound)]
-            removed = initial_count - len(df_filtered)
-            print(f"Removed {removed} outliers from column '{col}'")
+    Returns:
+    bool: True if validation passes, False otherwise.
+    """
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Missing required columns: {missing_cols}")
+            return False
     
-    return df_filtered
+    if len(df) < min_rows:
+        print(f"DataFrame has fewer than {min_rows} rows.")
+        return False
+    
+    print("Data validation passed.")
+    return True
 
 if __name__ == "__main__":
     sample_data = {
-        'name': ['Alice', 'Bob', 'Alice', 'Charlie', 'David', 'Eve'],
-        'email': ['alice@example.com', 'bob@test.org', 'alice@example.com', 
-                  'invalid-email', 'david@company.co', 'eve@sample.net'],
-        'age': [25, 30, 25, 35, 150, 28],
-        'join_date': ['2023-01-15', '2023-02-20', '2023-01-15', 
-                      'invalid-date', '2023-03-10', '2023-04-05']
+        'A': [1, 2, 2, 4, None],
+        'B': [5, None, 7, 8, 9],
+        'C': [10, 11, 12, 12, 14]
     }
     
     df = pd.DataFrame(sample_data)
     print("Original DataFrame:")
     print(df)
-    print("\n" + "="*50 + "\n")
     
-    cleaned_df = clean_dataframe(
-        df,
-        columns_to_standardize=['name'],
-        date_columns=['join_date']
-    )
+    cleaned = clean_dataset(df, fill_missing='median')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
     
-    print("Cleaned DataFrame:")
-    print(cleaned_df)
-    print("\n" + "="*50 + "\n")
-    
-    valid_emails = validate_email_column(cleaned_df, 'email')
-    print("Valid emails:")
-    print(valid_emails)
-    print("\n" + "="*50 + "\n")
-    
-    filtered_df = remove_outliers_iqr(cleaned_df, ['age'])
-    print("DataFrame after outlier removal:")
-    print(filtered_df)
+    is_valid = validate_data(cleaned, required_columns=['A', 'B', 'C'], min_rows=3)
+    print(f"\nData valid: {is_valid}")
