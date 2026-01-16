@@ -1,78 +1,103 @@
+
 import pandas as pd
+import numpy as np
 
-def remove_duplicates(df, subset=None, keep='first'):
+def remove_outliers_iqr(df, column):
     """
-    Remove duplicate rows from a DataFrame.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    subset (list, optional): Column labels to consider for duplicates.
-    keep (str, optional): Which duplicates to keep.
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
     
     Returns:
-    pd.DataFrame: DataFrame with duplicates removed.
+        pd.DataFrame: DataFrame with outliers removed
     """
-    if df.empty:
-        return df
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
-    return cleaned_df
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
 
-def clean_numeric_columns(df, columns):
+def calculate_basic_stats(df, column):
     """
-    Clean numeric columns by converting to appropriate dtype and handling errors.
+    Calculate basic statistics for a DataFrame column.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    columns (list): List of column names to clean.
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to analyze
     
     Returns:
-    pd.DataFrame: DataFrame with cleaned numeric columns.
+        dict: Dictionary containing statistics
     """
-    for col in columns:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-    return df
-
-def validate_dataframe(df, required_columns):
-    """
-    Validate that DataFrame contains required columns.
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    required_columns (list): List of required column names.
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
+    
+    return stats
+
+def normalize_column(df, column):
+    """
+    Normalize a column using min-max scaling.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to normalize
     
     Returns:
-    bool: True if all required columns are present.
+        pd.DataFrame: DataFrame with normalized column
     """
-    missing_columns = [col for col in required_columns if col not in df.columns]
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if missing_columns:
-        print(f"Missing columns: {missing_columns}")
-        return False
+    df_copy = df.copy()
+    min_val = df_copy[column].min()
+    max_val = df_copy[column].max()
     
-    return True
+    if max_val == min_val:
+        df_copy[f'{column}_normalized'] = 0.5
+    else:
+        df_copy[f'{column}_normalized'] = (df_copy[column] - min_val) / (max_val - min_val)
+    
+    return df_copy
 
-def clean_data_pipeline(df, config):
-    """
-    Execute a complete data cleaning pipeline based on configuration.
+if __name__ == "__main__":
+    sample_data = {
+        'values': [10, 12, 12, 13, 12, 11, 14, 13, 15, 100, 12, 13, 12, 11, 10, 14, 13, 12, 11, 10]
+    }
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    config (dict): Configuration dictionary with cleaning options.
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print()
     
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
-    """
-    if 'required_columns' in config:
-        if not validate_dataframe(df, config['required_columns']):
-            raise ValueError("DataFrame missing required columns")
+    stats = calculate_basic_stats(df, 'values')
+    print("Original Statistics:")
+    for key, value in stats.items():
+        print(f"{key}: {value:.2f}")
+    print()
     
-    if 'remove_duplicates' in config and config['remove_duplicates']:
-        subset = config.get('duplicate_subset', None)
-        df = remove_duplicates(df, subset=subset)
+    cleaned_df = remove_outliers_iqr(df, 'values')
+    print("Cleaned DataFrame (outliers removed):")
+    print(cleaned_df)
+    print()
     
-    if 'clean_numeric' in config:
-        df = clean_numeric_columns(df, config['clean_numeric'])
-    
-    return df
+    normalized_df = normalize_column(cleaned_df, 'values')
+    print("DataFrame with normalized column:")
+    print(normalized_df)
