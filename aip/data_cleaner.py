@@ -1,99 +1,58 @@
 
 import pandas as pd
 
-def clean_dataset(df, drop_duplicates=True, fill_missing=False, fill_value=0):
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     """
     Clean a pandas DataFrame by removing duplicates and handling missing values.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to drop duplicate rows.
-    fill_missing (bool): Whether to fill missing values.
-    fill_value: Value to use for filling missing data.
+    df (pd.DataFrame): Input DataFrame
+    drop_duplicates (bool): Whether to drop duplicate rows
+    fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop')
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame.
+    pd.DataFrame: Cleaned DataFrame
     """
     cleaned_df = df.copy()
     
     if drop_duplicates:
         cleaned_df = cleaned_df.drop_duplicates()
     
-    if fill_missing:
-        cleaned_df = cleaned_df.fillna(fill_value)
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
+            elif fill_missing == 'median':
+                cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
+    elif fill_missing == 'mode':
+        for col in cleaned_df.columns:
+            cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None, inplace=True)
     
     return cleaned_df
 
-def remove_outliers_iqr(df, column, multiplier=1.5):
+def validate_dataframe(df, required_columns=None):
     """
-    Remove outliers from a DataFrame column using the IQR method.
+    Validate DataFrame structure and content.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    column (str): Column name to process.
-    multiplier (float): IQR multiplier for outlier detection.
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed.
+    tuple: (is_valid, message)
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
     
-    q1 = df[column].quantile(0.25)
-    q3 = df[column].quantile(0.75)
-    iqr = q3 - q1
+    if df.empty:
+        return False, "DataFrame is empty"
     
-    lower_bound = q1 - multiplier * iqr
-    upper_bound = q3 + multiplier * iqr
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
-
-def normalize_column(df, column):
-    """
-    Normalize a column to range [0, 1] using min-max scaling.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    column (str): Column name to normalize.
-    
-    Returns:
-    pd.DataFrame: DataFrame with normalized column.
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    normalized_df = df.copy()
-    min_val = normalized_df[column].min()
-    max_val = normalized_df[column].max()
-    
-    if max_val != min_val:
-        normalized_df[column] = (normalized_df[column] - min_val) / (max_val - min_val)
-    else:
-        normalized_df[column] = 0
-    
-    return normalized_df
-
-if __name__ == "__main__":
-    sample_data = {
-        'A': [1, 2, 2, 3, 4, 5, 100],
-        'B': [10, 20, None, 30, 40, 50, 60],
-        'C': [100, 200, 300, 400, 500, 600, 700]
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    
-    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_value=0)
-    print("\nCleaned DataFrame:")
-    print(cleaned)
-    
-    no_outliers = remove_outliers_iqr(cleaned, 'A')
-    print("\nDataFrame without outliers in column A:")
-    print(no_outliers)
-    
-    normalized = normalize_column(no_outliers, 'C')
-    print("\nDataFrame with normalized column C:")
-    print(normalized)
+    return True, "DataFrame is valid"
