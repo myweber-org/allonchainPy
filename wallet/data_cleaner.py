@@ -1431,4 +1431,47 @@ if __name__ == "__main__":
     # Normalize column
     normalized_df = normalize_column(df, 'values', method='minmax')
     print("DataFrame with normalized column:")
-    print(normalized_df)
+    print(normalized_df)import pandas as pd
+import numpy as np
+import re
+
+def clean_csv_data(input_file, output_file):
+    """
+    Clean a CSV file by handling missing values, standardizing formats,
+    and removing duplicates.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Standardize column names: lowercase and replace spaces with underscores
+        df.columns = [col.lower().replace(' ', '_') for col in df.columns]
+        
+        # Handle missing values
+        for column in df.columns:
+            if df[column].dtype == 'object':
+                df[column] = df[column].fillna('unknown')
+            else:
+                df[column] = df[column].fillna(df[column].median())
+        
+        # Clean text columns: remove extra whitespace
+        text_columns = df.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            df[col] = df[col].apply(lambda x: re.sub(r'\s+', ' ', str(x)).strip())
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Data cleaned successfully. Output saved to {output_file}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return False
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+        return False
+
+if __name__ == "__main__":
+    clean_csv_data('raw_data.csv', 'cleaned_data.csv')
