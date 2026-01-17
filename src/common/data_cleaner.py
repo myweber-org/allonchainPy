@@ -257,3 +257,113 @@ if __name__ == "__main__":
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("\nCleaned statistics for column 'A':")
     print(calculate_summary_statistics(cleaned_df, 'A'))
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a dataset using the Interquartile Range method.
+    
+    Parameters:
+    data (np.ndarray): Input data array
+    column (int): Column index to check for outliers
+    
+    Returns:
+    np.ndarray: Cleaned data with outliers removed
+    """
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Input data must be a numpy array")
+    
+    if column >= data.shape[1]:
+        raise IndexError("Column index out of bounds")
+    
+    column_data = data[:, column]
+    
+    Q1 = np.percentile(column_data, 25)
+    Q3 = np.percentile(column_data, 75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    mask = (column_data >= lower_bound) & (column_data <= upper_bound)
+    cleaned_data = data[mask]
+    
+    outliers_removed = len(data) - len(cleaned_data)
+    print(f"Removed {outliers_removed} outliers from column {column}")
+    
+    return cleaned_data
+
+def calculate_basic_stats(data, column):
+    """
+    Calculate basic statistics for a data column.
+    
+    Parameters:
+    data (np.ndarray): Input data array
+    column (int): Column index to analyze
+    
+    Returns:
+    dict: Dictionary containing statistical measures
+    """
+    column_data = data[:, column]
+    
+    stats = {
+        'mean': np.mean(column_data),
+        'median': np.median(column_data),
+        'std': np.std(column_data),
+        'min': np.min(column_data),
+        'max': np.max(column_data),
+        'q1': np.percentile(column_data, 25),
+        'q3': np.percentile(column_data, 75)
+    }
+    
+    return stats
+
+def validate_data_shape(data, expected_rows=None, expected_cols=None):
+    """
+    Validate the shape of input data.
+    
+    Parameters:
+    data (np.ndarray): Input data to validate
+    expected_rows (int): Expected number of rows
+    expected_cols (int): Expected number of columns
+    
+    Returns:
+    bool: True if data shape is valid
+    """
+    if expected_rows is not None and data.shape[0] != expected_rows:
+        raise ValueError(f"Expected {expected_rows} rows, got {data.shape[0]}")
+    
+    if expected_cols is not None and data.shape[1] != expected_cols:
+        raise ValueError(f"Expected {expected_cols} columns, got {data.shape[1]}")
+    
+    return True
+
+def example_usage():
+    """
+    Example demonstrating how to use the data cleaning functions.
+    """
+    np.random.seed(42)
+    
+    sample_data = np.random.randn(100, 3)
+    sample_data[0:5, 1] = 100
+    
+    print("Original data shape:", sample_data.shape)
+    
+    stats_before = calculate_basic_stats(sample_data, 1)
+    print("Stats before cleaning:", stats_before)
+    
+    cleaned_data = remove_outliers_iqr(sample_data, 1)
+    
+    print("Cleaned data shape:", cleaned_data.shape)
+    
+    stats_after = calculate_basic_stats(cleaned_data, 1)
+    print("Stats after cleaning:", stats_after)
+    
+    try:
+        validate_data_shape(cleaned_data, expected_cols=3)
+        print("Data shape validation passed")
+    except ValueError as e:
+        print(f"Validation error: {e}")
+
+if __name__ == "__main__":
+    example_usage()
