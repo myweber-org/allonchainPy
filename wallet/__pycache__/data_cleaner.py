@@ -463,4 +463,98 @@ if __name__ == "__main__":
     if cleaned_df is not None:
         print("\nCleaning summary:")
         print(f"Final columns: {list(cleaned_df.columns)}")
-        print(f"First 5 rows:\n{cleaned_df.head()}")
+        print(f"First 5 rows:\n{cleaned_df.head()}")import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """Remove duplicate rows from DataFrame."""
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """Handle missing values using specified strategy."""
+    if columns is None:
+        columns = df.columns
+    
+    df_filled = df.copy()
+    
+    for col in columns:
+        if df[col].dtype in ['int64', 'float64']:
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0]
+            else:
+                fill_value = 0
+            
+            df_filled[col] = df[col].fillna(fill_value)
+        else:
+            df_filled[col] = df[col].fillna('Unknown')
+    
+    return df_filled
+
+def normalize_column(df, column):
+    """Normalize a numeric column to range [0, 1]."""
+    if df[column].dtype in ['int64', 'float64']:
+        col_min = df[column].min()
+        col_max = df[column].max()
+        
+        if col_max - col_min > 0:
+            df[column] = (df[column] - col_min) / (col_max - col_min)
+    
+    return df
+
+def filter_outliers(df, column, method='iqr', threshold=1.5):
+    """Filter outliers from a column using specified method."""
+    if df[column].dtype not in ['int64', 'float64']:
+        return df
+    
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        
+        return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    elif method == 'zscore':
+        mean = df[column].mean()
+        std = df[column].std()
+        
+        if std > 0:
+            z_scores = np.abs((df[column] - mean) / std)
+            return df[z_scores <= threshold]
+    
+    return df
+
+def clean_dataset(df, config):
+    """Apply multiple cleaning operations based on configuration."""
+    cleaned_df = df.copy()
+    
+    if config.get('remove_duplicates'):
+        cleaned_df = remove_duplicates(cleaned_df, config.get('duplicate_subset'))
+    
+    if config.get('handle_missing'):
+        cleaned_df = handle_missing_values(
+            cleaned_df, 
+            strategy=config.get('missing_strategy', 'mean'),
+            columns=config.get('missing_columns')
+        )
+    
+    if config.get('normalize_columns'):
+        for col in config.get('normalize_columns', []):
+            cleaned_df = normalize_column(cleaned_df, col)
+    
+    if config.get('filter_outliers'):
+        outlier_config = config.get('outlier_config', {})
+        for col, params in outlier_config.items():
+            cleaned_df = filter_outliers(
+                cleaned_df, 
+                col, 
+                method=params.get('method', 'iqr'),
+                threshold=params.get('threshold', 1.5)
+            )
+    
+    return cleaned_df
