@@ -1,40 +1,82 @@
 
 import pandas as pd
-import sys
+import numpy as np
 
-def remove_duplicates(input_file, output_file=None):
-    try:
-        df = pd.read_csv(input_file)
-        initial_count = len(df)
-        df_cleaned = df.drop_duplicates()
-        final_count = len(df_cleaned)
-        
-        if output_file is None:
-            output_file = input_file.replace('.csv', '_cleaned.csv')
-        
-        df_cleaned.to_csv(output_file, index=False)
-        
-        duplicates_removed = initial_count - final_count
-        print(f"Processed: {input_file}")
-        print(f"Initial rows: {initial_count}")
-        print(f"Final rows: {final_count}")
-        print(f"Duplicates removed: {duplicates_removed}")
-        print(f"Cleaned file saved as: {output_file}")
-        
-        return duplicates_removed
-        
-    except FileNotFoundError:
-        print(f"Error: File '{input_file}' not found.")
-        return -1
-    except Exception as e:
-        print(f"Error processing file: {str(e)}")
-        return -1
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
+
+def calculate_summary_statistics(df, column):
+    """
+    Calculate summary statistics for a column after outlier removal.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'original_count': len(df),
+        'cleaned_count': len(remove_outliers_iqr(df, column)),
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'q1': df[column].quantile(0.25),
+        'q3': df[column].quantile(0.75)
+    }
+    
+    return stats
+
+def example_usage():
+    """
+    Example usage of the data cleaning functions.
+    """
+    np.random.seed(42)
+    data = {
+        'id': range(100),
+        'value': np.concatenate([
+            np.random.normal(50, 10, 90),
+            np.random.normal(150, 30, 10)
+        ])
+    }
+    
+    df = pd.DataFrame(data)
+    print(f"Original DataFrame shape: {df.shape}")
+    
+    cleaned_df = remove_outliers_iqr(df, 'value')
+    print(f"Cleaned DataFrame shape: {cleaned_df.shape}")
+    
+    stats = calculate_summary_statistics(df, 'value')
+    for key, value in stats.items():
+        print(f"{key}: {value:.2f}")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python data_cleaner.py <input_file.csv> [output_file.csv]")
-        sys.exit(1)
-    
-    input_file = sys.argv[1]
-    output_file = sys.argv[2] if len(sys.argv) > 2 else None
-    remove_duplicates(input_file, output_file)
+    example_usage()
