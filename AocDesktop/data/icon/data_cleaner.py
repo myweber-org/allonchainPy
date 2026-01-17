@@ -402,4 +402,39 @@ if __name__ == "__main__":
     stats = calculate_basic_stats(cleaned_df, 'values')
     print("\nBasic Statistics:")
     for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+        print(f"{key}: {value:.2f}")import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(dataframe, column):
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
+
+def normalize_minmax(dataframe, column):
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    if max_val == min_val:
+        return dataframe[column]
+    return (dataframe[column] - min_val) / (max_val - min_val)
+
+def clean_dataset(dataframe, numeric_columns):
+    df_clean = dataframe.copy()
+    for col in numeric_columns:
+        if col in df_clean.columns:
+            df_clean = remove_outliers_iqr(df_clean, col)
+            df_clean[col] = normalize_minmax(df_clean, col)
+    return df_clean
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature_a': np.random.normal(50, 15, 100),
+        'feature_b': np.random.exponential(2, 100),
+        'category': np.random.choice(['X', 'Y', 'Z'], 100)
+    })
+    cleaned = clean_dataset(sample_data, ['feature_a', 'feature_b'])
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned.shape}")
+    print(cleaned.describe())
