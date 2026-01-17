@@ -347,3 +347,104 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned_df, required_columns=['A', 'B', 'C', 'D'], min_rows=3)
     print(f"\nData validation result: {is_valid}")
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
+
+def calculate_basic_stats(df, column):
+    """
+    Calculate basic statistics for a column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing statistical measures
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count(),
+        'missing': df[column].isnull().sum()
+    }
+    
+    return stats
+
+def validate_numeric_data(df, columns=None):
+    """
+    Validate that specified columns contain only numeric data.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to validate
+    
+    Returns:
+    dict: Validation results for each column
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    validation_results = {}
+    
+    for col in columns:
+        if col in df.columns:
+            non_numeric = pd.to_numeric(df[col], errors='coerce').isna().sum()
+            validation_results[col] = {
+                'total_rows': len(df),
+                'non_numeric_count': non_numeric,
+                'is_valid': non_numeric == 0
+            }
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'values': [10, 12, 13, 15, 100, 11, 14, 13, 12, 10, 9, 8, 7, 150, 12]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original data:")
+    print(df)
+    print(f"Original shape: {df.shape}")
+    
+    cleaned_df = remove_outliers_iqr(df, 'values')
+    print("\nCleaned data (outliers removed):")
+    print(cleaned_df)
+    print(f"Cleaned shape: {cleaned_df.shape}")
+    
+    stats = calculate_basic_stats(cleaned_df, 'values')
+    print("\nBasic statistics:")
+    for key, value in stats.items():
+        print(f"{key}: {value}")
