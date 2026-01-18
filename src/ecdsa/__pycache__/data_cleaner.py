@@ -1,83 +1,75 @@
+import numpy as np
 import pandas as pd
 
-def clean_dataframe(df, drop_duplicates=True, fill_missing=False, fill_value=0):
+def remove_missing_rows(df, threshold=0.5):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Remove rows with missing values exceeding threshold percentage.
+    """
+    missing_per_row = df.isnull().mean(axis=1)
+    return df[missing_per_row <= threshold].reset_index(drop=True)
+
+def fill_missing_with_median(df, columns=None):
+    """
+    Fill missing values with column median.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to drop duplicate rows.
-    fill_missing (bool): Whether to fill missing values.
-    fill_value: Value to use for filling missing data.
+    df_filled = df.copy()
+    for col in columns:
+        if col in df.columns:
+            median_val = df[col].median()
+            df_filled[col].fillna(median_val, inplace=True)
+    return df_filled
+
+def detect_outliers_iqr(df, column):
+    """
+    Detect outliers using IQR method.
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
+    outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)]
+    return outliers
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers using IQR method.
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)].reset_index(drop=True)
+
+def standardize_column(df, column):
+    """
+    Standardize column to have zero mean and unit variance.
+    """
+    if column in df.columns:
+        mean_val = df[column].mean()
+        std_val = df[column].std()
+        if std_val > 0:
+            df[column] = (df[column] - mean_val) / std_val
+    return df
+
+def clean_dataset(df, missing_threshold=0.3, outlier_columns=None):
+    """
+    Comprehensive data cleaning pipeline.
     """
     cleaned_df = df.copy()
     
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
+    cleaned_df = remove_missing_rows(cleaned_df, threshold=missing_threshold)
+    cleaned_df = fill_missing_with_median(cleaned_df)
     
-    if fill_missing:
-        cleaned_df = cleaned_df.fillna(fill_value)
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in cleaned_df.columns:
+                cleaned_df = remove_outliers_iqr(cleaned_df, col)
     
     return cleaned_df
-
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate DataFrame structure and required columns.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of column names that must be present.
-    
-    Returns:
-    bool: True if validation passes, False otherwise.
-    """
-    if not isinstance(df, pd.DataFrame):
-        return False
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            print(f"Missing required columns: {missing_columns}")
-            return False
-    
-    return True
-
-def process_data(file_path, output_path=None):
-    """
-    Load, clean, and optionally save data from a CSV file.
-    
-    Parameters:
-    file_path (str): Path to input CSV file.
-    output_path (str): Optional path to save cleaned data.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
-    """
-    try:
-        df = pd.read_csv(file_path)
-        
-        if not validate_dataframe(df):
-            raise ValueError("Data validation failed")
-        
-        cleaned_df = clean_dataframe(
-            df, 
-            drop_duplicates=True, 
-            fill_missing=True, 
-            fill_value=0
-        )
-        
-        if output_path:
-            cleaned_df.to_csv(output_path, index=False)
-            print(f"Cleaned data saved to: {output_path}")
-        
-        return cleaned_df
-        
-    except FileNotFoundError:
-        print(f"File not found: {file_path}")
-        return None
-    except Exception as e:
-        print(f"Error processing data: {e}")
-        return None
