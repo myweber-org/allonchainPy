@@ -614,3 +614,48 @@ class DataCleaner:
         
     def get_removed_count(self):
         return self.original_shape[0] - self.df.shape[0]
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    if max_val == min_val:
+        return df[column].apply(lambda x: 0.5)
+    return df[column].apply(lambda x: (x - min_val) / (max_val - min_val))
+
+def clean_dataset(df, numeric_columns):
+    cleaned_df = df.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+    return cleaned_df
+
+def process_csv(input_path, output_path):
+    try:
+        df = pd.read_csv(input_path)
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        cleaned_df = clean_dataset(df, numeric_cols)
+        cleaned_df.to_csv(output_path, index=False)
+        return True
+    except Exception as e:
+        print(f"Error processing file: {e}")
+        return False
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    success = process_csv(input_file, output_file)
+    if success:
+        print(f"Data cleaned and saved to {output_file}")
+    else:
+        print("Data cleaning failed")
