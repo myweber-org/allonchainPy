@@ -189,3 +189,16 @@ def validate_data(df, required_columns):
         return False
     
     return True
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_data(data_list):
+    if not isinstance(data_list, list):
+        raise TypeError("Input must be a list")
+    return remove_duplicates_preserve_order(data_list)
