@@ -241,4 +241,63 @@ def remove_outliers_iqr(df, column, multiplier=1.5):
     if removed_count > 0:
         print(f"Removed {removed_count} outliers from column '{column}' using IQR method.")
     
-    return filtered_df
+    return filtered_dfimport pandas as pd
+import numpy as np
+
+def clean_dataset(df, numeric_columns=None, outlier_threshold=3.0):
+    """
+    Clean dataset by handling missing values, normalizing numeric columns,
+    and removing outliers based on z-score.
+    """
+    df_clean = df.copy()
+    
+    if numeric_columns is None:
+        numeric_columns = df_clean.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in numeric_columns:
+        if col in df_clean.columns:
+            mean_val = df_clean[col].mean()
+            df_clean[col].fillna(mean_val, inplace=True)
+            
+            if df_clean[col].std() > 0:
+                z_scores = np.abs((df_clean[col] - df_clean[col].mean()) / df_clean[col].std())
+                df_clean = df_clean[z_scores < outlier_threshold]
+    
+    return df_clean.reset_index(drop=True)
+
+def normalize_columns(df, columns=None):
+    """
+    Normalize specified columns using min-max scaling.
+    """
+    df_norm = df.copy()
+    
+    if columns is None:
+        columns = df_norm.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in columns:
+        if col in df_norm.columns and df_norm[col].std() > 0:
+            min_val = df_norm[col].min()
+            max_val = df_norm[col].max()
+            df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+    
+    return df_norm
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from the dataset.
+    """
+    return df.drop_duplicates(subset=subset, keep=keep).reset_index(drop=True)
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and required columns.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
