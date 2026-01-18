@@ -298,3 +298,11 @@ if __name__ == "__main__":
     
     sample_dicts = [{'id': 1}, {'id': 2}, {'id': 1}, {'id': 3}]
     print(clean_data_with_order(sample_dicts, key=lambda x: x['id']))
+def remove_duplicates(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
