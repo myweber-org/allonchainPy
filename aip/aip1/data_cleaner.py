@@ -101,4 +101,131 @@ def validate_data(df, required_columns=None, allow_nan=False):
         nan_columns = df.columns[df.isnull().any()].tolist()
         raise ValueError(f"DataFrame contains NaN values in columns: {nan_columns}")
     
-    return True
+    return Trueimport numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers from a column using IQR method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        factor: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+
+def normalize_minmax(data, column):
+    """
+    Normalize column values to range [0, 1] using min-max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        Series with normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return pd.Series([0.5] * len(data), index=data.index)
+    
+    return (data[column] - min_val) / (max_val - min_val)
+
+def standardize_zscore(data, column):
+    """
+    Standardize column values using z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to standardize
+    
+    Returns:
+        Series with standardized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return pd.Series([0] * len(data), index=data.index)
+    
+    return (data[column] - mean_val) / std_val
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns.
+    
+    Args:
+        data: pandas DataFrame
+        strategy: 'mean', 'median', 'mode', or 'drop'
+        columns: list of columns to process (None for all numeric columns)
+    
+    Returns:
+        DataFrame with missing values handled
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    result = data.copy()
+    
+    for col in columns:
+        if col not in result.columns:
+            continue
+            
+        if strategy == 'drop':
+            result = result.dropna(subset=[col])
+        elif strategy == 'mean':
+            result[col] = result[col].fillna(result[col].mean())
+        elif strategy == 'median':
+            result[col] = result[col].fillna(result[col].median())
+        elif strategy == 'mode':
+            result[col] = result[col].fillna(result[col].mode()[0])
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+    
+    return result
+
+def create_data_summary(data):
+    """
+    Create a summary statistics DataFrame.
+    
+    Args:
+        data: pandas DataFrame
+    
+    Returns:
+        DataFrame with summary statistics
+    """
+    summary = pd.DataFrame({
+        'dtype': data.dtypes,
+        'non_null_count': data.count(),
+        'null_count': data.isnull().sum(),
+        'null_percentage': (data.isnull().sum() / len(data)) * 100,
+        'unique_count': data.nunique()
+    })
+    
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) > 0:
+        numeric_stats = data[numeric_cols].describe().T
+        summary = summary.join(numeric_stats, how='left')
+    
+    return summary
