@@ -1,84 +1,85 @@
 import pandas as pd
 import numpy as np
-from scipy import stats
 
-class DataCleaner:
-    def __init__(self, df):
-        self.df = df.copy()
-        self.original_columns = df.columns.tolist()
+def clean_csv_data(file_path, missing_strategy='mean', columns_to_drop=None):
+    """
+    Load and clean CSV data by handling missing values and optionally dropping columns.
     
-    def remove_missing(self, threshold=0.3):
-        missing_percent = self.df.isnull().sum() / len(self.df)
-        columns_to_drop = missing_percent[missing_percent > threshold].index
-        self.df = self.df.drop(columns=columns_to_drop)
-        return self
+    Parameters:
+    file_path (str): Path to the CSV file.
+    missing_strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop').
+    columns_to_drop (list): List of column names to drop from the dataset.
     
-    def fill_numeric_missing(self, method='median'):
-        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
-        
-        for col in numeric_cols:
-            if self.df[col].isnull().any():
-                if method == 'median':
-                    fill_value = self.df[col].median()
-                elif method == 'mean':
-                    fill_value = self.df[col].mean()
-                elif method == 'mode':
-                    fill_value = self.df[col].mode()[0]
-                else:
-                    fill_value = 0
-                
-                self.df[col] = self.df[col].fillna(fill_value)
-        
-        return self
-    
-    def remove_outliers_zscore(self, threshold=3):
-        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
-        
-        for col in numeric_cols:
-            z_scores = np.abs(stats.zscore(self.df[col]))
-            self.df = self.df[z_scores < threshold]
-        
-        return self
-    
-    def normalize_numeric(self, method='minmax'):
-        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
-        
-        for col in numeric_cols:
-            if method == 'minmax':
-                min_val = self.df[col].min()
-                max_val = self.df[col].max()
-                if max_val > min_val:
-                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
-            elif method == 'standard':
-                mean_val = self.df[col].mean()
-                std_val = self.df[col].std()
-                if std_val > 0:
-                    self.df[col] = (self.df[col] - mean_val) / std_val
-        
-        return self
-    
-    def get_cleaned_data(self):
-        return self.df
-    
-    def get_summary(self):
-        summary = {
-            'original_shape': (len(self.df), len(self.original_columns)),
-            'cleaned_shape': self.df.shape,
-            'columns_removed': len(self.original_columns) - self.df.shape[1],
-            'missing_values': self.df.isnull().sum().sum(),
-            'numeric_columns': self.df.select_dtypes(include=[np.number]).columns.tolist(),
-            'categorical_columns': self.df.select_dtypes(exclude=[np.number]).columns.tolist()
-        }
-        return summary
+    Returns:
+    pandas.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found at path: {file_path}")
+    except Exception as e:
+        raise Exception(f"Error reading CSV file: {e}")
 
-def clean_dataset(df, missing_threshold=0.3, outlier_threshold=3, normalize=True):
-    cleaner = DataCleaner(df)
+    if columns_to_drop:
+        df = df.drop(columns=columns_to_drop, errors='ignore')
+
+    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    categorical_columns = df.select_dtypes(exclude=[np.number]).columns
+
+    if missing_strategy == 'mean':
+        df[numeric_columns] = df[numeric_columns].fillna(df[numeric_columns].mean())
+    elif missing_strategy == 'median':
+        df[numeric_columns] = df[numeric_columns].fillna(df[numeric_columns].median())
+    elif missing_strategy == 'mode':
+        for col in numeric_columns:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 0)
+    elif missing_strategy == 'drop':
+        df = df.dropna(subset=numeric_columns)
+    else:
+        raise ValueError("Invalid missing_strategy. Choose from 'mean', 'median', 'mode', 'drop'.")
+
+    for col in categorical_columns:
+        df[col] = df[col].fillna('Unknown')
+
+    return df
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers from a specified column using the Interquartile Range (IQR) method.
     
-    cleaner.remove_missing(missing_threshold)
-    cleaner.fill_numeric_missing('median')
-    cleaner.remove_outliers_zscore(outlier_threshold)
+    Parameters:
+    df (pandas.DataFrame): Input DataFrame.
+    column (str): Column name to process.
+    multiplier (float): IQR multiplier for outlier detection.
     
-    if normalize:
-        cleaner.normalize_numeric('minmax')
+    Returns:
+    pandas.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame.")
     
-    return cleaner.get_cleaned_data(), cleaner.get_summary()
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5, 100],
+        'B': [10, 20, 30, np.nan, 50, 60],
+        'C': ['X', 'Y', np.nan, 'Z', 'X', 'Y']
+    }
+    df = pd.DataFrame(sample_data)
+    df.to_csv('sample_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('sample_data.csv', missing_strategy='mean', columns_to_drop=None)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    
+    filtered_df = remove_outliers_iqr(cleaned_df, 'A')
+    print("\nDataFrame after outlier removal in column 'A':")
+    print(filtered_df)
