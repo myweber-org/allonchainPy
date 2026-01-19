@@ -265,3 +265,89 @@ if __name__ == "__main__":
     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
     print(f"Validation: {is_valid}")
     print(f"Message: {message}")
+import pandas as pd
+import numpy as np
+from typing import Optional, List
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_duplicates(self, subset: Optional[List[str]] = None) -> 'DataCleaner':
+        self.df = self.df.drop_duplicates(subset=subset)
+        return self
+        
+    def handle_missing_values(self, 
+                             strategy: str = 'mean',
+                             columns: Optional[List[str]] = None) -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        for col in columns:
+            if col in self.df.columns:
+                if strategy == 'mean':
+                    self.df[col].fillna(self.df[col].mean(), inplace=True)
+                elif strategy == 'median':
+                    self.df[col].fillna(self.df[col].median(), inplace=True)
+                elif strategy == 'mode':
+                    self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+                elif strategy == 'drop':
+                    self.df = self.df.dropna(subset=[col])
+                    
+        return self
+        
+    def remove_outliers(self, 
+                       columns: Optional[List[str]] = None,
+                       threshold: float = 3.0) -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        for col in columns:
+            if col in self.df.columns:
+                z_scores = np.abs((self.df[col] - self.df[col].mean()) / self.df[col].std())
+                self.df = self.df[z_scores < threshold]
+                
+        return self
+        
+    def normalize_data(self, 
+                      columns: Optional[List[str]] = None,
+                      method: str = 'minmax') -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        for col in columns:
+            if col in self.df.columns:
+                if method == 'minmax':
+                    self.df[col] = (self.df[col] - self.df[col].min()) / (self.df[col].max() - self.df[col].min())
+                elif method == 'zscore':
+                    self.df[col] = (self.df[col] - self.df[col].mean()) / self.df[col].std()
+                    
+        return self
+        
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df
+        
+    def get_cleaning_report(self) -> dict:
+        return {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': self.df.shape[0],
+            'cleaned_columns': self.df.shape[1],
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'columns_removed': self.original_shape[1] - self.df.shape[1]
+        }
+
+def load_and_clean_csv(filepath: str, **kwargs) -> pd.DataFrame:
+    df = pd.read_csv(filepath, **kwargs)
+    cleaner = DataCleaner(df)
+    
+    cleaner.handle_missing_values(strategy='mean')
+    cleaner.remove_duplicates()
+    cleaner.remove_outliers(threshold=3.0)
+    cleaner.normalize_data(method='minmax')
+    
+    report = cleaner.get_cleaning_report()
+    print(f"Data cleaning completed. Removed {report['rows_removed']} rows.")
+    
+    return cleaner.get_cleaned_data()
