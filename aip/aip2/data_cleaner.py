@@ -1,101 +1,95 @@
 
-import numpy as np
 import pandas as pd
-from scipy import stats
+import numpy as np
 
-def remove_outliers_iqr(dataframe, column, threshold=1.5):
+def clean_csv_data(file_path, output_path=None, missing_strategy='mean'):
     """
-    Remove outliers using IQR method
-    """
-    q1 = dataframe[column].quantile(0.25)
-    q3 = dataframe[column].quantile(0.75)
-    iqr = q3 - q1
-    lower_bound = q1 - threshold * iqr
-    upper_bound = q3 + threshold * iqr
+    Clean CSV data by handling missing values and removing duplicates.
     
-    return dataframe[(dataframe[column] >= lower_bound) & 
-                     (dataframe[column] <= upper_bound)]
-
-def remove_outliers_zscore(dataframe, column, threshold=3):
-    """
-    Remove outliers using Z-score method
-    """
-    z_scores = np.abs(stats.zscore(dataframe[column]))
-    return dataframe[z_scores < threshold]
-
-def normalize_minmax(dataframe, column):
-    """
-    Normalize data using Min-Max scaling
-    """
-    min_val = dataframe[column].min()
-    max_val = dataframe[column].max()
+    Parameters:
+    file_path (str): Path to input CSV file
+    output_path (str): Path for cleaned output CSV (optional)
+    missing_strategy (str): Strategy for handling missing values ('mean', 'median', 'drop')
     
-    if max_val == min_val:
-        return dataframe[column].apply(lambda x: 0.5)
-    
-    return (dataframe[column] - min_val) / (max_val - min_val)
-
-def normalize_zscore(dataframe, column):
+    Returns:
+    pandas.DataFrame: Cleaned DataFrame
     """
-    Normalize data using Z-score standardization
-    """
-    mean_val = dataframe[column].mean()
-    std_val = dataframe[column].std()
     
-    if std_val == 0:
-        return dataframe[column].apply(lambda x: 0)
-    
-    return (dataframe[column] - mean_val) / std_val
-
-def clean_dataset(dataframe, numeric_columns, method='iqr', normalize=False):
-    """
-    Main cleaning function for numeric columns
-    """
-    cleaned_df = dataframe.copy()
-    
-    for column in numeric_columns:
-        if column not in cleaned_df.columns:
-            continue
-            
-        if method == 'iqr':
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-        elif method == 'zscore':
-            cleaned_df = remove_outliers_zscore(cleaned_df, column)
+    try:
+        df = pd.read_csv(file_path)
         
-        if normalize:
-            norm_method = 'minmax' if method == 'iqr' else 'zscore'
-            if norm_method == 'minmax':
-                cleaned_df[column] = normalize_minmax(cleaned_df, column)
-            else:
-                cleaned_df[column] = normalize_zscore(cleaned_df, column)
-    
-    return cleaned_df
+        print(f"Original data shape: {df.shape}")
+        print(f"Missing values per column:\n{df.isnull().sum()}")
+        
+        df_cleaned = df.copy()
+        
+        if missing_strategy == 'drop':
+            df_cleaned = df_cleaned.dropna()
+        elif missing_strategy in ['mean', 'median']:
+            numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+            
+            for col in numeric_cols:
+                if missing_strategy == 'mean':
+                    fill_value = df_cleaned[col].mean()
+                else:
+                    fill_value = df_cleaned[col].median()
+                
+                df_cleaned[col] = df_cleaned[col].fillna(fill_value)
+        
+        df_cleaned = df_cleaned.drop_duplicates()
+        
+        print(f"Cleaned data shape: {df_cleaned.shape}")
+        print(f"Remaining missing values: {df_cleaned.isnull().sum().sum()}")
+        
+        if output_path:
+            df_cleaned.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return df_cleaned
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
 
-def validate_dataframe(dataframe, required_columns):
+def validate_dataframe(df, required_columns=None):
     """
-    Validate dataframe structure and content
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pandas.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    bool: True if validation passes, False otherwise
     """
-    missing_columns = [col for col in required_columns if col not in dataframe.columns]
     
-    if missing_columns:
-        raise ValueError(f"Missing required columns: {missing_columns}")
+    if df is None or df.empty:
+        print("Error: DataFrame is empty or None")
+        return False
     
-    if dataframe.empty:
-        raise ValueError("DataFrame is empty")
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Error: Missing required columns: {missing_cols}")
+            return False
     
+    print("DataFrame validation passed")
     return True
 
-def get_summary_statistics(dataframe):
-    """
-    Generate summary statistics for numeric columns
-    """
-    numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
     
-    if len(numeric_cols) == 0:
-        return pd.DataFrame()
+    cleaned_df = clean_csv_data(input_file, output_file, missing_strategy='mean')
     
-    summary = dataframe[numeric_cols].describe()
-    summary.loc['missing'] = dataframe[numeric_cols].isnull().sum()
-    summary.loc['zeros'] = (dataframe[numeric_cols] == 0).sum()
-    
-    return summary
+    if cleaned_df is not None:
+        validation_passed = validate_dataframe(cleaned_df)
+        
+        if validation_passed:
+            print("Data cleaning completed successfully")
+            print(f"Sample of cleaned data:\n{cleaned_df.head()}")
+        else:
+            print("Data cleaning completed but validation failed")
