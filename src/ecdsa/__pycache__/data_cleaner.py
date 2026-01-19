@@ -81,3 +81,11 @@ def process_dataframe(df, numeric_columns):
             print(f"Removed {removed_count} outliers from column '{column}'")
     
     return cleaned_df
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
