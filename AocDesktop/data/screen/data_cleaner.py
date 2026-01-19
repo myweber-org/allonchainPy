@@ -236,3 +236,90 @@ if __name__ == "__main__":
     # Validate the cleaned data
     is_valid, message = validate_data(cleaned, required_columns=['id', 'name', 'age', 'score'], min_rows=3)
     print(f"\nValidation: {is_valid} - {message}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
+    
+    return cleaned_df
+
+def remove_outliers(df, column, threshold=3):
+    """
+    Remove outliers from a specific column using z-score method.
+    """
+    df_copy = df.copy()
+    z_scores = np.abs((df_copy[column] - df_copy[column].mean()) / df_copy[column].std())
+    return df_copy[z_scores < threshold]
+
+def normalize_column(df, column):
+    """
+    Normalize a column to range [0, 1] using min-max scaling.
+    """
+    df_copy = df.copy()
+    min_val = df_copy[column].min()
+    max_val = df_copy[column].max()
+    
+    if max_val != min_val:
+        df_copy[column] = (df_copy[column] - min_val) / (max_val - min_val)
+    
+    return df_copy
+
+def process_dataframe(df, operations):
+    """
+    Apply multiple cleaning operations to a DataFrame.
+    """
+    result_df = df.copy()
+    
+    for operation in operations:
+        if operation['type'] == 'clean':
+            result_df = clean_dataset(
+                result_df, 
+                drop_duplicates=operation.get('drop_duplicates', True),
+                fill_missing=operation.get('fill_missing', True),
+                fill_value=operation.get('fill_value', 0)
+            )
+        elif operation['type'] == 'remove_outliers':
+            result_df = remove_outliers(
+                result_df,
+                column=operation['column'],
+                threshold=operation.get('threshold', 3)
+            )
+        elif operation['type'] == 'normalize':
+            result_df = normalize_column(
+                result_df,
+                column=operation['column']
+            )
+    
+    return result_df
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, 2, 4, 5, np.nan, 7, 100],
+        'B': [10, 20, 20, 40, 50, 60, 70, 80],
+        'C': [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    operations = [
+        {'type': 'clean', 'drop_duplicates': True, 'fill_missing': True, 'fill_value': 0},
+        {'type': 'remove_outliers', 'column': 'A', 'threshold': 2},
+        {'type': 'normalize', 'column': 'B'}
+    ]
+    
+    cleaned_df = process_dataframe(df, operations)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
