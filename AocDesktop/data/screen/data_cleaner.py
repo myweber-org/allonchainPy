@@ -1,79 +1,100 @@
-import numpy as np
+
 import pandas as pd
-from scipy import stats
+import numpy as np
 
-def remove_outliers_iqr(data, column):
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-
-def remove_outliers_zscore(data, column, threshold=3):
-    z_scores = np.abs(stats.zscore(data[column]))
-    return data[z_scores < threshold]
-
-def normalize_minmax(data, column):
-    min_val = data[column].min()
-    max_val = data[column].max()
-    data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
-    return data
-
-def normalize_zscore(data, column):
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    data[column + '_standardized'] = (data[column] - mean_val) / std_val
-    return data
-
-def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize_method='minmax'):
-    cleaned_df = df.copy()
-    
-    for col in numeric_columns:
-        if outlier_method == 'iqr':
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-        elif outlier_method == 'zscore':
-            cleaned_df = remove_outliers_zscore(cleaned_df, col)
+def clean_csv_data(input_file, output_file):
+    """
+    Clean and preprocess CSV data by handling missing values,
+    removing duplicates, and standardizing column names.
+    """
+    try:
+        df = pd.read_csv(input_file)
         
-        if normalize_method == 'minmax':
-            cleaned_df = normalize_minmax(cleaned_df, col)
-        elif normalize_method == 'zscore':
-            cleaned_df = normalize_zscore(cleaned_df, col)
-    
-    return cleaned_df
+        # Standardize column names
+        df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Handle missing values
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        
+        # Fill numeric missing values with median
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].median())
+        
+        # Fill categorical missing values with mode
+        for col in categorical_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'unknown')
+        
+        # Remove outliers using IQR method for numeric columns
+        for col in numeric_cols:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df = df[(df[col] >= lower_bound) & (df[col] <= upper_bound)]
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Data cleaning completed. Cleaned data saved to {output_file}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: Input file {input_file} not found.")
+        return False
+    except pd.errors.EmptyDataError:
+        print("Error: Input file is empty.")
+        return False
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return False
 
-def get_summary_statistics(df, numeric_columns):
-    summary = {}
-    for col in numeric_columns:
-        summary[col] = {
-            'mean': df[col].mean(),
-            'median': df[col].median(),
-            'std': df[col].std(),
-            'min': df[col].min(),
-            'max': df[col].max(),
-            'count': df[col].count(),
-            'missing': df[col].isnull().sum()
+def validate_data(file_path):
+    """
+    Validate the cleaned data file.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        
+        # Check for remaining missing values
+        missing_values = df.isnull().sum().sum()
+        
+        # Check data types
+        data_types = df.dtypes
+        
+        # Basic statistics
+        stats = df.describe()
+        
+        print(f"Data validation completed:")
+        print(f"Missing values: {missing_values}")
+        print(f"Data shape: {df.shape}")
+        print(f"Column data types:\n{data_types}")
+        
+        return {
+            'missing_values': missing_values,
+            'shape': df.shape,
+            'data_types': data_types.to_dict(),
+            'stats': stats.to_dict()
         }
-    return pd.DataFrame(summary).T
+        
+    except Exception as e:
+        print(f"Error during data validation: {str(e)}")
+        return None
 
 if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'feature1': np.random.normal(100, 15, 1000),
-        'feature2': np.random.exponential(50, 1000),
-        'feature3': np.random.uniform(0, 200, 1000)
-    })
+    # Example usage
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
     
-    print("Original dataset shape:", sample_data.shape)
-    print("\nOriginal statistics:")
-    print(get_summary_statistics(sample_data, ['feature1', 'feature2', 'feature3']))
-    
-    cleaned_data = clean_dataset(
-        sample_data, 
-        ['feature1', 'feature2', 'feature3'],
-        outlier_method='iqr',
-        normalize_method='zscore'
-    )
-    
-    print("\nCleaned dataset shape:", cleaned_data.shape)
-    print("\nCleaned statistics:")
-    print(get_summary_statistics(cleaned_data, ['feature1', 'feature2', 'feature3']))
+    # Clean the data
+    if clean_csv_data(input_csv, output_csv):
+        # Validate the cleaned data
+        validation_results = validate_data(output_csv)
+        
+        if validation_results:
+            print("Data cleaning and validation completed successfully.")
+        else:
+            print("Data validation failed.")
