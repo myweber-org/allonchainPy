@@ -1,97 +1,107 @@
-import numpy as np
+
 import pandas as pd
-from scipy import stats
+import numpy as np
+from pathlib import Path
 
-def remove_outliers_iqr(data, column, multiplier=1.5):
-    """
-    Remove outliers using IQR method
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+class DataCleaner:
+    def __init__(self, file_path):
+        self.file_path = Path(file_path)
+        self.df = None
+        self.load_data()
     
-    q1 = data[column].quantile(0.25)
-    q3 = data[column].quantile(0.75)
-    iqr = q3 - q1
-    lower_bound = q1 - multiplier * iqr
-    upper_bound = q3 + multiplier * iqr
+    def load_data(self):
+        if self.file_path.exists():
+            self.df = pd.read_csv(self.file_path)
+            print(f"Loaded data with shape: {self.df.shape}")
+        else:
+            raise FileNotFoundError(f"File not found: {self.file_path}")
     
-    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-
-def remove_outliers_zscore(data, column, threshold=3):
-    """
-    Remove outliers using Z-score method
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    def identify_missing(self):
+        missing_summary = self.df.isnull().sum()
+        missing_percentage = (missing_summary / len(self.df)) * 100
+        missing_report = pd.DataFrame({
+            'missing_count': missing_summary,
+            'missing_percentage': missing_percentage
+        })
+        return missing_report[missing_report['missing_count'] > 0]
     
-    z_scores = np.abs(stats.zscore(data[column]))
-    return data[z_scores < threshold]
-
-def normalize_minmax(data, column):
-    """
-    Normalize data using Min-Max scaling
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    def fill_missing_numeric(self, strategy='mean'):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if self.df[col].isnull().any():
+                if strategy == 'mean':
+                    fill_value = self.df[col].mean()
+                elif strategy == 'median':
+                    fill_value = self.df[col].median()
+                elif strategy == 'zero':
+                    fill_value = 0
+                else:
+                    raise ValueError("Invalid strategy. Use 'mean', 'median', or 'zero'")
+                
+                self.df[col].fillna(fill_value, inplace=True)
+                print(f"Filled missing values in {col} with {strategy}: {fill_value}")
     
-    min_val = data[column].min()
-    max_val = data[column].max()
+    def fill_missing_categorical(self, strategy='mode'):
+        categorical_cols = self.df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if self.df[col].isnull().any():
+                if strategy == 'mode':
+                    fill_value = self.df[col].mode()[0]
+                elif strategy == 'unknown':
+                    fill_value = 'unknown'
+                else:
+                    raise ValueError("Invalid strategy. Use 'mode' or 'unknown'")
+                
+                self.df[col].fillna(fill_value, inplace=True)
+                print(f"Filled missing values in {col} with {strategy}: {fill_value}")
     
-    if min_val == max_val:
-        return data[column].apply(lambda x: 0.5)
+    def drop_columns(self, threshold=50):
+        missing_report = self.identify_missing()
+        columns_to_drop = missing_report[missing_report['missing_percentage'] > threshold].index
+        if len(columns_to_drop) > 0:
+            self.df.drop(columns=columns_to_drop, inplace=True)
+            print(f"Dropped columns with >{threshold}% missing values: {list(columns_to_drop)}")
     
-    return (data[column] - min_val) / (max_val - min_val)
-
-def normalize_zscore(data, column):
-    """
-    Normalize data using Z-score standardization
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    
-    if std_val == 0:
-        return data[column].apply(lambda x: 0)
-    
-    return (data[column] - mean_val) / std_val
-
-def clean_dataset(df, numeric_columns=None, outlier_method='iqr', normalize_method='minmax'):
-    """
-    Comprehensive data cleaning pipeline
-    """
-    if numeric_columns is None:
-        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
-    
-    cleaned_df = df.copy()
-    
-    for col in numeric_columns:
-        if col not in cleaned_df.columns:
-            continue
-            
-        if outlier_method == 'iqr':
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-        elif outlier_method == 'zscore':
-            cleaned_df = remove_outliers_zscore(cleaned_df, col)
+    def save_cleaned_data(self, output_path=None):
+        if output_path is None:
+            output_path = self.file_path.parent / f"cleaned_{self.file_path.name}"
         
-        if normalize_method == 'minmax':
-            cleaned_df[col] = normalize_minmax(cleaned_df, col)
-        elif normalize_method == 'zscore':
-            cleaned_df[col] = normalize_zscore(cleaned_df, col)
-    
-    return cleaned_df
+        self.df.to_csv(output_path, index=False)
+        print(f"Saved cleaned data to: {output_path}")
+        return output_path
 
-def validate_data(df, required_columns=None, allow_nan=False):
-    """
-    Validate dataset structure and content
-    """
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            raise ValueError(f"Missing required columns: {missing_cols}")
+def process_csv_file(input_file, output_dir='cleaned_data'):
+    cleaner = DataCleaner(input_file)
     
-    if not allow_nan and df.isnull().any().any():
-        raise ValueError("Dataset contains NaN values")
+    print("Initial missing values report:")
+    print(cleaner.identify_missing())
     
-    return True
+    cleaner.drop_columns(threshold=50)
+    cleaner.fill_missing_numeric(strategy='mean')
+    cleaner.fill_missing_categorical(strategy='mode')
+    
+    output_dir = Path(output_dir)
+    output_dir.mkdir(exist_ok=True)
+    
+    output_path = cleaner.save_cleaned_data(output_dir / f"cleaned_{Path(input_file).name}")
+    return output_path
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 3, 4, 5],
+        'age': [25, np.nan, 30, 35, np.nan],
+        'salary': [50000, 60000, np.nan, 80000, 90000],
+        'department': ['IT', 'HR', 'IT', np.nan, 'Finance'],
+        'experience': [2, 5, np.nan, np.nan, 10]
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_file = 'test_data.csv'
+    test_df.to_csv(test_file, index=False)
+    
+    try:
+        result = process_csv_file(test_file)
+        print(f"Processing completed. Output: {result}")
+    finally:
+        if Path(test_file).exists():
+            Path(test_file).unlink()
