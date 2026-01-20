@@ -1,57 +1,65 @@
-import pandas as pd
 
-def remove_duplicates(dataframe, subset=None, keep='first'):
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
     """
-    Remove duplicate rows from a pandas DataFrame.
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
     
     Args:
-        dataframe (pd.DataFrame): Input DataFrame.
-        subset (list, optional): Column labels to consider for identifying duplicates.
-        keep (str, optional): Determines which duplicates to keep.
-            'first' : Drop duplicates except for the first occurrence.
-            'last' : Drop duplicates except for the last occurrence.
-            False : Drop all duplicates.
+        df: Input pandas DataFrame
+        column_mapping: Dictionary to rename columns {old_name: new_name}
+        drop_duplicates: Boolean to remove duplicate rows
+        normalize_text: Boolean to normalize text columns
     
     Returns:
-        pd.DataFrame: DataFrame with duplicates removed.
+        Cleaned pandas DataFrame
     """
-    if dataframe.empty:
-        return dataframe
+    cleaned_df = df.copy()
     
-    cleaned_df = dataframe.drop_duplicates(subset=subset, keep=keep)
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates().reset_index(drop=True)
+    
+    if normalize_text:
+        text_columns = cleaned_df.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            cleaned_df[col] = cleaned_df[col].apply(_normalize_string)
+    
     return cleaned_df
 
-def clean_numeric_columns(dataframe, columns):
+def _normalize_string(text):
     """
-    Clean numeric columns by converting to appropriate types and handling errors.
-    
-    Args:
-        dataframe (pd.DataFrame): Input DataFrame.
-        columns (list): List of column names to clean.
-    
-    Returns:
-        pd.DataFrame: DataFrame with cleaned numeric columns.
+    Normalize a string by converting to lowercase, removing extra whitespace,
+    and stripping special characters.
     """
-    df_copy = dataframe.copy()
+    if pd.isna(text):
+        return text
     
-    for col in columns:
-        if col in df_copy.columns:
-            df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce')
+    normalized = str(text).lower().strip()
+    normalized = re.sub(r'\s+', ' ', normalized)
+    normalized = re.sub(r'[^\w\s-]', '', normalized)
     
-    return df_copy
+    return normalized
 
-def validate_dataframe(dataframe, required_columns):
+def validate_email_column(df, email_column):
     """
-    Validate that DataFrame contains all required columns.
+    Validate email addresses in a DataFrame column.
     
     Args:
-        dataframe (pd.DataFrame): Input DataFrame to validate.
-        required_columns (list): List of required column names.
+        df: Input pandas DataFrame
+        email_column: Name of the column containing email addresses
     
     Returns:
-        bool: True if all required columns are present, False otherwise.
+        DataFrame with validation results
     """
-    existing_columns = set(dataframe.columns)
-    required_set = set(required_columns)
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     
-    return required_set.issubset(existing_columns)
+    validation_results = df.copy()
+    validation_results['email_valid'] = validation_results[email_column].apply(
+        lambda x: bool(re.match(email_pattern, str(x))) if pd.notna(x) else False
+    )
+    
+    return validation_results
