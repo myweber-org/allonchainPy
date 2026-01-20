@@ -580,3 +580,60 @@ def clean_csv_file(input_path: str, output_path: str, cleaning_steps: Dict) -> D
             'success': False,
             'error': str(e)
         }
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def remove_outliers_iqr(df, columns):
+    cleaned_df = df.copy()
+    for col in columns:
+        if col in cleaned_df.columns:
+            Q1 = cleaned_df[col].quantile(0.25)
+            Q3 = cleaned_df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
+    return cleaned_df
+
+def normalize_data(df, columns, method='minmax'):
+    normalized_df = df.copy()
+    for col in columns:
+        if col in normalized_df.columns:
+            if method == 'minmax':
+                min_val = normalized_df[col].min()
+                max_val = normalized_df[col].max()
+                if max_val != min_val:
+                    normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+                else:
+                    normalized_df[col] = 0
+            elif method == 'zscore':
+                mean_val = normalized_df[col].mean()
+                std_val = normalized_df[col].std()
+                if std_val != 0:
+                    normalized_df[col] = (normalized_df[col] - mean_val) / std_val
+                else:
+                    normalized_df[col] = 0
+    return normalized_df
+
+def handle_missing_values(df, columns, strategy='mean'):
+    processed_df = df.copy()
+    for col in columns:
+        if col in processed_df.columns:
+            if strategy == 'mean':
+                fill_value = processed_df[col].mean()
+            elif strategy == 'median':
+                fill_value = processed_df[col].median()
+            elif strategy == 'mode':
+                fill_value = processed_df[col].mode()[0]
+            else:
+                fill_value = 0
+            processed_df[col].fillna(fill_value, inplace=True)
+    return processed_df
+
+def clean_dataset(df, numeric_columns):
+    df_clean = df.copy()
+    df_clean = handle_missing_values(df_clean, numeric_columns)
+    df_clean = remove_outliers_iqr(df_clean, numeric_columns)
+    df_clean = normalize_data(df_clean, numeric_columns, method='zscore')
+    return df_clean
