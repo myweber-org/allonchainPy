@@ -1,85 +1,100 @@
 import pandas as pd
+import numpy as np
 
-def remove_duplicates(df, subset=None, keep='first'):
+def remove_outliers_iqr(df, column):
     """
-    Remove duplicate rows from a DataFrame.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
     Args:
-        df (pd.DataFrame): Input DataFrame.
-        subset (list, optional): Column labels to consider for duplicates.
-        keep (str, optional): Which duplicates to keep.
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
     
     Returns:
-        pd.DataFrame: DataFrame with duplicates removed.
+        pd.DataFrame: DataFrame with outliers removed
     """
-    if df.empty:
-        return df
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def clean_numeric_data(df, columns=None):
+    """
+    Clean numeric data by removing outliers from specified columns.
+    If no columns specified, clean all numeric columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list, optional): List of column names to clean
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        columns = numeric_cols
+    
+    cleaned_df = df.copy()
+    
+    for col in columns:
+        if col in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[col]):
+            try:
+                cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            except Exception as e:
+                print(f"Warning: Could not clean column '{col}': {e}")
+    
     return cleaned_df
 
-def clean_numeric_columns(df, columns):
+def get_statistics(df, column):
     """
-    Clean numeric columns by removing non-numeric characters.
+    Calculate basic statistics for a column.
     
     Args:
-        df (pd.DataFrame): Input DataFrame.
-        columns (list): List of column names to clean.
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name
     
     Returns:
-        pd.DataFrame: DataFrame with cleaned numeric columns.
+        dict: Dictionary containing statistics
     """
-    for col in columns:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-    return df
-
-def validate_dataframe(df, required_columns):
-    """
-    Validate if DataFrame contains required columns.
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-        required_columns (list): List of required column names.
-    
-    Returns:
-        bool: True if all required columns are present.
-    """
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    
-    if missing_columns:
-        print(f"Missing columns: {missing_columns}")
-        return False
-    
-    return True
-
-def main():
-    # Example usage
-    data = {
-        'id': [1, 2, 2, 3, 4],
-        'name': ['Alice', 'Bob', 'Bob', 'Charlie', 'David'],
-        'age': ['25', '30', '30', '35', '40'],
-        'score': ['95.5', '88.0', '88.0', '92.3', '85.7']
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count(),
+        'missing': df[column].isnull().sum()
     }
     
-    df = pd.DataFrame(data)
-    print("Original DataFrame:")
-    print(df)
-    
-    # Remove duplicates
-    df_clean = remove_duplicates(df, subset=['id', 'name'])
-    print("\nDataFrame after removing duplicates:")
-    print(df_clean)
-    
-    # Clean numeric columns
-    df_clean = clean_numeric_columns(df_clean, ['age', 'score'])
-    print("\nDataFrame after cleaning numeric columns:")
-    print(df_clean)
-    
-    # Validate required columns
-    required = ['id', 'name', 'age']
-    is_valid = validate_dataframe(df_clean, required)
-    print(f"\nDataFrame validation: {is_valid}")
+    return stats
 
 if __name__ == "__main__":
-    main()
+    sample_data = {
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.uniform(0, 200, 1000)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.loc[::100, 'A'] = 500
+    
+    print("Original data shape:", df.shape)
+    print("Column A statistics before cleaning:")
+    print(get_statistics(df, 'A'))
+    
+    cleaned_df = clean_numeric_data(df, ['A'])
+    
+    print("\nCleaned data shape:", cleaned_df.shape)
+    print("Column A statistics after cleaning:")
+    print(get_statistics(cleaned_df, 'A'))
