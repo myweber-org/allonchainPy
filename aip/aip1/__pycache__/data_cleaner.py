@@ -206,4 +206,48 @@ def clean_dataset(df, missing_threshold=0.3, outlier_multiplier=1.5):
     # Step 4: Standardize numeric columns
     df_clean = standardize_columns(df_clean)
     
-    return df_clean
+    return df_cleanimport pandas as pd
+import numpy as np
+
+def clean_data(input_file, output_file):
+    """
+    Load a CSV file, clean the data by handling missing values,
+    removing duplicates, and standardizing text columns.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].median())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+        
+        # Standardize text columns: strip whitespace and convert to lowercase
+        for col in categorical_cols:
+            df[col] = df[col].astype(str).str.strip().str.lower()
+        
+        # Remove rows where all values are NaN
+        df = df.dropna(how='all')
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Data cleaned successfully. Output saved to {output_file}")
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+    except pd.errors.EmptyDataError:
+        print("Error: Input file is empty.")
+    except Exception as e:
+        print(f"An unexpected error occurred: {str(e)}")
+
+if __name__ == "__main__":
+    clean_data('raw_data.csv', 'cleaned_data.csv')
