@@ -70,4 +70,126 @@ def normalize_data(data, method='minmax'):
         std = np.std(data, axis=0)
         return (data - mean) / (std + 1e-8)
     else:
-        raise ValueError("Method must be 'minmax' or 'zscore'")
+        raise ValueError("Method must be 'minmax' or 'zscore'")import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in data")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in data")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in data")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean'):
+    """
+    Handle missing values in numeric columns
+    """
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        for col in numeric_cols:
+            data[col] = data[col].fillna(data[col].mean())
+    elif strategy == 'median':
+        for col in numeric_cols:
+            data[col] = data[col].fillna(data[col].median())
+    elif strategy == 'mode':
+        for col in numeric_cols:
+            data[col] = data[col].fillna(data[col].mode()[0])
+    elif strategy == 'drop':
+        data = data.dropna(subset=numeric_cols)
+    
+    return data
+
+def create_sample_data():
+    """
+    Create sample data for testing
+    """
+    np.random.seed(42)
+    data = {
+        'feature1': np.random.normal(100, 15, 100),
+        'feature2': np.random.exponential(50, 100),
+        'feature3': np.random.uniform(0, 1, 100)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    df.loc[10:15, 'feature1'] = np.nan
+    df.loc[5, 'feature2'] = 1000
+    df.loc[95, 'feature2'] = -500
+    
+    return df
+
+def main():
+    """
+    Demonstrate the data cleaning functions
+    """
+    print("Creating sample data...")
+    df = create_sample_data()
+    print(f"Original data shape: {df.shape}")
+    print(f"Missing values:\n{df.isnull().sum()}")
+    
+    print("\nHandling missing values...")
+    df_clean = handle_missing_values(df.copy(), strategy='mean')
+    print(f"After handling missing values: {df_clean.isnull().sum().sum()} missing values")
+    
+    print("\nRemoving outliers from feature2...")
+    df_no_outliers = remove_outliers_iqr(df_clean.copy(), 'feature2')
+    print(f"Data shape after outlier removal: {df_no_outliers.shape}")
+    
+    print("\nNormalizing feature1...")
+    df_no_outliers['feature1_normalized'] = normalize_minmax(df_no_outliers, 'feature1')
+    print(f"Feature1 normalized range: [{df_no_outliers['feature1_normalized'].min():.3f}, "
+          f"{df_no_outliers['feature1_normalized'].max():.3f}]")
+    
+    print("\nStandardizing feature2...")
+    df_no_outliers['feature2_standardized'] = standardize_zscore(df_no_outliers, 'feature2')
+    print(f"Feature2 standardized mean: {df_no_outliers['feature2_standardized'].mean():.3f}, "
+          f"std: {df_no_outliers['feature2_standardized'].std():.3f}")
+    
+    return df_no_outliers
+
+if __name__ == "__main__":
+    cleaned_data = main()
+    print(f"\nFinal cleaned data shape: {cleaned_data.shape}")
+    print("Data cleaning completed successfully.")
