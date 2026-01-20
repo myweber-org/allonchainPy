@@ -73,3 +73,16 @@ def clean_dataset(df, numeric_columns):
             cleaned_stats[col] = calculate_statistics(cleaned_df, col)
     
     return cleaned_df, {'original': original_stats, 'cleaned': cleaned_stats}
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_data(data_list):
+    if not isinstance(data_list, list):
+        raise TypeError("Input must be a list")
+    return remove_duplicates_preserve_order(data_list)
