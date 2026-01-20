@@ -1,98 +1,97 @@
+import numpy as np
 import pandas as pd
+from scipy import stats
 
-def clean_dataset(df, column_names=None):
+def remove_outliers_iqr(data, column, multiplier=1.5):
     """
-    Clean a pandas DataFrame by removing duplicates and normalizing string columns.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean.
-        column_names (list, optional): List of column names to normalize. 
-                                      If None, all object dtype columns are normalized.
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame.
+    Remove outliers using IQR method
     """
-    # Create a copy to avoid modifying the original
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = np.abs(stats.zscore(data[column]))
+    return data[z_scores < threshold]
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if min_val == max_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    return (data[column] - min_val) / (max_val - min_val)
+
+def normalize_zscore(data, column):
+    """
+    Normalize data using Z-score standardization
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    return (data[column] - mean_val) / std_val
+
+def clean_dataset(df, numeric_columns=None, outlier_method='iqr', normalize_method='minmax'):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
     cleaned_df = df.copy()
     
-    # Remove duplicate rows
-    initial_rows = cleaned_df.shape[0]
-    cleaned_df = cleaned_df.drop_duplicates()
-    removed_duplicates = initial_rows - cleaned_df.shape[0]
-    
-    # Normalize string columns
-    if column_names is None:
-        # Select all object dtype columns (typically strings)
-        column_names = cleaned_df.select_dtypes(include=['object']).columns.tolist()
-    
-    for col in column_names:
-        if col in cleaned_df.columns and cleaned_df[col].dtype == 'object':
-            # Convert to string, strip whitespace, and convert to lowercase
-            cleaned_df[col] = cleaned_df[col].astype(str).str.strip().str.lower()
-    
-    # Reset index after cleaning
-    cleaned_df = cleaned_df.reset_index(drop=True)
-    
-    # Print cleaning summary
-    print(f"Cleaning complete:")
-    print(f"  - Removed {removed_duplicates} duplicate rows")
-    print(f"  - Normalized {len(column_names)} columns")
-    print(f"  - Final dataset shape: {cleaned_df.shape}")
+    for col in numeric_columns:
+        if col not in cleaned_df.columns:
+            continue
+            
+        if outlier_method == 'iqr':
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+        elif outlier_method == 'zscore':
+            cleaned_df = remove_outliers_zscore(cleaned_df, col)
+        
+        if normalize_method == 'minmax':
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+        elif normalize_method == 'zscore':
+            cleaned_df[col] = normalize_zscore(cleaned_df, col)
     
     return cleaned_df
 
-def validate_dataframe(df, required_columns=None):
+def validate_data(df, required_columns=None, allow_nan=False):
     """
-    Validate DataFrame structure and content.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_columns (list, optional): List of required column names.
-    
-    Returns:
-        bool: True if validation passes, False otherwise.
+    Validate dataset structure and content
     """
-    if not isinstance(df, pd.DataFrame):
-        print("Error: Input is not a pandas DataFrame")
-        return False
-    
-    if df.empty:
-        print("Warning: DataFrame is empty")
-        return True
-    
     if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            print(f"Error: Missing required columns: {missing_columns}")
-            return False
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
     
-    # Check for NaN values
-    nan_count = df.isna().sum().sum()
-    if nan_count > 0:
-        print(f"Warning: Found {nan_count} NaN values in the DataFrame")
+    if not allow_nan and df.isnull().any().any():
+        raise ValueError("Dataset contains NaN values")
     
     return True
-
-# Example usage
-if __name__ == "__main__":
-    # Create sample data
-    sample_data = {
-        'name': ['John Doe', 'Jane Smith', 'John Doe', '  BOB JOHNSON  '],
-        'email': ['john@example.com', 'jane@example.com', 'john@example.com', 'bob@example.com'],
-        'age': [25, 30, 25, 35],
-        'city': ['New York', 'Los Angeles', 'New York', 'CHICAGO']
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\n" + "="*50 + "\n")
-    
-    # Clean the data
-    cleaned_df = clean_dataset(df)
-    print("\nCleaned DataFrame:")
-    print(cleaned_df)
-    
-    # Validate the cleaned data
-    validation_result = validate_dataframe(cleaned_df, ['name', 'email'])
-    print(f"\nData validation passed: {validation_result}")
