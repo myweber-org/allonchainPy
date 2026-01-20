@@ -122,4 +122,121 @@ if __name__ == "__main__":
     mixed_data = [1, "2", "three", 4.5, None]
     numeric_data = clean_numeric_data(mixed_data)
     print(f"Mixed data: {mixed_data}")
-    print(f"Numeric data: {numeric_data}")
+    print(f"Numeric data: {numeric_data}")import pandas as pd
+import numpy as np
+
+def clean_dataset(df, strategy='mean', outlier_method='iqr', fill_na=True):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): Strategy for filling missing values ('mean', 'median', 'mode')
+    outlier_method (str): Method for outlier detection ('iqr', 'zscore')
+    fill_na (bool): Whether to fill missing values
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    
+    cleaned_df = df.copy()
+    
+    if fill_na:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols:
+            if cleaned_df[col].isnull().any():
+                if strategy == 'mean':
+                    cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
+                elif strategy == 'median':
+                    cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
+                elif strategy == 'mode':
+                    cleaned_df[col].fillna(cleaned_df[col].mode()[0], inplace=True)
+    
+    if outlier_method:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols:
+            if outlier_method == 'iqr':
+                Q1 = cleaned_df[col].quantile(0.25)
+                Q3 = cleaned_df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - 1.5 * IQR
+                upper_bound = Q3 + 1.5 * IQR
+                
+                mask = (cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)
+                cleaned_df = cleaned_df[mask]
+            
+            elif outlier_method == 'zscore':
+                from scipy import stats
+                z_scores = np.abs(stats.zscore(cleaned_df[col]))
+                mask = z_scores < 3
+                cleaned_df = cleaned_df[mask]
+    
+    return cleaned_df.reset_index(drop=True)
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    subset (list): Columns to consider for duplicates
+    keep (str): Which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+    pd.DataFrame: DataFrame without duplicates
+    """
+    return df.drop_duplicates(subset=subset, keep=keep).reset_index(drop=True)
+
+def normalize_data(df, columns=None, method='minmax'):
+    """
+    Normalize specified columns in DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): Columns to normalize
+    method (str): Normalization method ('minmax', 'standard')
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns
+    """
+    normalized_df = df.copy()
+    
+    if columns is None:
+        columns = normalized_df.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in normalized_df.columns and pd.api.types.is_numeric_dtype(normalized_df[col]):
+            if method == 'minmax':
+                min_val = normalized_df[col].min()
+                max_val = normalized_df[col].max()
+                if max_val != min_val:
+                    normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+            
+            elif method == 'standard':
+                mean_val = normalized_df[col].mean()
+                std_val = normalized_df[col].std()
+                if std_val != 0:
+                    normalized_df[col] = (normalized_df[col] - mean_val) / std_val
+    
+    return normalized_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5, 100],
+        'B': [10, 20, 30, 40, 50, 60],
+        'C': [1, 1, 2, 2, 3, 3]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataset(df, strategy='median', outlier_method='iqr')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    normalized = normalize_data(cleaned, method='minmax')
+    print("\nNormalized DataFrame:")
+    print(normalized)
