@@ -431,3 +431,65 @@ def process_dataframe(df, column):
     print(f"Outliers removed: {len(df) - len(cleaned_df)}")
     
     return cleaned_df, original_stats, cleaned_stats
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df: Input pandas DataFrame
+        column_mapping: Dictionary to rename columns (old_name: new_name)
+        drop_duplicates: Whether to remove duplicate rows
+        normalize_text: Whether to normalize text columns (strip, lowercase)
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    df_clean = df.copy()
+    
+    if column_mapping:
+        df_clean = df_clean.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates().reset_index(drop=True)
+    
+    if normalize_text:
+        for col in df_clean.select_dtypes(include=['object']).columns:
+            df_clean[col] = df_clean[col].astype(str).str.strip().str.lower()
+    
+    return df_clean
+
+def remove_special_characters(text, keep_pattern=r'[a-zA-Z0-9\s]'):
+    """
+    Remove special characters from text, keeping only specified pattern.
+    
+    Args:
+        text: Input string
+        keep_pattern: Regex pattern of characters to keep
+    
+    Returns:
+        Cleaned string
+    """
+    if pd.isna(text):
+        return text
+    
+    text = str(text)
+    return re.sub(f'[^{keep_pattern}]', '', text)
+
+def validate_email(email):
+    """
+    Validate email format using regex pattern.
+    
+    Args:
+        email: Email string to validate
+    
+    Returns:
+        Boolean indicating if email is valid
+    """
+    if pd.isna(email):
+        return False
+    
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email)))
