@@ -1,82 +1,91 @@
 
+import numpy as np
 import pandas as pd
 
-def clean_dataset(df, drop_duplicates=True, fill_missing=False, fill_value=0):
+def remove_outliers_iqr(df, column):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Remove outliers from a DataFrame column using the IQR method.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to remove duplicate rows.
-    fill_missing (bool): Whether to fill missing values.
-    fill_value: Value to use for filling missing data.
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame.
+    pd.DataFrame: DataFrame with outliers removed
     """
-    cleaned_df = df.copy()
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    if fill_missing:
-        cleaned_df = cleaned_df.fillna(fill_value)
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    return cleaned_df
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
 
-def validate_data(df, required_columns=None):
+def calculate_summary_statistics(df, column):
     """
-    Validate that the DataFrame meets certain criteria.
+    Calculate summary statistics for a column after outlier removal.
     
     Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of column names that must be present.
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
     
     Returns:
-    tuple: (is_valid, error_message)
+    dict: Dictionary containing summary statistics
     """
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if df.empty:
-        return False, "DataFrame is empty"
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': len(df[column])
+    }
     
-    return True, "Data validation passed"
+    return stats
 
-def process_data(file_path, output_path=None):
+def process_numerical_data(df, columns):
     """
-    Load, clean, and optionally save a dataset.
+    Process multiple numerical columns by removing outliers.
     
     Parameters:
-    file_path (str): Path to the input CSV file.
-    output_path (str): Optional path to save cleaned data.
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to process
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame.
+    pd.DataFrame: Processed DataFrame
     """
-    try:
-        df = pd.read_csv(file_path)
-        
-        is_valid, message = validate_data(df)
-        if not is_valid:
-            raise ValueError(f"Data validation failed: {message}")
-        
-        cleaned_df = clean_dataset(df, drop_duplicates=True, fill_missing=True)
-        
-        if output_path:
-            cleaned_df.to_csv(output_path, index=False)
-            print(f"Cleaned data saved to: {output_path}")
-        
-        return cleaned_df
-        
-    except FileNotFoundError:
-        print(f"Error: File not found at {file_path}")
-        raise
-    except pd.errors.EmptyDataError:
-        print("Error: The file is empty")
-        raise
-    except Exception as e:
-        print(f"Error processing data: {str(e)}")
-        raise
+    processed_df = df.copy()
+    
+    for col in columns:
+        if col in processed_df.columns and pd.api.types.is_numeric_dtype(processed_df[col]):
+            processed_df = remove_outliers_iqr(processed_df, col)
+    
+    return processed_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.uniform(0, 200, 1000)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame shape:", df.shape)
+    
+    processed_df = process_numerical_data(df, ['A', 'B', 'C'])
+    print("Processed DataFrame shape:", processed_df.shape)
+    
+    for col in ['A', 'B', 'C']:
+        stats = calculate_summary_statistics(processed_df, col)
+        print(f"\nStatistics for column {col}:")
+        for key, value in stats.items():
+            print(f"  {key}: {value:.2f}")
