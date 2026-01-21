@@ -2,54 +2,75 @@
 import pandas as pd
 import numpy as np
 
-def clean_dataset(df):
+def clean_dataframe(df, drop_duplicates=True, fill_missing=True, fill_value=0):
     """
     Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        drop_duplicates (bool): Whether to drop duplicate rows
+        fill_missing (bool): Whether to fill missing values
+        fill_value: Value to use for filling missing data
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
     """
-    # Remove duplicate rows
-    df_cleaned = df.drop_duplicates()
+    cleaned_df = df.copy()
     
-    # Fill missing numeric values with column median
-    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
-    for col in numeric_cols:
-        df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].median())
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
     
-    # Fill missing categorical values with mode
-    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
-    for col in categorical_cols:
-        df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown')
+    if fill_missing:
+        missing_before = cleaned_df.isnull().sum().sum()
+        cleaned_df = cleaned_df.fillna(fill_value)
+        missing_after = cleaned_df.isnull().sum().sum()
+        print(f"Filled {missing_before - missing_after} missing values")
     
-    return df_cleaned
+    return cleaned_df
 
-def validate_data(df):
+def validate_dataframe(df, required_columns=None):
     """
-    Validate that the cleaned DataFrame has no missing values.
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+    
+    Returns:
+        tuple: (is_valid, error_message)
     """
-    missing_values = df.isnull().sum().sum()
-    if missing_values == 0:
-        print("Data validation passed: No missing values found.")
-        return True
-    else:
-        print(f"Data validation failed: {missing_values} missing values found.")
-        return False
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
 
-if __name__ == "__main__":
+def main():
     # Example usage
     sample_data = {
         'id': [1, 2, 2, 3, 4, 5],
-        'name': ['Alice', 'Bob', 'Bob', None, 'Eve', None],
-        'age': [25, 30, 30, None, 35, 40],
-        'score': [85.5, 92.0, 92.0, 78.5, None, 88.0]
+        'value': [10, 20, 20, np.nan, 40, 50],
+        'category': ['A', 'B', 'B', 'C', None, 'E']
     }
     
     df = pd.DataFrame(sample_data)
     print("Original DataFrame:")
     print(df)
-    print("\nMissing values in original data:")
-    print(df.isnull().sum())
+    print("\n" + "="*50 + "\n")
     
-    cleaned_df = clean_dataset(df)
-    print("\nCleaned DataFrame:")
-    print(cleaned_df)
+    cleaned = clean_dataframe(df, drop_duplicates=True, fill_missing=True)
+    print("Cleaned DataFrame:")
+    print(cleaned)
     
-    validation_result = validate_data(cleaned_df)
+    is_valid, message = validate_dataframe(cleaned, required_columns=['id', 'value'])
+    print(f"\nValidation: {message}")
+
+if __name__ == "__main__":
+    main()
