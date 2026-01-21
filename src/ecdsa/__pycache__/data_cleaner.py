@@ -1,48 +1,46 @@
-import numpy as np
+
 import pandas as pd
 
-def remove_outliers_iqr(dataframe, column):
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_value=0):
     """
-    Remove outliers from a specified column using the IQR method.
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_missing (bool): Whether to fill missing values.
+    fill_value: Value to use for filling missing data.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
     """
-    Q1 = dataframe[column].quantile(0.25)
-    Q3 = dataframe[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    filtered_df = dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
-    return filtered_df
-
-def normalize_column_minmax(dataframe, column):
-    """
-    Normalize a column using min-max scaling to range [0, 1].
-    """
-    min_val = dataframe[column].min()
-    max_val = dataframe[column].max()
-    if max_val - min_val == 0:
-        return dataframe[column].apply(lambda x: 0.5)
-    normalized = (dataframe[column] - min_val) / (max_val - min_val)
-    return normalized
-
-def clean_dataset(dataframe, numeric_columns):
-    """
-    Clean dataset by removing outliers and normalizing numeric columns.
-    """
-    cleaned_df = dataframe.copy()
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-            cleaned_df[col] = normalize_column_minmax(cleaned_df, col)
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
+    
     return cleaned_df
 
-if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'feature_a': np.random.normal(100, 15, 200),
-        'feature_b': np.random.exponential(50, 200),
-        'category': np.random.choice(['X', 'Y', 'Z'], 200)
-    })
-    numeric_cols = ['feature_a', 'feature_b']
-    result = clean_dataset(sample_data, numeric_cols)
-    print(f"Original shape: {sample_data.shape}")
-    print(f"Cleaned shape: {result.shape}")
-    print(result.head())
+def validate_data(df, required_columns=None):
+    """
+    Validate that the DataFrame meets basic requirements.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "Data validation passed"
