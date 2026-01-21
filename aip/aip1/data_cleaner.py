@@ -328,4 +328,11 @@ if __name__ == "__main__":
     if cleaned_df is not None:
         print("Data cleaning completed successfully.")
         print("\nFirst 5 rows of cleaned data:")
-        print(cleaned_df.head())
+        print(cleaned_df.head())def remove_duplicates(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
