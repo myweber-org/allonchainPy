@@ -87,3 +87,79 @@ if __name__ == "__main__":
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B', 'C'])
     print(f"Validation: {is_valid}")
     print(f"Message: {message}")
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_duplicates(self, subset: Optional[List[str]] = None) -> pd.DataFrame:
+        initial_count = len(self.df)
+        self.df = self.df.drop_duplicates(subset=subset)
+        removed = initial_count - len(self.df)
+        print(f"Removed {removed} duplicate rows")
+        return self.df
+    
+    def handle_missing_values(self, strategy: str = 'drop', fill_value: Optional[float] = None) -> pd.DataFrame:
+        if strategy == 'drop':
+            self.df = self.df.dropna()
+        elif strategy == 'fill':
+            if fill_value is not None:
+                self.df = self.df.fillna(fill_value)
+            else:
+                self.df = self.df.fillna(self.df.mean())
+        else:
+            raise ValueError("Strategy must be 'drop' or 'fill'")
+        
+        null_count = self.df.isnull().sum().sum()
+        print(f"Remaining null values: {null_count}")
+        return self.df
+    
+    def normalize_column(self, column: str) -> pd.DataFrame:
+        if column not in self.df.columns:
+            raise KeyError(f"Column {column} not found")
+        
+        col_data = self.df[column]
+        if pd.api.types.is_numeric_dtype(col_data):
+            min_val = col_data.min()
+            max_val = col_data.max()
+            if max_val > min_val:
+                self.df[column] = (col_data - min_val) / (max_val - min_val)
+            else:
+                self.df[column] = 0
+        else:
+            print(f"Column {column} is not numeric, skipping normalization")
+        
+        return self.df
+    
+    def get_summary(self) -> dict:
+        return {
+            'original_shape': self.original_shape,
+            'current_shape': self.df.shape,
+            'columns': list(self.df.columns),
+            'dtypes': self.df.dtypes.to_dict(),
+            'null_counts': self.df.isnull().sum().to_dict()
+        }
+
+def clean_dataset(filepath: str, output_path: Optional[str] = None) -> pd.DataFrame:
+    df = pd.read_csv(filepath)
+    cleaner = DataCleaner(df)
+    
+    cleaner.remove_duplicates()
+    cleaner.handle_missing_values(strategy='fill', fill_value=0)
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        cleaner.normalize_column(col)
+    
+    summary = cleaner.get_summary()
+    print(f"Data cleaning complete. Removed {summary['original_shape'][0] - summary['current_shape'][0]} rows")
+    
+    if output_path:
+        cleaner.df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to {output_path}")
+    
+    return cleaner.df
