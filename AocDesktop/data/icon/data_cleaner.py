@@ -525,3 +525,85 @@ if __name__ == "__main__":
     print(cleaned)
     print("\nValidation Results:")
     print(validate_data(cleaned, required_columns=['A', 'B', 'C']))
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers using IQR method
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    z_scores = np.abs(stats.zscore(data[column]))
+    return data[z_scores < threshold]
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    return data
+
+def normalize_standard(data, column):
+    """
+    Normalize data using Standardization (Z-score normalization)
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    data[column + '_standardized'] = (data[column] - mean_val) / std_val
+    return data
+
+def clean_dataset(df, numeric_columns, method='iqr', normalize=True):
+    """
+    Main cleaning function for datasets
+    """
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            if method == 'iqr':
+                cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            elif method == 'zscore':
+                cleaned_df = remove_outliers_zscore(cleaned_df, col)
+            
+            if normalize:
+                cleaned_df = normalize_standard(cleaned_df, col)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns, min_rows=10):
+    """
+    Validate dataset structure and content
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    if len(df) < min_rows:
+        raise ValueError(f"Dataset has fewer than {min_rows} rows")
+    
+    return True
+
+def get_summary_statistics(df):
+    """
+    Generate summary statistics for numeric columns
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    summary = df[numeric_cols].describe()
+    summary.loc['missing'] = df[numeric_cols].isnull().sum()
+    summary.loc['unique'] = df[numeric_cols].nunique()
+    
+    return summary
