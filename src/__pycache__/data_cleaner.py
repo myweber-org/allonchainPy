@@ -1,40 +1,109 @@
+
+import numpy as np
 import pandas as pd
 
-def clean_dataset(df):
+def remove_outliers_iqr(df, column):
     """
-    Clean a pandas DataFrame by removing duplicate rows and
-    filling missing values with column means for numeric columns.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
     """
-    # Remove duplicate rows
-    df_cleaned = df.drop_duplicates()
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    # Fill missing numeric values with column mean
-    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
-    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    # For non-numeric columns, fill with mode (most frequent value)
-    non_numeric_cols = df_cleaned.select_dtypes(exclude=['number']).columns
-    for col in non_numeric_cols:
-        if df_cleaned[col].isnull().any():
-            mode_value = df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown'
-            df_cleaned[col] = df_cleaned[col].fillna(mode_value)
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    return df_cleaned
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
 
-def validate_data(df, required_columns):
+def calculate_statistics(df, column):
     """
-    Validate that the DataFrame contains all required columns
-    and has no completely empty columns.
+    Calculate basic statistics for a column after outlier removal.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing statistical measures
     """
-    missing_columns = [col for col in required_columns if col not in df.columns]
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if missing_columns:
-        raise ValueError(f"Missing required columns: {missing_columns}")
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': len(df[column])
+    }
     
-    # Check for completely empty columns
-    empty_columns = df.columns[df.isnull().all()].tolist()
+    return stats
+
+def clean_dataset(df, columns_to_clean=None):
+    """
+    Clean multiple columns in a DataFrame by removing outliers.
     
-    if empty_columns:
-        print(f"Warning: Found completely empty columns: {empty_columns}")
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns_to_clean (list): List of column names to clean. If None, clean all numeric columns.
     
-    return True
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    dict: Dictionary of statistics for each cleaned column
+    """
+    if columns_to_clean is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        columns_to_clean = list(numeric_cols)
+    
+    cleaned_df = df.copy()
+    statistics = {}
+    
+    for column in columns_to_clean:
+        if column in df.columns and pd.api.types.is_numeric_dtype(df[column]):
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            removed_count = original_count - len(cleaned_df)
+            
+            stats = calculate_statistics(cleaned_df, column)
+            stats['outliers_removed'] = removed_count
+            statistics[column] = stats
+    
+    return cleaned_df, statistics
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.uniform(0, 200, 1000)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.loc[::100, 'A'] = 500
+    
+    print("Original dataset shape:", df.shape)
+    print("\nOriginal statistics for column 'A':")
+    print(df['A'].describe())
+    
+    cleaned_df, stats = clean_dataset(df, ['A', 'B'])
+    
+    print("\nCleaned dataset shape:", cleaned_df.shape)
+    print("\nCleaned statistics for column 'A':")
+    print(cleaned_df['A'].describe())
+    print("\nDetailed statistics:")
+    for col, col_stats in stats.items():
+        print(f"\n{col}:")
+        for key, value in col_stats.items():
+            print(f"  {key}: {value:.2f}")
