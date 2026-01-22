@@ -1,48 +1,63 @@
+
 import numpy as np
 import pandas as pd
 from scipy import stats
 
-def remove_outliers_iqr(data, column):
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
     IQR = Q3 - Q1
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
-    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
 
-def normalize_minmax(data, column):
-    min_val = data[column].min()
-    max_val = data[column].max()
-    data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
-    return data
+def remove_outliers_zscore(df, column, threshold=3):
+    z_scores = np.abs(stats.zscore(df[column]))
+    return df[z_scores < threshold]
 
-def z_score_normalize(data, column):
-    mean = data[column].mean()
-    std = data[column].std()
-    data[column + '_zscore'] = (data[column] - mean) / std
-    return data
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
 
-def clean_dataset(df, numeric_columns, method='iqr'):
+def normalize_zscore(df, column):
+    mean_val = df[column].mean()
+    std_val = df[column].std()
+    df[column + '_zscore'] = (df[column] - mean_val) / std_val
+    return df
+
+def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize_method='minmax'):
     cleaned_df = df.copy()
     
     for col in numeric_columns:
-        if method == 'iqr':
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-        elif method == 'zscore':
-            z_scores = np.abs(stats.zscore(cleaned_df[col]))
-            cleaned_df = cleaned_df[z_scores < 3]
-    
-    for col in numeric_columns:
-        cleaned_df = normalize_minmax(cleaned_df, col)
+        if col in cleaned_df.columns:
+            if outlier_method == 'iqr':
+                cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            elif outlier_method == 'zscore':
+                cleaned_df = remove_outliers_zscore(cleaned_df, col)
+            
+            if normalize_method == 'minmax':
+                cleaned_df = normalize_minmax(cleaned_df, col)
+            elif normalize_method == 'zscore':
+                cleaned_df = normalize_zscore(cleaned_df, col)
     
     return cleaned_df
 
-def validate_data(df, required_columns):
-    missing_cols = [col for col in required_columns if col not in df.columns]
-    if missing_cols:
-        raise ValueError(f"Missing required columns: {missing_cols}")
+def validate_cleaning(df, original_df, column):
+    print(f"Original {column} stats:")
+    print(f"  Mean: {original_df[column].mean():.2f}")
+    print(f"  Std: {original_df[column].std():.2f}")
+    print(f"  Min: {original_df[column].min():.2f}")
+    print(f"  Max: {original_df[column].max():.2f}")
     
-    if df.empty:
-        raise ValueError("DataFrame is empty")
+    print(f"\nCleaned {column} stats:")
+    print(f"  Mean: {df[column].mean():.2f}")
+    print(f"  Std: {df[column].std():.2f}")
+    print(f"  Min: {df[column].min():.2f}")
+    print(f"  Max: {df[column].max():.2f}")
     
-    return True
+    if column + '_normalized' in df.columns:
+        print(f"\nNormalized {column} stats:")
+        print(f"  Min: {df[column + '_normalized'].min():.2f}")
+        print(f"  Max: {df[column + '_normalized'].max():.2f}")
