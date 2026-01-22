@@ -356,3 +356,166 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+class DataCleaner:
+    def __init__(self, file_path):
+        self.file_path = Path(file_path)
+        self.df = None
+        
+    def load_data(self):
+        if not self.file_path.exists():
+            raise FileNotFoundError(f"File not found: {self.file_path}")
+        
+        if self.file_path.suffix == '.csv':
+            self.df = pd.read_csv(self.file_path)
+        elif self.file_path.suffix in ['.xlsx', '.xls']:
+            self.df = pd.read_excel(self.file_path)
+        else:
+            raise ValueError("Unsupported file format. Use CSV or Excel files.")
+        
+        print(f"Loaded {len(self.df)} rows and {len(self.df.columns)} columns")
+        return self.df
+    
+    def remove_duplicates(self):
+        if self.df is None:
+            self.load_data()
+        
+        initial_count = len(self.df)
+        self.df = self.df.drop_duplicates()
+        removed = initial_count - len(self.df)
+        print(f"Removed {removed} duplicate rows")
+        return self.df
+    
+    def handle_missing_values(self, strategy='mean', columns=None):
+        if self.df is None:
+            self.load_data()
+        
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        missing_before = self.df[columns].isnull().sum().sum()
+        
+        if strategy == 'mean':
+            for col in columns:
+                if self.df[col].dtype in [np.float64, np.int64]:
+                    self.df[col].fillna(self.df[col].mean(), inplace=True)
+        elif strategy == 'median':
+            for col in columns:
+                if self.df[col].dtype in [np.float64, np.int64]:
+                    self.df[col].fillna(self.df[col].median(), inplace=True)
+        elif strategy == 'mode':
+            for col in columns:
+                self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+        elif strategy == 'drop':
+            self.df = self.df.dropna(subset=columns)
+        else:
+            raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+        
+        missing_after = self.df[columns].isnull().sum().sum()
+        print(f"Handled {missing_before - missing_after} missing values using {strategy} strategy")
+        return self.df
+    
+    def remove_outliers(self, columns=None, method='iqr', threshold=1.5):
+        if self.df is None:
+            self.load_data()
+        
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        initial_count = len(self.df)
+        
+        if method == 'iqr':
+            for col in columns:
+                if self.df[col].dtype in [np.float64, np.int64]:
+                    Q1 = self.df[col].quantile(0.25)
+                    Q3 = self.df[col].quantile(0.75)
+                    IQR = Q3 - Q1
+                    lower_bound = Q1 - threshold * IQR
+                    upper_bound = Q3 + threshold * IQR
+                    self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+        
+        removed = initial_count - len(self.df)
+        print(f"Removed {removed} outliers using {method} method")
+        return self.df
+    
+    def standardize_columns(self, columns=None):
+        if self.df is None:
+            self.load_data()
+        
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if self.df[col].dtype in [np.float64, np.int64]:
+                mean = self.df[col].mean()
+                std = self.df[col].std()
+                if std > 0:
+                    self.df[col] = (self.df[col] - mean) / std
+        
+        print(f"Standardized {len(columns)} columns")
+        return self.df
+    
+    def save_cleaned_data(self, output_path=None):
+        if self.df is None:
+            raise ValueError("No data to save. Load and clean data first.")
+        
+        if output_path is None:
+            output_path = self.file_path.parent / f"cleaned_{self.file_path.name}"
+        
+        output_path = Path(output_path)
+        
+        if output_path.suffix == '.csv':
+            self.df.to_csv(output_path, index=False)
+        elif output_path.suffix in ['.xlsx', '.xls']:
+            self.df.to_excel(output_path, index=False)
+        else:
+            output_path = output_path.with_suffix('.csv')
+            self.df.to_csv(output_path, index=False)
+        
+        print(f"Saved cleaned data to {output_path}")
+        return output_path
+    
+    def get_summary(self):
+        if self.df is None:
+            self.load_data()
+        
+        summary = {
+            'rows': len(self.df),
+            'columns': len(self.df.columns),
+            'missing_values': self.df.isnull().sum().sum(),
+            'duplicates': self.df.duplicated().sum(),
+            'data_types': self.df.dtypes.value_counts().to_dict(),
+            'numeric_columns': list(self.df.select_dtypes(include=[np.number]).columns),
+            'categorical_columns': list(self.df.select_dtypes(include=['object']).columns)
+        }
+        
+        return summary
+
+def clean_dataset(input_file, output_file=None, remove_dups=True, 
+                  handle_missing=True, remove_outliers=True, standardize=True):
+    cleaner = DataCleaner(input_file)
+    cleaner.load_data()
+    
+    if remove_dups:
+        cleaner.remove_duplicates()
+    
+    if handle_missing:
+        cleaner.handle_missing_values(strategy='mean')
+    
+    if remove_outliers:
+        cleaner.remove_outliers()
+    
+    if standardize:
+        cleaner.standardize_columns()
+    
+    output_path = cleaner.save_cleaned_data(output_file)
+    summary = cleaner.get_summary()
+    
+    print("\nData Cleaning Summary:")
+    for key, value in summary.items():
+        print(f"{key}: {value}")
+    
+    return cleaner.df, output_path
