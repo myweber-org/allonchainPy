@@ -205,4 +205,90 @@ if __name__ == "__main__":
     print(f"\nCleaned shape: {cleaned_df.shape}")
     
     is_valid, message = validate_dataframe(cleaned_df, ['temperature', 'humidity'])
-    print(f"\nValidation: {message}")
+    print(f"\nValidation: {message}")import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean', text_columns=None):
+    """
+    Clean a pandas DataFrame by handling duplicates, missing values,
+    and standardizing text columns.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = cleaned_df.shape[0]
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - cleaned_df.shape[0]
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_missing:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        if fill_missing == 'mean':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+        elif fill_missing == 'median':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].median())
+        elif fill_missing == 'zero':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(0)
+    
+    if text_columns:
+        for col in text_columns:
+            if col in cleaned_df.columns:
+                cleaned_df[col] = cleaned_df[col].astype(str).str.strip().str.lower()
+                cleaned_df[col] = cleaned_df[col].replace({'nan': np.nan, 'none': np.nan})
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if df.shape[0] < min_rows:
+        raise ValueError(f"DataFrame must have at least {min_rows} rows")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise KeyError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+def sample_data_for_testing():
+    """
+    Generate sample data for testing the cleaning functions.
+    """
+    data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', None, 'Eve'],
+        'age': [25, 30, 30, None, 35, 40],
+        'score': [85.5, 92.0, 92.0, 78.5, 88.0, 95.5],
+        'category': ['A', 'B', 'B', 'A', 'C', ' A ']
+    }
+    return pd.DataFrame(data)
+
+if __name__ == "__main__":
+    test_df = sample_data_for_testing()
+    print("Original DataFrame:")
+    print(test_df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned = clean_dataset(
+        test_df,
+        drop_duplicates=True,
+        fill_missing='mean',
+        text_columns=['name', 'category']
+    )
+    
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    
+    try:
+        validate_dataframe(cleaned, required_columns=['id', 'name', 'age'])
+        print("\nData validation passed")
+    except Exception as e:
+        print(f"\nData validation failed: {e}")
