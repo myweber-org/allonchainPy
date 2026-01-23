@@ -1,148 +1,129 @@
-import numpy as np
 import pandas as pd
-from scipy import stats
+import numpy as np
 
-class DataCleaner:
-    def __init__(self, df):
-        self.df = df.copy()
-        self.original_shape = df.shape
-        
-    def remove_outliers_iqr(self, columns=None, threshold=1.5):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        df_clean = self.df.copy()
-        for col in columns:
-            if col in df_clean.columns:
-                Q1 = df_clean[col].quantile(0.25)
-                Q3 = df_clean[col].quantile(0.75)
-                IQR = Q3 - Q1
-                lower_bound = Q1 - threshold * IQR
-                upper_bound = Q3 + threshold * IQR
-                df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
-        
-        removed_count = len(self.df) - len(df_clean)
-        self.df = df_clean
-        return removed_count
-    
-    def remove_outliers_zscore(self, columns=None, threshold=3):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        df_clean = self.df.copy()
-        for col in columns:
-            if col in df_clean.columns:
-                z_scores = np.abs(stats.zscore(df_clean[col].dropna()))
-                df_clean = df_clean[(z_scores < threshold) | df_clean[col].isna()]
-        
-        removed_count = len(self.df) - len(df_clean)
-        self.df = df_clean
-        return removed_count
-    
-    def normalize_minmax(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        df_normalized = self.df.copy()
-        for col in columns:
-            if col in df_normalized.columns:
-                min_val = df_normalized[col].min()
-                max_val = df_normalized[col].max()
-                if max_val > min_val:
-                    df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
-        
-        self.df = df_normalized
-        return self.df
-    
-    def normalize_zscore(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        df_normalized = self.df.copy()
-        for col in columns:
-            if col in df_normalized.columns:
-                mean_val = df_normalized[col].mean()
-                std_val = df_normalized[col].std()
-                if std_val > 0:
-                    df_normalized[col] = (df_normalized[col] - mean_val) / std_val
-        
-        self.df = df_normalized
-        return self.df
-    
-    def fill_missing_mean(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        df_filled = self.df.copy()
-        for col in columns:
-            if col in df_filled.columns:
-                mean_val = df_filled[col].mean()
-                df_filled[col] = df_filled[col].fillna(mean_val)
-        
-        self.df = df_filled
-        return self.df
-    
-    def get_cleaned_data(self):
-        return self.df
-    
-    def get_removal_stats(self):
-        final_shape = self.df.shape
-        rows_removed = self.original_shape[0] - final_shape[0]
-        cols_removed = self.original_shape[1] - final_shape[1]
-        return {
-            'original_rows': self.original_shape[0],
-            'current_rows': final_shape[0],
-            'rows_removed': rows_removed,
-            'original_cols': self.original_shape[1],
-            'current_cols': final_shape[1],
-            'cols_removed': cols_removed
-        }import pandas as pd
-
-def clean_dataset(df, drop_duplicates=True):
+def clean_dataframe(df, missing_strategy='mean', outlier_threshold=3):
     """
-    Clean a pandas DataFrame by removing null values and optionally duplicates.
+    Clean a pandas DataFrame by handling missing values and outliers.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean.
-        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    missing_strategy (str): Strategy for handling missing values. 
+                            Options: 'mean', 'median', 'drop', 'fill_zero'.
+    outlier_threshold (float): Number of standard deviations for outlier detection.
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame.
+    pd.DataFrame: Cleaned DataFrame.
     """
-    cleaned_df = df.dropna()
+    cleaned_df = df.copy()
     
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
+    # Handle missing values
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    
+    if missing_strategy == 'mean':
+        cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(
+            cleaned_df[numeric_cols].mean()
+        )
+    elif missing_strategy == 'median':
+        cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(
+            cleaned_df[numeric_cols].median()
+        )
+    elif missing_strategy == 'fill_zero':
+        cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(0)
+    elif missing_strategy == 'drop':
+        cleaned_df = cleaned_df.dropna(subset=numeric_cols)
+    
+    # Handle outliers using Z-score method
+    if outlier_threshold > 0:
+        for col in numeric_cols:
+            z_scores = np.abs((cleaned_df[col] - cleaned_df[col].mean()) / 
+                             cleaned_df[col].std())
+            outlier_mask = z_scores > outlier_threshold
+            
+            if outlier_mask.any():
+                # Cap outliers at threshold * standard deviation
+                upper_bound = cleaned_df[col].mean() + outlier_threshold * cleaned_df[col].std()
+                lower_bound = cleaned_df[col].mean() - outlier_threshold * cleaned_df[col].std()
+                cleaned_df.loc[outlier_mask, col] = np.where(
+                    cleaned_df.loc[outlier_mask, col] > upper_bound,
+                    upper_bound,
+                    lower_bound
+                )
+    
+    # Clean non-numeric columns by filling with mode
+    non_numeric_cols = cleaned_df.select_dtypes(exclude=[np.number]).columns
+    for col in non_numeric_cols:
+        if cleaned_df[col].isna().any():
+            mode_value = cleaned_df[col].mode()
+            if not mode_value.empty:
+                cleaned_df[col] = cleaned_df[col].fillna(mode_value.iloc[0])
     
     return cleaned_df
 
-def validate_data(df, required_columns):
+def validate_dataframe(df, required_columns=None, min_rows=1):
     """
-    Validate that the DataFrame contains all required columns.
+    Validate DataFrame structure and content.
     
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_columns (list): List of column names that must be present.
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    min_rows (int): Minimum number of rows required.
     
     Returns:
-        bool: True if all required columns are present, False otherwise.
+    tuple: (is_valid, error_message)
     """
-    return all(col in df.columns for col in required_columns)
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
 
-if __name__ == "__main__":
-    sample_data = {
-        'A': [1, 2, None, 4, 1],
-        'B': [5, 6, 7, None, 5],
-        'C': ['x', 'y', 'z', 'x', 'x']
+# Example usage function
+def process_example_data():
+    """Example function demonstrating data cleaning."""
+    np.random.seed(42)
+    
+    # Create sample data with missing values and outliers
+    data = {
+        'temperature': np.random.normal(25, 5, 100),
+        'humidity': np.random.normal(60, 10, 100),
+        'location': ['A', 'B', 'C'] * 33 + ['A'],
+        'pressure': np.random.normal(1013, 50, 100)
     }
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
+    df = pd.DataFrame(data)
     
-    cleaned = clean_dataset(df)
-    print("\nCleaned DataFrame:")
-    print(cleaned)
+    # Introduce missing values
+    df.loc[10:15, 'temperature'] = np.nan
+    df.loc[20:25, 'humidity'] = np.nan
+    df.loc[5, 'location'] = np.nan
     
-    is_valid = validate_data(cleaned, ['A', 'B', 'C'])
-    print(f"\nData validation result: {is_valid}")
+    # Introduce outliers
+    df.loc[0, 'temperature'] = 100
+    df.loc[1, 'pressure'] = 2000
+    
+    print("Original DataFrame shape:", df.shape)
+    print("Missing values:\n", df.isna().sum())
+    
+    # Clean the data
+    cleaned_df = clean_dataframe(df, missing_strategy='median', outlier_threshold=3)
+    
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("Missing values after cleaning:\n", cleaned_df.isna().sum())
+    
+    # Validate the cleaned data
+    is_valid, message = validate_dataframe(cleaned_df, min_rows=50)
+    print(f"\nValidation: {message}")
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    result_df = process_example_data()
+    print("\nFirst 5 rows of cleaned data:")
+    print(result_df.head())
