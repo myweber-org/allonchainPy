@@ -89,3 +89,11 @@ if __name__ == "__main__":
     cleaned_data = remove_outliers_iqr(sample_data, 'values')
     print("\nCleaned data shape:", cleaned_data.shape)
     print("Cleaned statistics:", calculate_summary_statistics(cleaned_data, 'values'))
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
