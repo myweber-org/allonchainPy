@@ -1,10 +1,10 @@
 
-import numpy as np
 import pandas as pd
+import numpy as np
 
 def remove_outliers_iqr(df, column):
     """
-    Remove outliers from a DataFrame column using the IQR method.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
@@ -29,11 +29,11 @@ def remove_outliers_iqr(df, column):
 
 def calculate_summary_statistics(df, column):
     """
-    Calculate summary statistics for a column.
+    Calculate summary statistics for a column after outlier removal.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    column (str): Column name
+    column (str): Column name to analyze
     
     Returns:
     dict: Dictionary containing summary statistics
@@ -47,59 +47,26 @@ def calculate_summary_statistics(df, column):
         'std': df[column].std(),
         'min': df[column].min(),
         'max': df[column].max(),
-        'count': df[column].count(),
-        'missing': df[column].isnull().sum()
+        'count': df[column].count()
     }
     
     return stats
 
-def clean_numeric_data(df, columns=None):
+def clean_dataset(df, numeric_columns):
     """
-    Clean numeric data by removing outliers from specified columns.
-    If no columns specified, clean all numeric columns.
+    Clean multiple numeric columns in a DataFrame by removing outliers.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    columns (list): List of column names to clean
+    numeric_columns (list): List of column names to clean
     
     Returns:
     pd.DataFrame: Cleaned DataFrame
     """
-    if columns is None:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        columns = numeric_cols
-    
     cleaned_df = df.copy()
     
-    for col in columns:
-        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
-            try:
-                cleaned_df = remove_outliers_iqr(cleaned_df, col)
-            except Exception as e:
-                print(f"Warning: Could not clean column '{col}': {e}")
+    for column in numeric_columns:
+        if column in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[column]):
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
     
     return cleaned_df
-
-if __name__ == "__main__":
-    # Example usage
-    sample_data = {
-        'A': np.random.normal(100, 15, 1000),
-        'B': np.random.exponential(50, 1000),
-        'C': np.random.uniform(0, 200, 1000)
-    }
-    
-    df = pd.DataFrame(sample_data)
-    
-    # Add some outliers
-    df.loc[1000] = [500, 1000, 300]
-    df.loc[1001] = [-100, -50, -10]
-    
-    print("Original shape:", df.shape)
-    print("Original statistics for column 'A':")
-    print(calculate_summary_statistics(df, 'A'))
-    
-    cleaned_df = clean_numeric_data(df, ['A', 'B'])
-    
-    print("\nCleaned shape:", cleaned_df.shape)
-    print("Cleaned statistics for column 'A':")
-    print(calculate_summary_statistics(cleaned_df, 'A'))
