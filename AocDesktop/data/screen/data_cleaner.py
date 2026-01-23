@@ -1,35 +1,97 @@
 import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
 
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
-    return df
+    def handle_missing_values(self, strategy='mean', columns=None):
+        if columns is None:
+            columns = self.df.columns
 
-def clean_dataset(input_file, output_file):
-    df = pd.read_csv(input_file)
+        for col in columns:
+            if self.df[col].isnull().any():
+                if strategy == 'mean':
+                    fill_value = self.df[col].mean()
+                elif strategy == 'median':
+                    fill_value = self.df[col].median()
+                elif strategy == 'mode':
+                    fill_value = self.df[col].mode()[0]
+                elif strategy == 'drop':
+                    self.df = self.df.dropna(subset=[col])
+                    continue
+                else:
+                    raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+                
+                self.df[col] = self.df[col].fillna(fill_value)
+        
+        return self
+
+    def remove_outliers_iqr(self, columns=None, threshold=1.5):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+
+        for col in columns:
+            Q1 = self.df[col].quantile(0.25)
+            Q3 = self.df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            
+            mask = (self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)
+            self.df = self.df[mask]
+        
+        return self
+
+    def normalize_data(self, columns=None, method='minmax'):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+
+        for col in columns:
+            if method == 'minmax':
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val != min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+            elif method == 'zscore':
+                mean_val = self.df[col].mean()
+                std_val = self.df[col].std()
+                if std_val != 0:
+                    self.df[col] = (self.df[col] - mean_val) / std_val
+            else:
+                raise ValueError("Method must be 'minmax' or 'zscore'")
+        
+        return self
+
+    def get_cleaned_data(self):
+        print(f"Original shape: {self.original_shape}")
+        print(f"Cleaned shape: {self.df.shape}")
+        print(f"Rows removed: {self.original_shape[0] - self.df.shape[0]}")
+        return self.df
+
+    def save_cleaned_data(self, filepath):
+        self.df.to_csv(filepath, index=False)
+        print(f"Cleaned data saved to {filepath}")
+
+def example_usage():
+    data = {
+        'A': [1, 2, np.nan, 4, 5, 100],
+        'B': [10, 20, 30, np.nan, 50, 200],
+        'C': ['x', 'y', 'x', 'y', 'x', 'y']
+    }
     
-    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    df = pd.DataFrame(data)
+    cleaner = DataCleaner(df)
     
-    for col in numeric_columns:
-        df = remove_outliers_iqr(df, col)
+    cleaned_df = (cleaner
+                  .handle_missing_values(strategy='mean')
+                  .remove_outliers_iqr(threshold=1.5)
+                  .normalize_data(method='minmax')
+                  .get_cleaned_data())
     
-    for col in numeric_columns:
-        df = normalize_minmax(df, col)
-    
-    df.to_csv(output_file, index=False)
-    print(f"Cleaned data saved to {output_file}")
-    print(f"Original shape: {pd.read_csv(input_file).shape}")
-    print(f"Cleaned shape: {df.shape}")
+    return cleaned_df
 
 if __name__ == "__main__":
-    clean_dataset('raw_data.csv', 'cleaned_data.csv')
+    result = example_usage()
+    print(result.head())
