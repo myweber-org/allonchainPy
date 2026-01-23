@@ -101,3 +101,55 @@ def clean_dataframe(df: pd.DataFrame,
                 cleaned_df = filter_outliers(cleaned_df, col, method=method)
     
     return cleaned_df
+def remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    
+    Args:
+        data_list (list): Input list potentially containing duplicates.
+    
+    Returns:
+        list: List with duplicates removed.
+    
+    Example:
+        >>> remove_duplicates([1, 2, 2, 3, 1])
+        [1, 2, 3]
+    """
+    seen = set()
+    result = []
+    
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    
+    return result
+
+def clean_numeric_data(values, default=0):
+    """
+    Clean numeric data by converting strings to floats and handling invalid values.
+    
+    Args:
+        values (list): List of values to clean.
+        default (float): Default value for invalid entries.
+    
+    Returns:
+        list: Cleaned list of numeric values.
+    """
+    cleaned = []
+    
+    for value in values:
+        try:
+            cleaned.append(float(value))
+        except (ValueError, TypeError):
+            cleaned.append(default)
+    
+    return cleaned
+
+if __name__ == "__main__":
+    # Test the functions
+    test_data = [1, "2", 2, "invalid", 3.5, 1]
+    
+    print("Original data:", test_data)
+    print("Without duplicates:", remove_duplicates(test_data))
+    print("Cleaned numeric:", clean_numeric_data(test_data))
