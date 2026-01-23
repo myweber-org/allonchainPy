@@ -88,3 +88,69 @@ if __name__ == "__main__":
     print(cleaned_df)
     print("\nSummary statistics after cleaning:")
     print(calculate_summary_statistics(cleaned_df, 'temperature'))
+import pandas as pd
+import numpy as np
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def handle_missing_values(self, strategy='mean', columns=None):
+        if columns is None:
+            columns = self.df.columns
+            
+        for col in columns:
+            if self.df[col].dtype in ['int64', 'float64']:
+                if strategy == 'mean':
+                    fill_value = self.df[col].mean()
+                elif strategy == 'median':
+                    fill_value = self.df[col].median()
+                elif strategy == 'mode':
+                    fill_value = self.df[col].mode()[0]
+                else:
+                    fill_value = strategy
+                    
+                self.df[col].fillna(fill_value, inplace=True)
+            else:
+                self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+                
+        return self.df
+    
+    def remove_outliers_iqr(self, columns=None, threshold=1.5):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        df_clean = self.df.copy()
+        
+        for col in columns:
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            
+            mask = (df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)
+            df_clean = df_clean[mask]
+            
+        self.df = df_clean
+        return self.df
+    
+    def get_cleaning_report(self):
+        removed_rows = self.original_shape[0] - self.df.shape[0]
+        removed_cols = self.original_shape[1] - self.df.shape[1]
+        
+        report = {
+            'original_shape': self.original_shape,
+            'cleaned_shape': self.df.shape,
+            'rows_removed': removed_rows,
+            'columns_removed': removed_cols,
+            'missing_values_remaining': self.df.isnull().sum().sum()
+        }
+        
+        return report
+    
+    def save_cleaned_data(self, filepath):
+        self.df.to_csv(filepath, index=False)
+        return f"Data saved to {filepath}"
