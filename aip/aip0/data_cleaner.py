@@ -1,83 +1,51 @@
+
 import pandas as pd
 import numpy as np
 
-def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
-    """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean.
-        drop_duplicates (bool): If True, remove duplicate rows.
-        fill_missing (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'.
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame.
-    """
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def clean_dataset(df, numeric_columns):
     cleaned_df = df.copy()
-    
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-    
-    if fill_missing == 'drop':
-        cleaned_df = cleaned_df.dropna()
-    else:
-        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
-        for col in numeric_cols:
-            if cleaned_df[col].isnull().any():
-                if fill_missing == 'mean':
-                    cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
-                elif fill_missing == 'median':
-                    cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
-                elif fill_missing == 'mode':
-                    cleaned_df[col].fillna(cleaned_df[col].mode()[0], inplace=True)
-    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df = normalize_minmax(cleaned_df, col)
+    cleaned_df = cleaned_df.dropna()
     return cleaned_df
 
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate DataFrame structure and content.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_columns (list): List of column names that must be present.
-    
-    Returns:
-        dict: Validation results with keys 'is_valid' and 'message'.
-    """
-    validation_result = {'is_valid': True, 'message': 'Validation passed'}
-    
-    if not isinstance(df, pd.DataFrame):
-        validation_result['is_valid'] = False
-        validation_result['message'] = 'Input is not a pandas DataFrame'
-        return validation_result
-    
-    if df.empty:
-        validation_result['is_valid'] = False
-        validation_result['message'] = 'DataFrame is empty'
-        return validation_result
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            validation_result['is_valid'] = False
-            validation_result['message'] = f'Missing required columns: {missing_columns}'
-    
-    return validation_result
-
-if __name__ == '__main__':
+def main():
     sample_data = {
-        'A': [1, 2, 2, 4, None],
-        'B': [5, None, 7, 8, 9],
-        'C': ['x', 'y', 'y', 'z', 'z']
+        'feature1': np.random.normal(100, 15, 200),
+        'feature2': np.random.exponential(50, 200),
+        'category': np.random.choice(['A', 'B', 'C'], 200)
     }
-    
     df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
+    df.loc[10, 'feature1'] = 500
+    df.loc[20, 'feature2'] = 1000
     
-    cleaned = clean_dataset(df, fill_missing='median')
-    print("\nCleaned DataFrame:")
-    print(cleaned)
+    print("Original dataset shape:", df.shape)
+    print("Original statistics:")
+    print(df[['feature1', 'feature2']].describe())
     
-    validation = validate_dataframe(cleaned, required_columns=['A', 'B'])
-    print(f"\nValidation: {validation['message']}")
+    cleaned = clean_dataset(df, ['feature1', 'feature2'])
+    
+    print("\nCleaned dataset shape:", cleaned.shape)
+    print("Cleaned statistics:")
+    print(cleaned[['feature1', 'feature2']].describe())
+    
+    return cleaned
+
+if __name__ == "__main__":
+    result = main()
