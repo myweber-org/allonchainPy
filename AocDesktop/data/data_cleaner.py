@@ -95,3 +95,25 @@ def clean_dataset(df, numeric_columns):
             cleaned_df = remove_outliers_iqr(cleaned_df, col)
             cleaned_df = normalize_minmax(cleaned_df, col)
     return cleaned_df.reset_index(drop=True)
+def filter_valid_entries(data_list, required_keys):
+    """
+    Returns a new list containing only dictionaries that have all specified keys
+    and where none of the required key values are None or empty strings.
+    """
+    if not isinstance(data_list, list):
+        raise TypeError("Input must be a list")
+    if not isinstance(required_keys, list):
+        raise TypeError("Required keys must be a list")
+
+    filtered_data = []
+    for entry in data_list:
+        if not isinstance(entry, dict):
+            continue
+        valid = True
+        for key in required_keys:
+            if key not in entry or entry[key] in (None, ""):
+                valid = False
+                break
+        if valid:
+            filtered_data.append(entry)
+    return filtered_data
