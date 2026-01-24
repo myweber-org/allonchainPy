@@ -153,4 +153,23 @@ class DataCleaner:
     
     def save_cleaned_data(self, filepath):
         self.df.to_csv(filepath, index=False)
-        return f"Data saved to {filepath}"
+        return f"Data saved to {filepath}"import pandas as pd
+
+def clean_dataframe(df, column_name):
+    """
+    Clean a specific column in a pandas DataFrame.
+    Removes duplicates, strips whitespace, and converts to lowercase.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame.")
+    
+    # Remove duplicates
+    df = df.drop_duplicates(subset=[column_name])
+    
+    # Strip whitespace and convert to lowercase
+    df[column_name] = df[column_name].astype(str).str.strip().str.lower()
+    
+    # Drop rows where the column is empty after cleaning
+    df = df[df[column_name] != '']
+    
+    return df.reset_index(drop=True)
