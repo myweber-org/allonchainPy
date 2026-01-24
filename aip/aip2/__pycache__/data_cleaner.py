@@ -1,101 +1,127 @@
-import numpy as np
 import pandas as pd
-from scipy import stats
+import numpy as np
 
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        subset: column label or sequence of labels to consider for duplicates
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
 
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
-    return df
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        strategy: 'mean', 'median', 'mode', or 'drop'
+        columns: specific columns to apply strategy to
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    df_copy = df.copy()
+    
+    if columns is None:
+        columns = df_copy.columns
+    
+    for col in columns:
+        if df_copy[col].dtype in ['int64', 'float64']:
+            if strategy == 'mean':
+                df_copy[col].fillna(df_copy[col].mean(), inplace=True)
+            elif strategy == 'median':
+                df_copy[col].fillna(df_copy[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df_copy[col].fillna(df_copy[col].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                df_copy = df_copy.dropna(subset=[col])
+    
+    return df_copy
 
-def standardize_zscore(df, column):
-    mean_val = df[column].mean()
-    std_val = df[column].std()
-    df[column + '_standardized'] = (df[column] - mean_val) / std_val
-    return df
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a column in DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        column: column name to normalize
+        method: 'minmax' or 'zscore'
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    df_copy = df.copy()
+    
+    if method == 'minmax':
+        min_val = df_copy[column].min()
+        max_val = df_copy[column].max()
+        if max_val != min_val:
+            df_copy[column] = (df_copy[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = df_copy[column].mean()
+        std_val = df_copy[column].std()
+        if std_val != 0:
+            df_copy[column] = (df_copy[column] - mean_val) / std_val
+    
+    return df_copy
 
-def clean_dataset(df, numeric_columns):
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Remove outliers from a column in DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        column: column name to check for outliers
+        method: 'iqr' or 'zscore'
+        threshold: threshold value for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    df_copy = df.copy()
+    
+    if method == 'iqr':
+        Q1 = df_copy[column].quantile(0.25)
+        Q3 = df_copy[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        df_copy = df_copy[(df_copy[column] >= lower_bound) & (df_copy[column] <= upper_bound)]
+    
+    elif method == 'zscore':
+        z_scores = np.abs((df_copy[column] - df_copy[column].mean()) / df_copy[column].std())
+        df_copy = df_copy[z_scores < threshold]
+    
+    return df_copy
+
+def clean_data_pipeline(df, steps=None):
+    """
+    Execute a pipeline of data cleaning steps.
+    
+    Args:
+        df: pandas DataFrame
+        steps: list of cleaning functions and their arguments
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if steps is None:
+        steps = [
+            (remove_duplicates, {}),
+            (handle_missing_values, {'strategy': 'mean'}),
+            (remove_outliers, {'column': df.columns[0], 'method': 'iqr'})
+        ]
+    
     cleaned_df = df.copy()
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-            cleaned_df = normalize_minmax(cleaned_df, col)
-            cleaned_df = standardize_zscore(cleaned_df, col)
+    
+    for func, kwargs in steps:
+        cleaned_df = func(cleaned_df, **kwargs)
+    
     return cleaned_df
-
-def validate_data(df, required_columns):
-    missing_cols = [col for col in required_columns if col not in df.columns]
-    if missing_cols:
-        raise ValueError(f"Missing required columns: {missing_cols}")
-    return True
-
-if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'feature_a': np.random.normal(100, 15, 200),
-        'feature_b': np.random.exponential(50, 200),
-        'feature_c': np.random.uniform(0, 1, 200)
-    })
-    
-    cleaned = clean_dataset(sample_data, ['feature_a', 'feature_b', 'feature_c'])
-    print(f"Original shape: {sample_data.shape}")
-    print(f"Cleaned shape: {cleaned.shape}")
-    print(f"Columns after cleaning: {list(cleaned.columns)}")
-def remove_duplicates(data_list):
-    """
-    Remove duplicate items from a list while preserving order.
-    
-    Args:
-        data_list (list): Input list potentially containing duplicates.
-    
-    Returns:
-        list: List with duplicates removed.
-    """
-    seen = set()
-    result = []
-    
-    for item in data_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    
-    return result
-
-def clean_numeric_data(values, default=0):
-    """
-    Clean numeric data by converting strings to floats and handling invalid values.
-    
-    Args:
-        values (list): List of values to clean.
-        default (float): Default value for invalid entries.
-    
-    Returns:
-        list: Cleaned list of numeric values.
-    """
-    cleaned = []
-    
-    for val in values:
-        try:
-            cleaned.append(float(val))
-        except (ValueError, TypeError):
-            cleaned.append(default)
-    
-    return cleaned
-
-if __name__ == "__main__":
-    # Example usage
-    sample_data = [1, 2, 2, 3, 4, 4, 5]
-    cleaned_data = remove_duplicates(sample_data)
-    print(f"Original: {sample_data}")
-    print(f"Cleaned: {cleaned_data}")
-    
-    numeric_data = ["1.5", "2.3", "invalid", "4.7", None]
-    cleaned_numeric = clean_numeric_data(numeric_data)
-    print(f"Numeric data: {cleaned_numeric}")
