@@ -95,3 +95,33 @@ def example_usage():
 if __name__ == "__main__":
     result = example_usage()
     print(result.head())
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def clean_dataset(df, numeric_columns):
+    original_len = len(df)
+    for col in numeric_columns:
+        if col in df.columns:
+            df = remove_outliers_iqr(df, col)
+    removed_count = original_len - len(df)
+    print(f"Removed {removed_count} outliers from dataset")
+    return df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': np.random.normal(100, 15, 1000).tolist() + [500, -100],
+        'B': np.random.normal(50, 10, 1000).tolist() + [200, -50],
+        'C': np.random.normal(0, 1, 1002)
+    }
+    df = pd.DataFrame(sample_data)
+    cleaned_df = clean_dataset(df, ['A', 'B'])
+    print(f"Original shape: {df.shape}, Cleaned shape: {cleaned_df.shape}")
