@@ -105,3 +105,95 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
     print(f"Removed {removed} outliers from column '{column}'")
     
     return filtered_df
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_df = df.copy()
+        
+    def remove_outliers_zscore(self, columns=None, threshold=3):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        df_clean = self.df.copy()
+        for col in columns:
+            if col in self.df.columns:
+                z_scores = np.abs(stats.zscore(self.df[col].dropna()))
+                mask = z_scores < threshold
+                df_clean = df_clean[mask | self.df[col].isna()]
+        
+        self.df = df_clean.reset_index(drop=True)
+        return self
+    
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns:
+                col_min = self.df[col].min()
+                col_max = self.df[col].max()
+                if col_max > col_min:
+                    self.df[col] = (self.df[col] - col_min) / (col_max - col_min)
+        
+        return self
+    
+    def fill_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns:
+                median_val = self.df[col].median()
+                self.df[col] = self.df[col].fillna(median_val)
+        
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def get_summary(self):
+        summary = {
+            'original_rows': len(self.original_df),
+            'cleaned_rows': len(self.df),
+            'removed_rows': len(self.original_df) - len(self.df),
+            'removed_percentage': (len(self.original_df) - len(self.df)) / len(self.original_df) * 100
+        }
+        return summary
+
+def create_sample_data():
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.uniform(0, 1, 1000)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    df.iloc[10:20, 0] = np.nan
+    df.iloc[50:55, 1] = 9999
+    df.iloc[100:105, 2] = -999
+    
+    return df
+
+if __name__ == "__main__":
+    sample_df = create_sample_data()
+    cleaner = DataCleaner(sample_df)
+    
+    print("Original data shape:", cleaner.original_df.shape)
+    
+    cleaner.fill_missing_median() \
+           .remove_outliers_zscore(threshold=3) \
+           .normalize_minmax()
+    
+    print("Cleaned data shape:", cleaner.df.shape)
+    summary = cleaner.get_summary()
+    print(f"Removed {summary['removed_rows']} rows ({summary['removed_percentage']:.2f}%)")
+    
+    cleaned_data = cleaner.get_cleaned_data()
+    print("\nFirst 5 rows of cleaned data:")
+    print(cleaned_data.head())
