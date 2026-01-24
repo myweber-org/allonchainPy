@@ -1,17 +1,17 @@
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 def remove_outliers_iqr(df, column):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Remove outliers from a DataFrame column using the IQR method.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to process
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
     
     Returns:
-        pd.DataFrame: DataFrame with outliers removed
+    pd.DataFrame: DataFrame with outliers removed
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
@@ -27,49 +27,64 @@ def remove_outliers_iqr(df, column):
     
     return filtered_df
 
-def clean_numeric_data(df, columns=None):
+def normalize_column(df, column):
     """
-    Clean numeric data by removing outliers from specified columns.
-    If no columns specified, clean all numeric columns.
+    Normalize a column using min-max scaling.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        columns (list, optional): List of column names to clean
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to normalize
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame
+    pd.DataFrame: DataFrame with normalized column
     """
-    if columns is None:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        columns = numeric_cols
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = df[column].min()
+    max_val = df[column].max()
+    
+    if max_val == min_val:
+        df[f'{column}_normalized'] = 0.5
+    else:
+        df[f'{column}_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    
+    return df
+
+def clean_dataset(df, numeric_columns=None):
+    """
+    Clean dataset by removing outliers from all numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    numeric_columns (list): List of numeric column names to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
     
     cleaned_df = df.copy()
     
-    for col in columns:
-        if col in cleaned_df.columns:
-            try:
-                cleaned_df = remove_outliers_iqr(cleaned_df, col)
-            except Exception as e:
-                print(f"Warning: Could not clean column '{col}': {e}")
+    for column in numeric_columns:
+        if column in df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
     
     return cleaned_df
 
-def get_cleaning_report(original_df, cleaned_df):
-    """
-    Generate a report comparing original and cleaned DataFrames.
-    
-    Args:
-        original_df (pd.DataFrame): Original DataFrame
-        cleaned_df (pd.DataFrame): Cleaned DataFrame
-    
-    Returns:
-        dict: Dictionary containing cleaning statistics
-    """
-    report = {
-        'original_rows': len(original_df),
-        'cleaned_rows': len(cleaned_df),
-        'rows_removed': len(original_df) - len(cleaned_df),
-        'removal_percentage': ((len(original_df) - len(cleaned_df)) / len(original_df)) * 100
+if __name__ == "__main__":
+    sample_data = {
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.uniform(0, 200, 1000)
     }
     
-    return report
+    df = pd.DataFrame(sample_data)
+    print(f"Original shape: {df.shape}")
+    
+    cleaned_df = clean_dataset(df)
+    print(f"Cleaned shape: {cleaned_df.shape}")
+    
+    normalized_df = normalize_column(cleaned_df, 'A')
+    print(f"Normalized column added: {'A_normalized' in normalized_df.columns}")
