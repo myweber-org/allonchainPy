@@ -48,3 +48,54 @@ if __name__ == "__main__":
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {cleaned.shape}")
     print(f"Columns after cleaning: {list(cleaned.columns)}")
+def remove_duplicates(data_list):
+    """
+    Remove duplicate items from a list while preserving order.
+    
+    Args:
+        data_list (list): Input list potentially containing duplicates.
+    
+    Returns:
+        list: List with duplicates removed.
+    """
+    seen = set()
+    result = []
+    
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    
+    return result
+
+def clean_numeric_data(values, default=0):
+    """
+    Clean numeric data by converting strings to floats and handling invalid values.
+    
+    Args:
+        values (list): List of values to clean.
+        default (float): Default value for invalid entries.
+    
+    Returns:
+        list: Cleaned list of numeric values.
+    """
+    cleaned = []
+    
+    for val in values:
+        try:
+            cleaned.append(float(val))
+        except (ValueError, TypeError):
+            cleaned.append(default)
+    
+    return cleaned
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = [1, 2, 2, 3, 4, 4, 5]
+    cleaned_data = remove_duplicates(sample_data)
+    print(f"Original: {sample_data}")
+    print(f"Cleaned: {cleaned_data}")
+    
+    numeric_data = ["1.5", "2.3", "invalid", "4.7", None]
+    cleaned_numeric = clean_numeric_data(numeric_data)
+    print(f"Numeric data: {cleaned_numeric}")
