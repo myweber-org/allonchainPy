@@ -278,4 +278,111 @@ if __name__ == "__main__":
         stats = calculate_statistics(cleaned_df)
         print(f"Data statistics: {stats}")
         print(f"Cleaned data shape: {cleaned_df.shape}")
-        print(f"Cleaned data saved to: cleaned_data.csv")
+        print(f"Cleaned data saved to: cleaned_data.csv")import csv
+import os
+from typing import List, Dict, Optional
+
+class DataCleaner:
+    def __init__(self, input_file: str, output_file: Optional[str] = None):
+        self.input_file = input_file
+        self.output_file = output_file or self._generate_output_filename()
+        self.data = []
+        self.headers = []
+
+    def _generate_output_filename(self) -> str:
+        base, ext = os.path.splitext(self.input_file)
+        return f"{base}_cleaned{ext}"
+
+    def load_data(self) -> None:
+        try:
+            with open(self.input_file, 'r', newline='', encoding='utf-8') as file:
+                reader = csv.DictReader(file)
+                self.headers = reader.fieldnames or []
+                self.data = [row for row in reader]
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Input file '{self.input_file}' not found.")
+        except Exception as e:
+            raise RuntimeError(f"Error loading data: {str(e)}")
+
+    def remove_empty_rows(self) -> None:
+        self.data = [row for row in self.data if any(row.values())]
+
+    def trim_whitespace(self) -> None:
+        for row in self.data:
+            for key in row:
+                if isinstance(row[key], str):
+                    row[key] = row[key].strip()
+
+    def fill_missing_values(self, default: str = "N/A") -> None:
+        for row in self.data:
+            for key in self.headers:
+                if not row.get(key):
+                    row[key] = default
+
+    def remove_duplicates(self, subset: Optional[List[str]] = None) -> None:
+        if not self.data:
+            return
+        
+        seen = set()
+        unique_data = []
+        
+        for row in self.data:
+            if subset:
+                key = tuple(row[col] for col in subset)
+            else:
+                key = tuple(row.values())
+            
+            if key not in seen:
+                seen.add(key)
+                unique_data.append(row)
+        
+        self.data = unique_data
+
+    def save_data(self) -> None:
+        if not self.data:
+            raise ValueError("No data to save. Please load data first.")
+        
+        with open(self.output_file, 'w', newline='', encoding='utf-8') as file:
+            writer = csv.DictWriter(file, fieldnames=self.headers)
+            writer.writeheader()
+            writer.writerows(self.data)
+
+    def clean(self, 
+              remove_empty: bool = True,
+              trim_whitespace: bool = True,
+              fill_missing: bool = True,
+              default_value: str = "N/A",
+              remove_dups: bool = True,
+              duplicate_subset: Optional[List[str]] = None) -> str:
+        
+        self.load_data()
+        
+        if remove_empty:
+            self.remove_empty_rows()
+        
+        if trim_whitespace:
+            self.trim_whitespace()
+        
+        if fill_missing:
+            self.fill_missing_values(default_value)
+        
+        if remove_dups:
+            self.remove_duplicates(duplicate_subset)
+        
+        self.save_data()
+        return self.output_file
+
+def example_usage():
+    cleaner = DataCleaner("raw_data.csv")
+    output_file = cleaner.clean(
+        remove_empty=True,
+        trim_whitespace=True,
+        fill_missing=True,
+        default_value="UNKNOWN",
+        remove_dups=True,
+        duplicate_subset=["id", "email"]
+    )
+    print(f"Cleaned data saved to: {output_file}")
+
+if __name__ == "__main__":
+    example_usage()
