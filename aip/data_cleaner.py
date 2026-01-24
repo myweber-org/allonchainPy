@@ -208,4 +208,63 @@ def validate_data(df, required_columns=None, min_rows=1):
         if missing_cols:
             return False, f"Missing required columns: {missing_cols}"
     
-    return True, "Data validation passed"
+    return True, "Data validation passed"import pandas as pd
+import numpy as np
+
+def clean_data(df, column_mapping=None, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        column_mapping (dict, optional): Dictionary to rename columns.
+        drop_duplicates (bool, optional): Whether to drop duplicate rows.
+        fill_missing (str, optional): Strategy to fill missing values.
+            Options: 'mean', 'median', 'mode', or 'drop'.
+
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+
+    if column_mapping:
+        cleaned_df.rename(columns=column_mapping, inplace=True)
+
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df.drop_duplicates(inplace=True)
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows.")
+
+    for col in cleaned_df.select_dtypes(include=[np.number]).columns:
+        if cleaned_df[col].isnull().any():
+            if fill_missing == 'mean':
+                cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
+            elif fill_missing == 'median':
+                cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
+            elif fill_missing == 'mode':
+                cleaned_df[col].fillna(cleaned_df[col].mode()[0], inplace=True)
+            elif fill_missing == 'drop':
+                cleaned_df.dropna(subset=[col], inplace=True)
+            else:
+                raise ValueError("Invalid fill_missing option.")
+
+    for col in cleaned_df.select_dtypes(include=['object']).columns:
+        if cleaned_df[col].isnull().any():
+            cleaned_df[col].fillna('Unknown', inplace=True)
+
+    print(f"Data cleaning complete. Final shape: {cleaned_df.shape}")
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'ID': [1, 2, 2, 3, 4, 5, 5],
+        'Value': [10.5, np.nan, 15.0, 20.0, np.nan, 25.0, 25.0],
+        'Category': ['A', 'B', 'B', None, 'C', 'A', 'A']
+    }
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned = clean_data(df, column_mapping=None, drop_duplicates=True, fill_missing='mean')
+    print(cleaned)
