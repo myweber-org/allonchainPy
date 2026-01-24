@@ -171,3 +171,142 @@ def validate_data(data, check_duplicates=True, check_infinite=True):
                 break
     
     return validation_results
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    factor (float): Multiplier for IQR (default 1.5)
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)].copy()
+
+def normalize_minmax(data, column):
+    """
+    Normalize a column using min-max scaling to [0, 1] range.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to normalize
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    result = data.copy()
+    min_val = result[column].min()
+    max_val = result[column].max()
+    
+    if max_val == min_val:
+        result[column] = 0.5
+    else:
+        result[column] = (result[column] - min_val) / (max_val - min_val)
+    
+    return result
+
+def standardize_zscore(data, column):
+    """
+    Standardize a column using z-score normalization.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to standardize
+    
+    Returns:
+    pd.DataFrame: DataFrame with standardized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    result = data.copy()
+    mean_val = result[column].mean()
+    std_val = result[column].std()
+    
+    if std_val == 0:
+        result[column] = 0
+    else:
+        result[column] = (result[column] - mean_val) / std_val
+    
+    return result
+
+def clean_dataset(data, numeric_columns, outlier_factor=1.5, normalize=True):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    numeric_columns (list): List of numeric column names to process
+    outlier_factor (float): Factor for IQR outlier detection
+    normalize (bool): Whether to apply min-max normalization
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if not isinstance(data, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            cleaned_data = remove_outliers_iqr(cleaned_data, column, outlier_factor)
+            
+            if normalize:
+                cleaned_data = normalize_minmax(cleaned_data, column)
+    
+    return cleaned_data.reset_index(drop=True)
+
+def validate_data(data, required_columns, numeric_columns):
+    """
+    Validate dataset structure and content.
+    
+    Parameters:
+    data (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    numeric_columns (list): List of column names that should be numeric
+    
+    Returns:
+    dict: Dictionary with validation results
+    """
+    validation_result = {
+        'is_valid': True,
+        'missing_columns': [],
+        'non_numeric_columns': [],
+        'null_counts': {}
+    }
+    
+    for column in required_columns:
+        if column not in data.columns:
+            validation_result['missing_columns'].append(column)
+            validation_result['is_valid'] = False
+    
+    for column in numeric_columns:
+        if column in data.columns:
+            if not pd.api.types.is_numeric_dtype(data[column]):
+                validation_result['non_numeric_columns'].append(column)
+                validation_result['is_valid'] = False
+            
+            null_count = data[column].isnull().sum()
+            if null_count > 0:
+                validation_result['null_counts'][column] = null_count
+    
+    return validation_result
