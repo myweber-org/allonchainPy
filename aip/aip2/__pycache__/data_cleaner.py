@@ -147,3 +147,11 @@ if __name__ == "__main__":
     
     print("\nCleaned data shape:", cleaned_df.shape)
     print("Missing values after cleaning:", cleaned_df.isnull().sum().sum())
+def deduplicate_list(original_list):
+    seen = set()
+    deduplicated = []
+    for item in original_list:
+        if item not in seen:
+            seen.add(item)
+            deduplicated.append(item)
+    return deduplicated
