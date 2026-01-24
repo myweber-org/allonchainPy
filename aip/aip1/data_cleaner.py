@@ -1,66 +1,121 @@
-
-import json
-
-def clean_data(input_file, output_file, key='valid'):
-    """
-    Load JSON data from input_file, filter entries where the specified key
-    is True, and save the cleaned data to output_file.
-    """
-    try:
-        with open(input_file, 'r') as f:
-            data = json.load(f)
-        
-        if isinstance(data, list):
-            cleaned_data = [entry for entry in data if entry.get(key) is True]
-        elif isinstance(data, dict):
-            cleaned_data = {k: v for k, v in data.items() if v.get(key) is True}
-        else:
-            raise ValueError("Unsupported data format. Expected list or dict.")
-        
-        with open(output_file, 'w') as f:
-            json.dump(cleaned_data, f, indent=2)
-        
-        print(f"Cleaned data saved to {output_file}")
-        return len(cleaned_data)
-    
-    except FileNotFoundError:
-        print(f"Error: File '{input_file}' not found.")
-    except json.JSONDecodeError:
-        print(f"Error: File '{input_file}' contains invalid JSON.")
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-import pandas as pd
 import numpy as np
-from scipy import stats
+import pandas as pd
 
-def load_dataset(filepath):
-    return pd.read_csv(filepath)
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to process
+    multiplier (float): IQR multiplier for outlier detection
+    
+    Returns:
+    pd.DataFrame: Dataframe with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data.copy()
 
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling to range [0, 1].
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to normalize
+    
+    Returns:
+    pd.Series: Normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return pd.Series([0.5] * len(data), index=data.index)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
 
-def normalize_column(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
-    return df
+def standardize_zscore(data, column):
+    """
+    Standardize data using Z-score normalization.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to standardize
+    
+    Returns:
+    pd.Series: Standardized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return pd.Series([0] * len(data), index=data.index)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
 
-def clean_data(df, numeric_columns):
-    for col in numeric_columns:
-        df = remove_outliers_iqr(df, col)
-        df = normalize_column(df, col)
-    return df
+def clean_dataset(data, numeric_columns=None, outlier_multiplier=1.5):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    numeric_columns (list): List of numeric column names to process
+    outlier_multiplier (float): IQR multiplier for outlier removal
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            cleaned_data = remove_outliers_iqr(cleaned_data, column, outlier_multiplier)
+            cleaned_data[f'{column}_normalized'] = normalize_minmax(cleaned_data, column)
+            cleaned_data[f'{column}_standardized'] = standardize_zscore(cleaned_data, column)
+    
+    return cleaned_data
 
-def save_cleaned_data(df, output_path):
-    df.to_csv(output_path, index=False)
-
-if __name__ == "__main__":
-    raw_data = load_dataset('raw_dataset.csv')
-    numeric_cols = ['age', 'income', 'score']
-    cleaned_df = clean_data(raw_data, numeric_cols)
-    save_cleaned_data(cleaned_df, 'cleaned_dataset.csv')
+def validate_data(data, required_columns, min_rows=1):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    data (pd.DataFrame): Dataframe to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(data, pd.DataFrame):
+        return False, "Input must be a pandas DataFrame"
+    
+    if len(data) < min_rows:
+        return False, f"Dataframe must have at least {min_rows} rows"
+    
+    missing_columns = [col for col in required_columns if col not in data.columns]
+    if missing_columns:
+        return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "Data validation passed"
