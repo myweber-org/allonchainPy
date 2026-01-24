@@ -157,4 +157,125 @@ def validate_dataframe(df, required_columns=None, min_rows=1):
         if missing_columns:
             return False, f"Missing required columns: {missing_columns}"
     
-    return True, "DataFrame is valid"
+    return True, "DataFrame is valid"import pandas as pd
+import numpy as np
+from typing import Optional
+
+def clean_csv_data(
+    input_path: str,
+    output_path: str,
+    missing_strategy: str = 'mean',
+    numeric_columns: Optional[list] = None,
+    date_columns: Optional[list] = None
+) -> pd.DataFrame:
+    """
+    Clean CSV data by handling missing values and converting data types.
+    
+    Parameters:
+    input_path: Path to input CSV file
+    output_path: Path to save cleaned CSV file
+    missing_strategy: Strategy for handling missing values ('mean', 'median', 'drop', 'zero')
+    numeric_columns: List of column names to treat as numeric
+    date_columns: List of column names to parse as dates
+    
+    Returns:
+    Cleaned DataFrame
+    """
+    
+    # Read the CSV file
+    df = pd.read_csv(input_path)
+    
+    # Convert specified columns to numeric
+    if numeric_columns:
+        for col in numeric_columns:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+    
+    # Convert specified columns to datetime
+    if date_columns:
+        for col in date_columns:
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+    
+    # Handle missing values based on strategy
+    if missing_strategy == 'mean':
+        df = df.fillna(df.mean(numeric_only=True))
+    elif missing_strategy == 'median':
+        df = df.fillna(df.median(numeric_only=True))
+    elif missing_strategy == 'zero':
+        df = df.fillna(0)
+    elif missing_strategy == 'drop':
+        df = df.dropna()
+    else:
+        raise ValueError(f"Unknown missing strategy: {missing_strategy}")
+    
+    # Remove duplicate rows
+    df = df.drop_duplicates()
+    
+    # Reset index after cleaning
+    df = df.reset_index(drop=True)
+    
+    # Save cleaned data
+    df.to_csv(output_path, index=False)
+    
+    return df
+
+def validate_dataframe(df: pd.DataFrame, required_columns: list) -> bool:
+    """
+    Validate that DataFrame contains all required columns.
+    
+    Parameters:
+    df: DataFrame to validate
+    required_columns: List of required column names
+    
+    Returns:
+    Boolean indicating if all required columns are present
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        print(f"Missing columns: {missing_columns}")
+        return False
+    
+    return True
+
+def calculate_statistics(df: pd.DataFrame) -> dict:
+    """
+    Calculate basic statistics for numeric columns.
+    
+    Parameters:
+    df: DataFrame to analyze
+    
+    Returns:
+    Dictionary containing statistics
+    """
+    numeric_df = df.select_dtypes(include=[np.number])
+    
+    if numeric_df.empty:
+        return {}
+    
+    stats = {
+        'mean': numeric_df.mean().to_dict(),
+        'median': numeric_df.median().to_dict(),
+        'std': numeric_df.std().to_dict(),
+        'min': numeric_df.min().to_dict(),
+        'max': numeric_df.max().to_dict()
+    }
+    
+    return stats
+
+if __name__ == "__main__":
+    # Example usage
+    cleaned_df = clean_csv_data(
+        input_path='raw_data.csv',
+        output_path='cleaned_data.csv',
+        missing_strategy='mean',
+        numeric_columns=['age', 'salary', 'score'],
+        date_columns=['join_date']
+    )
+    
+    if validate_dataframe(cleaned_df, ['id', 'name', 'age']):
+        stats = calculate_statistics(cleaned_df)
+        print(f"Data statistics: {stats}")
+        print(f"Cleaned data shape: {cleaned_df.shape}")
+        print(f"Cleaned data saved to: cleaned_data.csv")
