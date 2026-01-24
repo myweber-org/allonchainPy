@@ -1,37 +1,75 @@
-import numpy as np
+
 import pandas as pd
+import numpy as np
 
 def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
     Q1 = df[column].quantile(0.25)
     Q3 = df[column].quantile(0.75)
     IQR = Q3 - Q1
+    
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
 
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    if max_val == min_val:
-        return df[column].apply(lambda x: 0.5)
-    return df[column].apply(lambda x: (x - min_val) / (max_val - min_val))
-
-def clean_dataset(df, numeric_columns):
+def clean_numeric_data(df, columns=None):
+    """
+    Clean numeric data by removing outliers from specified columns.
+    If no columns specified, clean all numeric columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list, optional): List of column names to clean
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        columns = numeric_cols
+    
     cleaned_df = df.copy()
-    for col in numeric_columns:
+    
+    for col in columns:
         if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+            try:
+                cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            except Exception as e:
+                print(f"Warning: Could not clean column '{col}': {e}")
+    
     return cleaned_df
 
-def validate_dataframe(df):
-    required_checks = [
-        (lambda x: not x.empty, "DataFrame is empty"),
-        (lambda x: x.isnull().sum().sum() == 0, "DataFrame contains null values"),
-        (lambda x: (x.select_dtypes(include=[np.number]) >= 0).all().all(),
-         "DataFrame contains negative numeric values")
-    ]
-    for check_func, error_msg in required_checks:
-        if not check_func(df):
-            raise ValueError(f"Data validation failed: {error_msg}")
-    return True
+def get_cleaning_report(original_df, cleaned_df):
+    """
+    Generate a report comparing original and cleaned DataFrames.
+    
+    Args:
+        original_df (pd.DataFrame): Original DataFrame
+        cleaned_df (pd.DataFrame): Cleaned DataFrame
+    
+    Returns:
+        dict: Dictionary containing cleaning statistics
+    """
+    report = {
+        'original_rows': len(original_df),
+        'cleaned_rows': len(cleaned_df),
+        'rows_removed': len(original_df) - len(cleaned_df),
+        'removal_percentage': ((len(original_df) - len(cleaned_df)) / len(original_df)) * 100
+    }
+    
+    return report
