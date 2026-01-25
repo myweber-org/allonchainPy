@@ -98,4 +98,56 @@ if __name__ == "__main__":
     
     print("\nCleaned DataFrame shape:", cleaned_df.shape)
     print("\nCleaned summary for column 'A':")
-    print(calculate_summary_stats(cleaned_df, 'A'))
+    print(calculate_summary_stats(cleaned_df, 'A'))import pandas as pd
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and
+    filling missing values with appropriate defaults.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing values
+    # For numeric columns, fill with median
+    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+    for col in numeric_cols:
+        df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].median())
+    
+    # For categorical columns, fill with mode
+    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown')
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def validate_data(df, required_columns=None):
+    """
+    Validate that the DataFrame meets basic quality requirements.
+    """
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    return True
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     sample_data = pd.DataFrame({
+#         'id': [1, 2, 2, 3, 4],
+#         'value': [10, None, 20, 30, None],
+#         'category': ['A', 'B', None, 'A', 'C']
+#     })
+#     
+#     cleaned_data = clean_dataset(sample_data)
+#     print("Original data shape:", sample_data.shape)
+#     print("Cleaned data shape:", cleaned_data.shape)
+#     print("\nCleaned data:")
+#     print(cleaned_data)
