@@ -148,4 +148,99 @@ def validate_data(df, required_columns=None):
         if missing_columns:
             return False, f"Missing required columns: {missing_columns}"
     
-    return True, "Data validation passed"
+    return True, "Data validation passed"import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    def remove_outliers_iqr(self, columns=None, multiplier=1.5):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        clean_df = self.df.copy()
+        for col in columns:
+            if col in self.numeric_columns:
+                Q1 = clean_df[col].quantile(0.25)
+                Q3 = clean_df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - multiplier * IQR
+                upper_bound = Q3 + multiplier * IQR
+                clean_df = clean_df[(clean_df[col] >= lower_bound) & (clean_df[col] <= upper_bound)]
+        
+        return clean_df
+    
+    def fill_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        filled_df = self.df.copy()
+        for col in columns:
+            if col in self.numeric_columns:
+                median_val = filled_df[col].median()
+                filled_df[col] = filled_df[col].fillna(median_val)
+        
+        return filled_df
+    
+    def standardize_features(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        standardized_df = self.df.copy()
+        for col in columns:
+            if col in self.numeric_columns:
+                mean_val = standardized_df[col].mean()
+                std_val = standardized_df[col].std()
+                if std_val > 0:
+                    standardized_df[col] = (standardized_df[col] - mean_val) / std_val
+        
+        return standardized_df
+    
+    def get_summary(self):
+        summary = {
+            'original_shape': self.df.shape,
+            'missing_values': self.df.isnull().sum().to_dict(),
+            'numeric_columns': self.numeric_columns,
+            'data_types': self.df.dtypes.to_dict()
+        }
+        return summary
+
+def create_sample_data():
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 100),
+        'feature_b': np.random.exponential(50, 100),
+        'feature_c': np.random.randint(1, 100, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    missing_mask = np.random.random(100) < 0.1
+    df.loc[missing_mask, 'feature_a'] = np.nan
+    
+    outlier_mask = np.random.random(100) < 0.05
+    df.loc[outlier_mask, 'feature_b'] = df['feature_b'].max() * 5
+    
+    return df
+
+if __name__ == "__main__":
+    sample_df = create_sample_data()
+    cleaner = DataCleaner(sample_df)
+    
+    print("Data Summary:")
+    summary = cleaner.get_summary()
+    for key, value in summary.items():
+        print(f"{key}: {value}")
+    
+    cleaned_df = cleaner.remove_outliers_iqr(['feature_b'])
+    filled_df = cleaner.fill_missing_median()
+    standardized_df = cleaner.standardize_features(['feature_a', 'feature_b'])
+    
+    print(f"\nOriginal shape: {sample_df.shape}")
+    print(f"After outlier removal: {cleaned_df.shape}")
+    print(f"Missing values filled: {filled_df.isnull().sum().sum()}")
+    print(f"Standardized features mean: {standardized_df[['feature_a', 'feature_b']].mean().to_dict()}")
