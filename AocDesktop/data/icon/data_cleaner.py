@@ -255,3 +255,117 @@ def validate_data(df, required_columns=None, check_missing=True, check_duplicate
         validation_report['duplicate_rows'] = duplicate_count
     
     return validation_report
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def load_and_clean_csv(file_path, fill_strategy='mean', drop_threshold=0.5):
+    """
+    Load a CSV file and perform basic cleaning operations.
+    
+    Args:
+        file_path (str): Path to the CSV file
+        fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', 'zero')
+        drop_threshold (float): Drop columns with missing values above this threshold (0.0 to 1.0)
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Loaded {len(df)} rows and {len(df.columns)} columns")
+        
+        # Drop columns with too many missing values
+        missing_ratio = df.isnull().sum() / len(df)
+        columns_to_drop = missing_ratio[missing_ratio > drop_threshold].index
+        if len(columns_to_drop) > 0:
+            df = df.drop(columns=columns_to_drop)
+            print(f"Dropped {len(columns_to_drop)} columns with >{drop_threshold*100}% missing values")
+        
+        # Fill missing values based on strategy
+        if fill_strategy == 'mean':
+            df = df.fillna(df.select_dtypes(include=[np.number]).mean())
+        elif fill_strategy == 'median':
+            df = df.fillna(df.select_dtypes(include=[np.number]).median())
+        elif fill_strategy == 'mode':
+            for col in df.columns:
+                if df[col].dtype == 'object':
+                    df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+        elif fill_strategy == 'zero':
+            df = df.fillna(0)
+        
+        # Remove duplicate rows
+        initial_rows = len(df)
+        df = df.drop_duplicates()
+        if len(df) < initial_rows:
+            print(f"Removed {initial_rows - len(df)} duplicate rows")
+        
+        # Reset index
+        df = df.reset_index(drop=True)
+        
+        print(f"Cleaned data: {len(df)} rows and {len(df.columns)} columns remaining")
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+        return None
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to CSV.
+    
+    Args:
+        df (pd.DataFrame): Cleaned DataFrame
+        output_path (str): Path to save the cleaned data
+    """
+    if df is not None:
+        try:
+            Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to {output_path}")
+            return True
+        except Exception as e:
+            print(f"Error saving file: {str(e)}")
+            return False
+    return False
+
+def get_data_summary(df):
+    """
+    Generate summary statistics for the DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+        dict: Summary statistics
+    """
+    if df is None or df.empty:
+        return {}
+    
+    summary = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'numeric_columns': len(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': len(df.select_dtypes(include=['object']).columns),
+        'missing_values': int(df.isnull().sum().sum()),
+        'duplicate_rows': len(df) - len(df.drop_duplicates()),
+        'memory_usage_mb': round(df.memory_usage(deep=True).sum() / 1024 / 1024, 2)
+    }
+    
+    return summary
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = load_and_clean_csv(input_file, fill_strategy='mean', drop_threshold=0.3)
+    
+    if cleaned_df is not None:
+        summary = get_data_summary(cleaned_df)
+        print("Data Summary:", summary)
+        
+        save_cleaned_data(cleaned_df, output_file)
