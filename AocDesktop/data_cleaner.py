@@ -194,3 +194,94 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
+    
+    return cleaned_df
+
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Remove outliers from a specific column in a DataFrame.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    data = df[column].dropna()
+    
+    if method == 'iqr':
+        Q1 = data.quantile(0.25)
+        Q3 = data.quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    elif method == 'zscore':
+        mean = data.mean()
+        std = data.std()
+        z_scores = np.abs((df[column] - mean) / std)
+        filtered_df = df[z_scores <= threshold]
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+    
+    return filtered_df
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize specified columns to have zero mean and unit variance.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    standardized_df = df.copy()
+    for col in columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            mean = df[col].mean()
+            std = df[col].std()
+            if std > 0:
+                standardized_df[col] = (df[col] - mean) / std
+    
+    return standardized_df
+
+def main():
+    """
+    Example usage of the data cleaning functions.
+    """
+    sample_data = {
+        'id': [1, 2, 3, 4, 5, 5, 6],
+        'value': [10, 20, np.nan, 40, 50, 50, 1000],
+        'category': ['A', 'B', 'A', 'B', 'A', 'A', 'C']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned = clean_dataframe(df)
+    print("After cleaning:")
+    print(cleaned)
+    print("\n")
+    
+    no_outliers = remove_outliers(cleaned, 'value')
+    print("After removing outliers from 'value' column:")
+    print(no_outliers)
+    print("\n")
+    
+    standardized = standardize_columns(no_outliers, ['value'])
+    print("After standardizing 'value' column:")
+    print(standardized)
+
+if __name__ == "__main__":
+    main()
