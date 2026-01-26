@@ -153,4 +153,18 @@ def clean_dataset(data, outlier_method='iqr', normalize_method='minmax', missing
     
     cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy)
     
-    return cleaned_data
+    return cleaned_datadef remove_duplicates(input_list):
+    """
+    Removes duplicate items from a list while preserving the original order.
+    Args:
+        input_list (list): The list from which duplicates are to be removed.
+    Returns:
+        list: A new list with duplicates removed.
+    """
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
