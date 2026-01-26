@@ -391,4 +391,119 @@ def validate_dataframe(df, required_columns=None, min_rows=1):
     if len(df) < min_rows:
         return False, f"DataFrame has fewer than {min_rows} rows"
     
-    return True, "DataFrame is valid"
+    return True, "DataFrame is valid"import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, columns):
+    """
+    Remove outliers using the Interquartile Range method.
+    Returns a cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    for col in columns:
+        if col in df_clean.columns:
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean.reset_index(drop=True)
+
+def normalize_minmax(df, columns):
+    """
+    Normalize specified columns using Min-Max scaling.
+    Returns a DataFrame with normalized columns.
+    """
+    df_norm = df.copy()
+    for col in columns:
+        if col in df_norm.columns:
+            min_val = df_norm[col].min()
+            max_val = df_norm[col].max()
+            if max_val > min_val:
+                df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+    return df_norm
+
+def standardize_zscore(df, columns):
+    """
+    Standardize specified columns using Z-score normalization.
+    Returns a DataFrame with standardized columns.
+    """
+    df_std = df.copy()
+    for col in columns:
+        if col in df_std.columns:
+            mean_val = df_std[col].mean()
+            std_val = df_std[col].std()
+            if std_val > 0:
+                df_std[col] = (df_std[col] - mean_val) / std_val
+    return df_std
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values using specified strategy.
+    Supported strategies: 'mean', 'median', 'mode', 'drop'
+    """
+    df_processed = df.copy()
+    
+    if columns is None:
+        columns = df_processed.columns
+    
+    numeric_cols = df_processed[columns].select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'drop':
+        df_processed = df_processed.dropna(subset=numeric_cols)
+    elif strategy == 'mean':
+        df_processed[numeric_cols] = df_processed[numeric_cols].fillna(df_processed[numeric_cols].mean())
+    elif strategy == 'median':
+        df_processed[numeric_cols] = df_processed[numeric_cols].fillna(df_processed[numeric_cols].median())
+    elif strategy == 'mode':
+        for col in numeric_cols:
+            mode_val = df_processed[col].mode()
+            if not mode_val.empty:
+                df_processed[col] = df_processed[col].fillna(mode_val.iloc[0])
+    
+    return df_processed.reset_index(drop=True)
+
+def clean_dataset(df, numeric_columns=None, outlier_method='iqr', normalize=False, standardize=False, missing_strategy='mean'):
+    """
+    Comprehensive data cleaning pipeline.
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_clean = df.copy()
+    
+    df_clean = handle_missing_values(df_clean, strategy=missing_strategy, columns=numeric_columns)
+    
+    if outlier_method == 'iqr':
+        df_clean = remove_outliers_iqr(df_clean, numeric_columns)
+    
+    if normalize:
+        df_clean = normalize_minmax(df_clean, numeric_columns)
+    
+    if standardize:
+        df_clean = standardize_zscore(df_clean, numeric_columns)
+    
+    return df_clean
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, 3, 4, 5, 100],
+        'B': [10, 20, 30, 40, 50, 200],
+        'C': [0.1, 0.2, 0.3, 0.4, 0.5, 2.0]
+    })
+    
+    print("Original Data:")
+    print(sample_data)
+    
+    cleaned_data = clean_dataset(
+        sample_data,
+        numeric_columns=['A', 'B', 'C'],
+        outlier_method='iqr',
+        normalize=True,
+        standardize=False,
+        missing_strategy='mean'
+    )
+    
+    print("\nCleaned Data:")
+    print(cleaned_data)
