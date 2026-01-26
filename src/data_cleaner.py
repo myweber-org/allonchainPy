@@ -158,3 +158,120 @@ if __name__ == "__main__":
     print("\nValidation results:")
     for key, value in validation.items():
         print(f"{key}: {value}")
+import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        drop_duplicates (bool): Whether to drop duplicate rows
+        fill_missing (str or dict): Strategy to fill missing values:
+            - 'mean': Fill with column mean
+            - 'median': Fill with column median
+            - 'mode': Fill with column mode
+            - dict: Column-specific fill values
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing is not None:
+        if isinstance(fill_missing, dict):
+            cleaned_df = cleaned_df.fillna(fill_missing)
+        elif fill_missing == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_missing == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        elif fill_missing == 'mode':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
+    
+    return cleaned_df
+
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Remove outliers from a specific column using specified method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+        method (str): 'iqr' for interquartile range or 'zscore' for standard deviation
+        threshold (float): Threshold value for outlier detection
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    elif method == 'zscore':
+        mean = df[column].mean()
+        std = df[column].std()
+        z_scores = (df[column] - mean) / std
+        filtered_df = df[abs(z_scores) <= threshold]
+    
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+    
+    return filtered_df
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize specified columns to have zero mean and unit variance.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of column names to standardize
+    
+    Returns:
+        pd.DataFrame: DataFrame with standardized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=['float64', 'int64']).columns
+    
+    standardized_df = df.copy()
+    
+    for col in columns:
+        if col in df.columns and df[col].dtype in ['float64', 'int64']:
+            mean = df[col].mean()
+            std = df[col].std()
+            if std > 0:
+                standardized_df[col] = (df[col] - mean) / std
+    
+    return standardized_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, 5, None, 7, 8, 9, 100],
+        'B': [10, 20, 20, 40, 50, 60, 70, 80, 90, 1000],
+        'C': ['a', 'b', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    no_outliers = remove_outliers(cleaned, 'B', method='iqr')
+    print("\nDataFrame without outliers in column B:")
+    print(no_outliers)
+    
+    standardized = standardize_columns(no_outliers, columns=['A', 'B'])
+    print("\nStandardized DataFrame:")
+    print(standardized)
