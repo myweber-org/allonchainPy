@@ -271,3 +271,82 @@ def example_usage():
 
 if __name__ == "__main__":
     cleaned_data = example_usage()
+import pandas as pd
+
+def clean_dataset(df):
+    """
+    Remove null values and duplicate rows from a pandas DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to be cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame with nulls removed and duplicates dropped.
+    """
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Remove duplicate rows
+    df_cleaned = df_cleaned.drop_duplicates()
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def validate_dataset(df):
+    """
+    Validate dataset by checking for null values and duplicates.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+    
+    Returns:
+        dict: Dictionary containing validation results.
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'null_count': df.isnull().sum().sum(),
+        'duplicate_count': df.duplicated().sum(),
+        'unique_rows': len(df.drop_duplicates())
+    }
+    
+    return validation_results
+
+def process_data_file(file_path):
+    """
+    Load and clean data from a CSV file.
+    
+    Args:
+        file_path (str): Path to the CSV file.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        # Load data from CSV
+        df = pd.read_csv(file_path)
+        
+        # Print validation results before cleaning
+        print("Validation before cleaning:")
+        before_validation = validate_dataset(df)
+        for key, value in before_validation.items():
+            print(f"{key}: {value}")
+        
+        # Clean the dataset
+        df_cleaned = clean_dataset(df)
+        
+        # Print validation results after cleaning
+        print("\nValidation after cleaning:")
+        after_validation = validate_dataset(df_cleaned)
+        for key, value in after_validation.items():
+            print(f"{key}: {value}")
+        
+        return df_cleaned
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error processing file: {str(e)}")
+        return None
