@@ -534,3 +534,156 @@ if __name__ == "__main__":
     cleaned_df = clean_dataset(sample_df)
     print(f"Cleaned dataset shape: {cleaned_df.shape}")
     print(f"Outliers removed: {len(sample_df) - len(cleaned_df)}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers from a DataFrame column using IQR method.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    threshold (float): IQR multiplier for outlier detection
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    return filtered_df.copy()
+
+def normalize_column_zscore(dataframe, column):
+    """
+    Normalize a column using Z-score normalization.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    column (str): Column name to normalize
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    result_df = dataframe.copy()
+    mean_val = result_df[column].mean()
+    std_val = result_df[column].std()
+    
+    if std_val > 0:
+        result_df[f'{column}_normalized'] = (result_df[column] - mean_val) / std_val
+    else:
+        result_df[f'{column}_normalized'] = 0
+    
+    return result_df
+
+def clean_dataset(dataframe, numeric_columns=None, outlier_threshold=1.5):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    numeric_columns (list): List of numeric columns to process
+    outlier_threshold (float): Threshold for outlier removal
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = dataframe.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_df.columns:
+            # Remove outliers
+            q1 = cleaned_df[column].quantile(0.25)
+            q3 = cleaned_df[column].quantile(0.75)
+            iqr = q3 - q1
+            lower_bound = q1 - outlier_threshold * iqr
+            upper_bound = q3 + outlier_threshold * iqr
+            
+            mask = (cleaned_df[column] >= lower_bound) & (cleaned_df[column] <= upper_bound)
+            cleaned_df = cleaned_df[mask]
+            
+            # Normalize
+            mean_val = cleaned_df[column].mean()
+            std_val = cleaned_df[column].std()
+            
+            if std_val > 0:
+                cleaned_df[f'{column}_normalized'] = (cleaned_df[column] - mean_val) / std_val
+            else:
+                cleaned_df[f'{column}_normalized'] = 0
+    
+    return cleaned_df.reset_index(drop=True)
+
+def validate_dataframe(dataframe, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    dataframe (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'missing_columns': [],
+        'null_counts': {},
+        'data_types': {}
+    }
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in dataframe.columns]
+        if missing:
+            validation_results['is_valid'] = False
+            validation_results['missing_columns'] = missing
+    
+    for column in dataframe.columns:
+        null_count = dataframe[column].isnull().sum()
+        validation_results['null_counts'][column] = null_count
+        validation_results['data_types'][column] = str(dataframe[column].dtype)
+    
+    return validation_results
+
+def example_usage():
+    """
+    Example demonstrating the data cleaning functions.
+    """
+    np.random.seed(42)
+    
+    sample_data = {
+        'id': range(100),
+        'value': np.random.normal(100, 15, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    
+    print("Original DataFrame shape:", df.shape)
+    
+    cleaned_df = clean_dataset(df, numeric_columns=['value'])
+    
+    print("Cleaned DataFrame shape:", cleaned_df.shape)
+    print("\nValidation results:")
+    print(validate_dataframe(cleaned_df))
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    result_df = example_usage()
+    print("\nFirst 5 rows of cleaned data:")
+    print(result_df.head())
