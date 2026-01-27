@@ -1,7 +1,7 @@
 
 import pandas as pd
 import numpy as np
-from typing import Optional, Dict, List
+from typing import List, Optional
 
 class DataCleaner:
     def __init__(self, df: pd.DataFrame):
@@ -9,51 +9,58 @@ class DataCleaner:
         self.original_shape = df.shape
         
     def remove_duplicates(self, subset: Optional[List[str]] = None) -> 'DataCleaner':
-        self.df = self.df.drop_duplicates(subset=subset)
+        self.df = self.df.drop_duplicates(subset=subset, keep='first')
         return self
         
-    def handle_missing_values(self, strategy: str = 'mean', 
-                             custom_values: Optional[Dict] = None) -> 'DataCleaner':
-        if strategy == 'drop':
-            self.df = self.df.dropna()
-        elif strategy == 'mean':
-            numeric_cols = self.df.select_dtypes(include=[np.number]).columns
-            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mean())
-        elif strategy == 'custom' and custom_values:
-            self.df = self.df.fillna(custom_values)
-        return self
-        
-    def convert_dtypes(self, dtype_map: Dict[str, str]) -> 'DataCleaner':
-        for col, dtype in dtype_map.items():
-            if col in self.df.columns:
-                try:
-                    if dtype == 'datetime':
-                        self.df[col] = pd.to_datetime(self.df[col])
-                    else:
-                        self.df[col] = self.df[col].astype(dtype)
-                except Exception as e:
-                    print(f"Warning: Could not convert {col} to {dtype}: {e}")
-        return self
-        
-    def remove_outliers(self, column: str, method: str = 'iqr', 
-                       threshold: float = 1.5) -> 'DataCleaner':
+    def normalize_column(self, column: str, method: str = 'minmax') -> 'DataCleaner':
         if column not in self.df.columns:
-            return self
+            raise ValueError(f"Column '{column}' not found in DataFrame")
             
-        if method == 'iqr':
-            Q1 = self.df[column].quantile(0.25)
-            Q3 = self.df[column].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - threshold * IQR
-            upper_bound = Q3 + threshold * IQR
-            self.df = self.df[(self.df[column] >= lower_bound) & 
-                             (self.df[column] <= upper_bound)]
+        if method == 'minmax':
+            col_min = self.df[column].min()
+            col_max = self.df[column].max()
+            if col_max != col_min:
+                self.df[column] = (self.df[column] - col_min) / (col_max - col_min)
+        elif method == 'zscore':
+            col_mean = self.df[column].mean()
+            col_std = self.df[column].std()
+            if col_std > 0:
+                self.df[column] = (self.df[column] - col_mean) / col_std
+        else:
+            raise ValueError(f"Unknown normalization method: {method}")
+            
+        return self
+        
+    def fill_missing(self, column: str, strategy: str = 'mean') -> 'DataCleaner':
+        if column not in self.df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame")
+            
+        if strategy == 'mean':
+            fill_value = self.df[column].mean()
+        elif strategy == 'median':
+            fill_value = self.df[column].median()
+        elif strategy == 'mode':
+            fill_value = self.df[column].mode()[0]
+        elif strategy == 'zero':
+            fill_value = 0
+        else:
+            raise ValueError(f"Unknown fill strategy: {strategy}")
+            
+        self.df[column] = self.df[column].fillna(fill_value)
+        return self
+        
+    def remove_outliers(self, column: str, threshold: float = 3.0) -> 'DataCleaner':
+        if column not in self.df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame")
+            
+        z_scores = np.abs((self.df[column] - self.df[column].mean()) / self.df[column].std())
+        self.df = self.df[z_scores < threshold]
         return self
         
     def get_cleaned_data(self) -> pd.DataFrame:
-        return self.df
+        return self.df.copy()
         
-    def get_cleaning_report(self) -> Dict:
+    def get_stats(self) -> dict:
         return {
             'original_rows': self.original_shape[0],
             'original_columns': self.original_shape[1],
@@ -63,34 +70,27 @@ class DataCleaner:
             'columns_removed': self.original_shape[1] - self.df.shape[1]
         }
 
-def clean_csv_file(input_path: str, output_path: str, 
-                  cleaning_steps: Optional[Dict] = None) -> Dict:
-    try:
-        df = pd.read_csv(input_path)
-        cleaner = DataCleaner(df)
+def clean_dataset(df: pd.DataFrame, 
+                  remove_dups: bool = True,
+                  normalize_cols: Optional[List[str]] = None,
+                  fill_missing_cols: Optional[List[str]] = None,
+                  remove_outlier_cols: Optional[List[str]] = None) -> pd.DataFrame:
+    
+    cleaner = DataCleaner(df)
+    
+    if remove_dups:
+        cleaner.remove_duplicates()
         
-        if cleaning_steps:
-            if cleaning_steps.get('remove_duplicates'):
-                cleaner.remove_duplicates(cleaning_steps.get('duplicate_subset'))
-                
-            if cleaning_steps.get('handle_missing'):
-                strategy = cleaning_steps.get('missing_strategy', 'mean')
-                custom_vals = cleaning_steps.get('custom_values')
-                cleaner.handle_missing_values(strategy, custom_vals)
-                
-            if cleaning_steps.get('convert_dtypes'):
-                cleaner.convert_dtypes(cleaning_steps['convert_dtypes'])
-                
-            if cleaning_steps.get('remove_outliers'):
-                for outlier_config in cleaning_steps['remove_outliers']:
-                    cleaner.remove_outliers(**outlier_config)
-        
-        cleaned_df = cleaner.get_cleaned_data()
-        cleaned_df.to_csv(output_path, index=False)
-        
-        report = cleaner.get_cleaning_report()
-        report['success'] = True
-        return report
-        
-    except Exception as e:
-        return {'success': False, 'error': str(e)}
+    if normalize_cols:
+        for col in normalize_cols:
+            cleaner.normalize_column(col)
+            
+    if fill_missing_cols:
+        for col in fill_missing_cols:
+            cleaner.fill_missing(col)
+            
+    if remove_outlier_cols:
+        for col in remove_outlier_cols:
+            cleaner.remove_outliers(col)
+            
+    return cleaner.get_cleaned_data()
