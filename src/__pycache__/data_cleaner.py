@@ -1,74 +1,33 @@
-import pandas as pd
-import numpy as np
 
-def clean_dataframe(df):
-    """
-    Clean a pandas DataFrame by removing duplicates, handling missing values,
-    and standardizing string columns.
-    """
-    # Create a copy to avoid modifying the original
-    cleaned_df = df.copy()
-    
-    # Remove duplicate rows
-    initial_rows = len(cleaned_df)
-    cleaned_df = cleaned_df.drop_duplicates()
-    removed_duplicates = initial_rows - len(cleaned_df)
-    
-    # Standardize string columns (trim whitespace and convert to lowercase)
-    string_columns = cleaned_df.select_dtypes(include=['object']).columns
-    for col in string_columns:
-        cleaned_df[col] = cleaned_df[col].astype(str).str.strip().str.lower()
-    
-    # Replace empty strings with NaN
-    cleaned_df = cleaned_df.replace(r'^\s*$', np.nan, regex=True)
-    
-    # Fill missing numeric values with column mean
-    numeric_columns = cleaned_df.select_dtypes(include=[np.number]).columns
-    for col in numeric_columns:
-        cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
-    
-    # Fill missing string values with 'unknown'
-    for col in string_columns:
-        cleaned_df[col] = cleaned_df[col].fillna('unknown')
-    
-    # Reset index after cleaning
-    cleaned_df = cleaned_df.reset_index(drop=True)
-    
-    return cleaned_df, removed_duplicates
+import re
 
-def validate_dataframe(df):
+def clean_string(text):
     """
-    Validate DataFrame for common data quality issues.
+    Cleans a string by:
+    1. Removing leading and trailing whitespace.
+    2. Converting multiple spaces/newlines/tabs to a single space.
+    3. Converting the string to lowercase.
     """
-    validation_results = {
-        'total_rows': len(df),
-        'total_columns': len(df.columns),
-        'missing_values': df.isnull().sum().sum(),
-        'duplicate_rows': df.duplicated().sum(),
-        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
-        'string_columns': list(df.select_dtypes(include=['object']).columns)
-    }
-    
-    return validation_results
+    if not isinstance(text, str):
+        raise TypeError("Input must be a string")
 
-if __name__ == "__main__":
-    # Example usage
-    sample_data = {
-        'name': ['Alice', 'Bob', 'Alice', 'Charlie', '  david  ', None],
-        'age': [25, 30, 25, None, 35, 40],
-        'city': ['New York', 'London', 'new york', 'Paris', '  BERLIN  ', ''],
-        'score': [85.5, 92.0, 85.5, 78.5, 88.0, 91.5]
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\nValidation Results:")
-    print(validate_dataframe(df))
-    
-    cleaned_df, duplicates_removed = clean_dataframe(df)
-    print(f"\nRemoved {duplicates_removed} duplicate rows")
-    print("\nCleaned DataFrame:")
-    print(cleaned_df)
-    print("\nCleaned Validation Results:")
-    print(validate_dataframe(cleaned_df))
+    # Strip leading/trailing whitespace
+    text = text.strip()
+
+    # Replace any sequence of whitespace characters with a single space
+    text = re.sub(r'\s+', ' ', text)
+
+    # Convert to lowercase
+    text = text.lower()
+
+    return text
+
+def normalize_list(string_list):
+    """
+    Applies clean_string to each element in a list.
+    Returns a new list with cleaned strings.
+    """
+    if not isinstance(string_list, list):
+        raise TypeError("Input must be a list")
+
+    return [clean_string(item) for item in string_list]
