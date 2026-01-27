@@ -620,4 +620,78 @@ def clean_dataset(input_file, output_file, outlier_method='iqr', normalize_metho
     print(f"Cleaned shape: {df.shape}")
 
 if __name__ == "__main__":
-    clean_dataset('raw_data.csv', 'cleaned_data.csv')
+    clean_dataset('raw_data.csv', 'cleaned_data.csv')import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_file, output_file):
+    """
+    Load a CSV file, perform basic cleaning operations,
+    and save the cleaned data to a new file.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original shape: {df.shape}")
+        
+        df_cleaned = df.copy()
+        
+        df_cleaned = df_cleaned.drop_duplicates()
+        
+        numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].median())
+        
+        categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            df_cleaned[col] = df_cleaned[col].fillna('Unknown')
+        
+        df_cleaned = df_cleaned.dropna(how='all')
+        
+        print(f"Cleaned shape: {df_cleaned.shape}")
+        print(f"Rows removed: {df.shape[0] - df_cleaned.shape[0]}")
+        print(f"Columns: {df_cleaned.shape[1]}")
+        
+        df_cleaned.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to: {output_file}")
+        
+        return df_cleaned
+        
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        return None
+    except pd.errors.EmptyDataError:
+        print(f"Error: File '{input_file}' is empty.")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return None
+
+def analyze_data(df):
+    """
+    Perform basic analysis on the cleaned dataframe.
+    """
+    if df is not None and not df.empty:
+        print("\nData Analysis:")
+        print("=" * 50)
+        print(f"Total records: {len(df)}")
+        print(f"Total columns: {len(df.columns)}")
+        
+        print("\nColumn data types:")
+        print(df.dtypes)
+        
+        print("\nBasic statistics for numeric columns:")
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        if len(numeric_cols) > 0:
+            print(df[numeric_cols].describe())
+        
+        print("\nMissing values per column:")
+        missing_values = df.isnull().sum()
+        print(missing_values[missing_values > 0])
+
+if __name__ == "__main__":
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_csv, output_csv)
+    
+    if cleaned_df is not None:
+        analyze_data(cleaned_df)
