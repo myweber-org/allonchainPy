@@ -695,3 +695,130 @@ if __name__ == "__main__":
     
     if cleaned_df is not None:
         analyze_data(cleaned_df)
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, missing_strategy='mean', outlier_method='iqr', columns=None):
+    """
+    Clean dataset by handling missing values and outliers.
+    
+    Args:
+        df (pd.DataFrame): Input dataframe
+        missing_strategy (str): Strategy for missing values ('mean', 'median', 'mode', 'drop')
+        outlier_method (str): Method for outlier detection ('iqr', 'zscore')
+        columns (list): Specific columns to clean, defaults to all numeric columns
+    
+    Returns:
+        pd.DataFrame: Cleaned dataframe
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    for col in columns:
+        if col not in df_clean.columns:
+            continue
+            
+        if df_clean[col].isnull().any():
+            df_clean = handle_missing_values(df_clean, col, missing_strategy)
+        
+        if outlier_method:
+            df_clean = handle_outliers(df_clean, col, outlier_method)
+    
+    return df_clean
+
+def handle_missing_values(df, column, strategy='mean'):
+    df_copy = df.copy()
+    
+    if strategy == 'mean':
+        fill_value = df_copy[column].mean()
+    elif strategy == 'median':
+        fill_value = df_copy[column].median()
+    elif strategy == 'mode':
+        fill_value = df_copy[column].mode()[0]
+    elif strategy == 'drop':
+        return df_copy.dropna(subset=[column])
+    else:
+        raise ValueError(f"Unknown strategy: {strategy}")
+    
+    df_copy[column] = df_copy[column].fillna(fill_value)
+    return df_copy
+
+def handle_outliers(df, column, method='iqr'):
+    df_copy = df.copy()
+    data = df_copy[column].dropna()
+    
+    if method == 'iqr':
+        Q1 = data.quantile(0.25)
+        Q3 = data.quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+    elif method == 'zscore':
+        mean = data.mean()
+        std = data.std()
+        lower_bound = mean - 3 * std
+        upper_bound = mean + 3 * std
+    else:
+        raise ValueError(f"Unknown method: {method}")
+    
+    outliers_mask = (df_copy[column] < lower_bound) | (df_copy[column] > upper_bound)
+    df_copy.loc[outliers_mask, column] = np.nan
+    df_copy[column] = df_copy[column].interpolate(method='linear')
+    
+    return df_copy
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    
+    Args:
+        df (pd.DataFrame): Dataframe to validate
+        required_columns (list): List of required column names
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
+
+def get_data_summary(df):
+    """
+    Generate summary statistics for the dataframe.
+    
+    Args:
+        df (pd.DataFrame): Input dataframe
+    
+    Returns:
+        dict: Summary statistics
+    """
+    summary = {
+        'shape': df.shape,
+        'missing_values': df.isnull().sum().to_dict(),
+        'data_types': df.dtypes.astype(str).to_dict(),
+        'numeric_stats': {}
+    }
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        summary['numeric_stats'][col] = {
+            'mean': df[col].mean(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            'max': df[col].max(),
+            'median': df[col].median()
+        }
+    
+    return summary
