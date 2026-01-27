@@ -1,109 +1,100 @@
-import numpy as np
+
 import pandas as pd
+import numpy as np
 
-def remove_outliers_iqr(data, column, factor=1.5):
+def remove_outliers_iqr(df, column):
     """
-    Remove outliers using the Interquartile Range method.
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
     """
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
     IQR = Q3 - Q1
-    lower_bound = Q1 - factor * IQR
-    upper_bound = Q3 + factor * IQR
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
 
-def normalize_minmax(data, columns):
+def clean_numeric_data(df, columns=None):
     """
-    Normalize specified columns using Min-Max scaling.
+    Clean numeric data by removing outliers from specified columns.
+    If no columns specified, clean all numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
     """
-    normalized_data = data.copy()
-    for col in columns:
-        min_val = normalized_data[col].min()
-        max_val = normalized_data[col].max()
-        if max_val != min_val:
-            normalized_data[col] = (normalized_data[col] - min_val) / (max_val - min_val)
-        else:
-            normalized_data[col] = 0
-    return normalized_data
-
-def handle_missing_values(data, strategy='mean', columns=None):
-    """
-    Handle missing values using specified strategy.
-    """
-    processed_data = data.copy()
     if columns is None:
-        columns = processed_data.columns
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
     
     for col in columns:
-        if processed_data[col].isnull().any():
-            if strategy == 'mean':
-                fill_value = processed_data[col].mean()
-            elif strategy == 'median':
-                fill_value = processed_data[col].median()
-            elif strategy == 'mode':
-                fill_value = processed_data[col].mode()[0]
-            elif strategy == 'drop':
-                processed_data = processed_data.dropna(subset=[col])
-                continue
-            else:
-                fill_value = 0
-            
-            processed_data[col] = processed_data[col].fillna(fill_value)
+        if col in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[col]):
+            try:
+                cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            except Exception as e:
+                print(f"Warning: Could not clean column '{col}': {e}")
     
-    return processed_data
+    return cleaned_df
 
-def clean_dataset(data, config):
+def get_cleaning_stats(original_df, cleaned_df):
     """
-    Main function to clean dataset based on configuration.
+    Get statistics about the cleaning process.
+    
+    Parameters:
+    original_df (pd.DataFrame): Original DataFrame
+    cleaned_df (pd.DataFrame): Cleaned DataFrame
+    
+    Returns:
+    dict: Dictionary containing cleaning statistics
     """
-    cleaned_data = data.copy()
-    
-    if 'outlier_removal' in config:
-        for col in config['outlier_removal'].get('columns', []):
-            cleaned_data = remove_outliers_iqr(
-                cleaned_data, 
-                col, 
-                factor=config['outlier_removal'].get('factor', 1.5)
-            )
-    
-    if 'normalization' in config:
-        cleaned_data = normalize_minmax(
-            cleaned_data, 
-            config['normalization'].get('columns', [])
-        )
-    
-    if 'missing_values' in config:
-        cleaned_data = handle_missing_values(
-            cleaned_data,
-            strategy=config['missing_values'].get('strategy', 'mean'),
-            columns=config['missing_values'].get('columns')
-        )
-    
-    return cleaned_data
-
-if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'A': np.random.normal(100, 15, 1000),
-        'B': np.random.uniform(0, 1, 1000),
-        'C': np.random.choice([1, 2, 3, None], 1000, p=[0.3, 0.3, 0.3, 0.1])
-    })
-    
-    config = {
-        'outlier_removal': {
-            'columns': ['A'],
-            'factor': 1.5
-        },
-        'normalization': {
-            'columns': ['B']
-        },
-        'missing_values': {
-            'strategy': 'mean',
-            'columns': ['C']
-        }
+    stats = {
+        'original_rows': len(original_df),
+        'cleaned_rows': len(cleaned_df),
+        'rows_removed': len(original_df) - len(cleaned_df),
+        'removal_percentage': ((len(original_df) - len(cleaned_df)) / len(original_df)) * 100
     }
     
-    cleaned = clean_dataset(sample_data, config)
-    print(f"Original shape: {sample_data.shape}")
-    print(f"Cleaned shape: {cleaned.shape}")
-    print(f"Missing values after cleaning: {cleaned.isnull().sum().sum()}")
+    return stats
+
+if __name__ == "__main__":
+    # Example usage
+    np.random.seed(42)
+    data = {
+        'id': range(100),
+        'value': np.random.normal(100, 15, 100),
+        'score': np.random.uniform(0, 1, 100)
+    }
+    
+    # Add some outliers
+    data['value'][95] = 500
+    data['value'][96] = -200
+    data['score'][97] = 2.5
+    data['score'][98] = -1.0
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame shape:", df.shape)
+    
+    cleaned_df = clean_numeric_data(df)
+    print("Cleaned DataFrame shape:", cleaned_df.shape)
+    
+    stats = get_cleaning_stats(df, cleaned_df)
+    print("\nCleaning Statistics:")
+    for key, value in stats.items():
+        print(f"{key}: {value:.2f}" if isinstance(value, float) else f"{key}: {value}")
