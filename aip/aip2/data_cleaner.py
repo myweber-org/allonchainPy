@@ -321,3 +321,103 @@ if __name__ == "__main__":
     
     stats = calculate_statistics(sample_data, 1)
     print("Statistics:", stats)
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using Interquartile Range method.
+    Returns indices of outliers.
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers.index.tolist()
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method.
+    Returns cleaned dataframe.
+    """
+    z_scores = np.abs(stats.zscore(data[column].dropna()))
+    filtered_data = data[(z_scores < threshold) | (data[column].isna())]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize column using Min-Max scaling.
+    Returns normalized series.
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_column(data, column):
+    """
+    Standardize column using Z-score normalization.
+    Returns standardized series.
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values using specified strategy.
+    Supported strategies: 'mean', 'median', 'mode', 'drop'
+    """
+    if columns is None:
+        columns = data.columns
+    
+    data_copy = data.copy()
+    
+    for col in columns:
+        if data_copy[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = data_copy[col].mean()
+            elif strategy == 'median':
+                fill_value = data_copy[col].median()
+            elif strategy == 'mode':
+                fill_value = data_copy[col].mode()[0]
+            elif strategy == 'drop':
+                data_copy = data_copy.dropna(subset=[col])
+                continue
+            else:
+                raise ValueError(f"Unsupported strategy: {strategy}")
+            
+            data_copy[col] = data_copy[col].fillna(fill_value)
+    
+    return data_copy
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate dataframe structure and content.
+    Returns boolean and error message.
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
