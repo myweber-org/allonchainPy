@@ -546,4 +546,66 @@ class DataCleaner:
         if len(numeric_cols) > 0:
             print("\nNumeric columns statistics:")
             for col in numeric_cols:
-                print(f"{col}: mean={self.df[col].mean():.2f}, std={self.df[col].std():.2f}")
+                print(f"{col}: mean={self.df[col].mean():.2f}, std={self.df[col].std():.2f}")import pandas as pd
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+
+    Parameters:
+    df (pd.DataFrame): The input DataFrame to clean.
+    drop_duplicates (bool): If True, remove duplicate rows.
+    fill_missing (str or dict): Method to fill missing values.
+        If None, missing values are not filled.
+        If 'mean', fill with column mean (numeric only).
+        If 'median', fill with column median (numeric only).
+        If 'mode', fill with column mode.
+        If dict, column-specific fill values.
+
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+
+    if fill_missing is not None:
+        if fill_missing == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_missing == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        elif fill_missing == 'mode':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
+        elif isinstance(fill_missing, dict):
+            cleaned_df = cleaned_df.fillna(fill_missing)
+        else:
+            raise ValueError("Invalid fill_missing value. Use 'mean', 'median', 'mode', or a dict.")
+
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None, unique_columns=None):
+    """
+    Validate a DataFrame for required columns and unique constraints.
+
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
+    unique_columns (list): List of column names that must have unique values.
+
+    Returns:
+    bool: True if validation passes, False otherwise.
+    """
+    if required_columns is not None:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            print(f"Missing required columns: {missing}")
+            return False
+
+    if unique_columns is not None:
+        for col in unique_columns:
+            if col in df.columns and df[col].duplicated().any():
+                print(f"Column '{col}' has duplicate values.")
+                return False
+
+    return True
