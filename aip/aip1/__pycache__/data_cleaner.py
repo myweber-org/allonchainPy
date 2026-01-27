@@ -225,4 +225,152 @@ if __name__ == "__main__":
     
     print("\nCleaned DataFrame shape:", cleaned_df.shape)
     print("\nCleaned summary statistics:")
-    print(calculate_summary_statistics(cleaned_df, 'A'))
+    print(calculate_summary_statistics(cleaned_df, 'A'))import pandas as pd
+import numpy as np
+
+def clean_missing_data(df, strategy='mean', columns=None):
+    """
+    Clean missing values in a DataFrame using specified strategy.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        strategy (str): Strategy for handling missing values. 
+                       Options: 'mean', 'median', 'mode', 'drop', 'fill_zero'
+        columns (list): List of columns to apply cleaning. If None, applies to all numeric columns.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    for col in columns:
+        if col not in df_clean.columns:
+            continue
+            
+        if strategy == 'mean':
+            fill_value = df_clean[col].mean()
+        elif strategy == 'median':
+            fill_value = df_clean[col].median()
+        elif strategy == 'mode':
+            fill_value = df_clean[col].mode()[0] if not df_clean[col].mode().empty else 0
+        elif strategy == 'fill_zero':
+            fill_value = 0
+        elif strategy == 'drop':
+            df_clean = df_clean.dropna(subset=[col])
+            continue
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+        
+        df_clean[col] = df_clean[col].fillna(fill_value)
+    
+    return df_clean
+
+def remove_outliers_iqr(df, columns=None, multiplier=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of columns to check for outliers
+        multiplier (float): IQR multiplier for outlier detection
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col not in df_clean.columns:
+            continue
+            
+        Q1 = df_clean[col].quantile(0.25)
+        Q3 = df_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        
+        df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    
+    return df_clean
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize numeric columns to have zero mean and unit variance.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of columns to standardize
+    
+    Returns:
+        pd.DataFrame: Standardized DataFrame
+    """
+    from sklearn.preprocessing import StandardScaler
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_standardized = df.copy()
+    scaler = StandardScaler()
+    
+    df_standardized[columns] = scaler.fit_transform(df_standardized[columns])
+    
+    return df_standardized, scaler
+
+def load_and_clean_csv(filepath, cleaning_strategy='mean', remove_outliers=True):
+    """
+    Load CSV file and apply cleaning pipeline.
+    
+    Args:
+        filepath (str): Path to CSV file
+        cleaning_strategy (str): Strategy for handling missing values
+        remove_outliers (bool): Whether to remove outliers
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    try:
+        df = pd.read_csv(filepath)
+        print(f"Loaded data with shape: {df.shape}")
+        
+        df_clean = clean_missing_data(df, strategy=cleaning_strategy)
+        print(f"After cleaning missing values: {df_clean.shape}")
+        
+        if remove_outliers:
+            df_clean = remove_outliers_iqr(df_clean)
+            print(f"After removing outliers: {df_clean.shape}")
+        
+        return df_clean
+    
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5, 100],
+        'B': [10, 20, 30, np.nan, 50, 60],
+        'C': ['x', 'y', 'z', 'x', 'y', 'z']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_missing_data(df, strategy='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    outlier_free_df = remove_outliers_iqr(cleaned_df, multiplier=1.5)
+    print("\nDataFrame after outlier removal:")
+    print(outlier_free_df)
