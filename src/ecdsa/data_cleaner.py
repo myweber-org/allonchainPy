@@ -286,3 +286,77 @@ if __name__ == "__main__":
     # Validate the cleaned dataset
     print("\n" + "="*50 + "\n")
     validation_result = validate_dataset(cleaned_df, required_columns=['id', 'value', 'category'], min_rows=3)
+import pandas as pd
+import numpy as np
+from typing import Optional, List, Union
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_duplicates(self, subset: Optional[List[str]] = None, keep: str = 'first') -> 'DataCleaner':
+        self.df = self.df.drop_duplicates(subset=subset, keep=keep)
+        return self
+        
+    def convert_dtypes(self, column_type_map: dict) -> 'DataCleaner':
+        for column, dtype in column_type_map.items():
+            if column in self.df.columns:
+                try:
+                    if dtype == 'datetime':
+                        self.df[column] = pd.to_datetime(self.df[column])
+                    elif dtype == 'numeric':
+                        self.df[column] = pd.to_numeric(self.df[column], errors='coerce')
+                    elif dtype == 'category':
+                        self.df[column] = self.df[column].astype('category')
+                    else:
+                        self.df[column] = self.df[column].astype(dtype)
+                except Exception as e:
+                    print(f"Warning: Could not convert {column} to {dtype}: {e}")
+        return self
+        
+    def fill_missing(self, strategy: str = 'mean', custom_value: Optional[Union[int, float, str]] = None) -> 'DataCleaner':
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if strategy == 'mean':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mean())
+        elif strategy == 'median':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].median())
+        elif strategy == 'mode':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mode().iloc[0])
+        elif strategy == 'custom' and custom_value is not None:
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(custom_value)
+            
+        return self
+        
+    def remove_outliers(self, column: str, method: str = 'iqr', threshold: float = 1.5) -> 'DataCleaner':
+        if column not in self.df.columns:
+            return self
+            
+        if method == 'iqr':
+            Q1 = self.df[column].quantile(0.25)
+            Q3 = self.df[column].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            self.df = self.df[(self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)]
+            
+        elif method == 'zscore':
+            from scipy import stats
+            z_scores = np.abs(stats.zscore(self.df[column]))
+            self.df = self.df[z_scores < threshold]
+            
+        return self
+        
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df
+        
+    def get_stats(self) -> dict:
+        return {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': self.df.shape[0],
+            'cleaned_columns': self.df.shape[1],
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'missing_values': self.df.isnull().sum().sum()
+        }
