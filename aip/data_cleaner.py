@@ -504,3 +504,57 @@ def remove_duplicates_preserve_order(iterable):
             seen.add(item)
             result.append(item)
     return result
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_df = df.copy()
+        
+    def remove_outliers_zscore(self, columns=None, threshold=3):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        df_clean = self.df.copy()
+        for col in columns:
+            if col in df_clean.columns:
+                z_scores = np.abs(stats.zscore(df_clean[col].dropna()))
+                mask = z_scores < threshold
+                df_clean = df_clean[mask | df_clean[col].isna()]
+        return df_clean
+    
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        df_normalized = self.df.copy()
+        for col in columns:
+            if col in df_normalized.columns:
+                col_min = df_normalized[col].min()
+                col_max = df_normalized[col].max()
+                if col_max > col_min:
+                    df_normalized[col] = (df_normalized[col] - col_min) / (col_max - col_min)
+        return df_normalized
+    
+    def fill_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        df_filled = self.df.copy()
+        for col in columns:
+            if col in df_filled.columns:
+                median_val = df_filled[col].median()
+                df_filled[col] = df_filled[col].fillna(median_val)
+        return df_filled
+    
+    def get_summary(self):
+        summary = {
+            'original_rows': len(self.original_df),
+            'current_rows': len(self.df),
+            'missing_values': self.df.isnull().sum().sum(),
+            'numeric_columns': list(self.df.select_dtypes(include=[np.number]).columns),
+            'categorical_columns': list(self.df.select_dtypes(include=['object']).columns)
+        }
+        return summary
