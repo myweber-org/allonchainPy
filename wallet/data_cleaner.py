@@ -756,3 +756,26 @@ if __name__ == "__main__":
     normalized = normalize_columns(cleaned, columns=['A', 'B'])
     print("\nNormalized DataFrame:")
     print(normalized)
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_and_clean_data(filepath):
+    df = pd.read_csv(filepath)
+    df = df.dropna()
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    z_scores = np.abs(stats.zscore(df[numeric_cols]))
+    df = df[(z_scores < 3).all(axis=1)]
+    
+    for col in numeric_cols:
+        df[col] = (df[col] - df[col].min()) / (df[col].max() - df[col].min())
+    
+    return df
+
+def save_cleaned_data(df, output_path):
+    df.to_csv(output_path, index=False)
+
+if __name__ == "__main__":
+    cleaned_df = load_and_clean_data("raw_data.csv")
+    save_cleaned_data(cleaned_df, "cleaned_data.csv")
