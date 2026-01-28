@@ -1,109 +1,60 @@
 
 import os
-import hashlib
-from base64 import b64encode, b64decode
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad, unpad
-from Crypto.Protocol.KDF import PBKDF2
-from Crypto.Random import get_random_bytes
+import sys
 
-class FileEncryptor:
-    def __init__(self, password):
-        self.password = password.encode('utf-8')
-        self.salt = get_random_bytes(16)
-        self.key = PBKDF2(self.password, self.salt, dkLen=32, count=1000000)
+class XORCipher:
+    def __init__(self, key: str):
+        self.key = key.encode('utf-8')
+    
+    def encrypt(self, data: bytes) -> bytes:
+        key_length = len(self.key)
+        return bytes([data[i] ^ self.key[i % key_length] for i in range(len(data))])
+    
+    def decrypt(self, data: bytes) -> bytes:
+        return self.encrypt(data)
 
-    def encrypt_file(self, input_path, output_path=None):
-        if not os.path.exists(input_path):
-            raise FileNotFoundError(f"Input file not found: {input_path}")
-
-        iv = get_random_bytes(16)
-        cipher = AES.new(self.key, AES.MODE_CBC, iv)
-
-        with open(input_path, 'rb') as f:
-            plaintext = f.read()
-
-        ciphertext = cipher.encrypt(pad(plaintext, AES.block_size))
-
-        if output_path is None:
-            output_path = input_path + '.enc'
-
-        with open(output_path, 'wb') as f:
-            f.write(self.salt + iv + ciphertext)
-
-        return output_path
-
-    def decrypt_file(self, input_path, output_path=None):
-        if not os.path.exists(input_path):
-            raise FileNotFoundError(f"Input file not found: {input_path}")
-
-        with open(input_path, 'rb') as f:
-            data = f.read()
-
-        salt = data[:16]
-        iv = data[16:32]
-        ciphertext = data[32:]
-
-        key = PBKDF2(self.password, salt, dkLen=32, count=1000000)
-        cipher = AES.new(key, AES.MODE_CBC, iv)
-
-        try:
-            plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size)
-        except ValueError as e:
-            raise ValueError("Decryption failed. Incorrect password or corrupted file.") from e
-
-        if output_path is None:
-            if input_path.endswith('.enc'):
-                output_path = input_path[:-4]
-            else:
-                output_path = input_path + '.dec'
-
-        with open(output_path, 'wb') as f:
-            f.write(plaintext)
-
-        return output_path
-
-    def calculate_hash(self, file_path, algorithm='sha256'):
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"File not found: {file_path}")
-
-        hash_func = hashlib.new(algorithm)
-        with open(file_path, 'rb') as f:
-            for chunk in iter(lambda: f.read(4096), b''):
-                hash_func.update(chunk)
-
-        return hash_func.hexdigest()
-
-def example_usage():
-    password = "secure_password_123"
-    encryptor = FileEncryptor(password)
-
-    test_file = "test_document.txt"
-    with open(test_file, 'w') as f:
-        f.write("This is a secret document containing sensitive information.")
-
+def process_file(input_path: str, output_path: str, key: str, mode: str):
+    if not os.path.exists(input_path):
+        print(f"Error: Input file '{input_path}' not found.")
+        sys.exit(1)
+    
+    cipher = XORCipher(key)
+    
     try:
-        encrypted_file = encryptor.encrypt_file(test_file)
-        print(f"Encrypted file created: {encrypted_file}")
-
-        original_hash = encryptor.calculate_hash(test_file)
-        print(f"Original file hash: {original_hash}")
-
-        decrypted_file = encryptor.decrypt_file(encrypted_file)
-        print(f"Decrypted file created: {decrypted_file}")
-
-        decrypted_hash = encryptor.calculate_hash(decrypted_file)
-        print(f"Decrypted file hash: {decrypted_hash}")
-
-        if original_hash == decrypted_hash:
-            print("Encryption/decryption successful: Hashes match")
+        with open(input_path, 'rb') as f:
+            file_data = f.read()
+        
+        if mode == 'encrypt':
+            processed_data = cipher.encrypt(file_data)
+            action = "encrypted"
+        elif mode == 'decrypt':
+            processed_data = cipher.decrypt(file_data)
+            action = "decrypted"
         else:
-            print("Error: Hashes do not match")
+            print("Error: Mode must be 'encrypt' or 'decrypt'.")
+            sys.exit(1)
+        
+        with open(output_path, 'wb') as f:
+            f.write(processed_data)
+        
+        print(f"File successfully {action}. Output saved to: {output_path}")
+        
+    except Exception as e:
+        print(f"Error processing file: {e}")
+        sys.exit(1)
 
-    finally:
-        for file in [test_file, encrypted_file, decrypted_file]:
-            if os.path.exists(file):
-                os.remove(file)
+def main():
+    if len(sys.argv) != 5:
+        print("Usage: python file_encryption_utility.py <input_file> <output_file> <key> <encrypt|decrypt>")
+        print("Example: python file_encryption_utility.py secret.txt secret.enc mypassword encrypt")
+        sys.exit(1)
+    
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    key = sys.argv[3]
+    mode = sys.argv[4].lower()
+    
+    process_file(input_file, output_file, key, mode)
 
 if __name__ == "__main__":
-    example_usage()
+    main()
