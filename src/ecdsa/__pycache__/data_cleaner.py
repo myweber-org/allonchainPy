@@ -125,4 +125,32 @@ if __name__ == "__main__":
     
     # Get summary
     summary = get_data_summary(cleaned)
-    print(f"\nData shape: {summary['shape']}")
+    print(f"\nData shape: {summary['shape']}")import pandas as pd
+
+def clean_dataframe(df):
+    """
+    Remove duplicate rows and standardize column names.
+    """
+    # Remove duplicates
+    df_cleaned = df.drop_duplicates()
+    
+    # Standardize column names: lowercase and replace spaces with underscores
+    df_cleaned.columns = df_cleaned.columns.str.lower().str.replace(' ', '_')
+    
+    return df_cleaned
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'Product Name': ['A', 'B', 'A', 'C'],
+        'Price': [100, 200, 100, 300],
+        'Category': ['X', 'Y', 'X', 'Z']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
