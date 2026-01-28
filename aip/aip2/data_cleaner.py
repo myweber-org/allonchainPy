@@ -214,4 +214,45 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
     else:
         raise ValueError("Method must be 'iqr' or 'zscore'")
     
-    return df[mask]
+    return df[mask]import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, columns):
+    cleaned_df = df.copy()
+    for col in columns:
+        Q1 = cleaned_df[col].quantile(0.25)
+        Q3 = cleaned_df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
+    return cleaned_df
+
+def normalize_minmax(df, columns):
+    normalized_df = df.copy()
+    for col in columns:
+        min_val = normalized_df[col].min()
+        max_val = normalized_df[col].max()
+        if max_val != min_val:
+            normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+        else:
+            normalized_df[col] = 0
+    return normalized_df
+
+def clean_dataset(df, numeric_columns):
+    df_cleaned = remove_outliers_iqr(df, numeric_columns)
+    df_normalized = normalize_minmax(df_cleaned, numeric_columns)
+    return df_normalized
+
+if __name__ == "__main__":
+    sample_data = {
+        'feature1': [10, 12, 12, 14, 15, 16, 18, 20, 22, 100],
+        'feature2': [1, 2, 2, 3, 4, 5, 6, 7, 8, 50],
+        'category': ['A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B']
+    }
+    df = pd.DataFrame(sample_data)
+    numeric_cols = ['feature1', 'feature2']
+    result = clean_dataset(df, numeric_cols)
+    print("Original shape:", df.shape)
+    print("Cleaned shape:", result.shape)
+    print(result.head())
