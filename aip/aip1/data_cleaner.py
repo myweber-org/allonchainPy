@@ -228,3 +228,111 @@ def remove_outliers_iqr(df, columns, multiplier=1.5):
                                (df_clean[column] <= upper_bound)]
     
     return df_clean
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_strategy='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        drop_duplicates (bool): Whether to remove duplicate rows
+        fill_missing (bool): Whether to fill missing values
+        fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', 'zero')
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Remove duplicate rows
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    # Handle missing values
+    if fill_missing:
+        for column in cleaned_df.columns:
+            if cleaned_df[column].dtype in ['int64', 'float64']:
+                if fill_strategy == 'mean':
+                    fill_value = cleaned_df[column].mean()
+                elif fill_strategy == 'median':
+                    fill_value = cleaned_df[column].median()
+                elif fill_strategy == 'mode':
+                    fill_value = cleaned_df[column].mode()[0] if not cleaned_df[column].mode().empty else 0
+                elif fill_strategy == 'zero':
+                    fill_value = 0
+                else:
+                    fill_value = cleaned_df[column].mean()
+                
+                missing_count = cleaned_df[column].isna().sum()
+                if missing_count > 0:
+                    cleaned_df[column] = cleaned_df[column].fillna(fill_value)
+                    print(f"Filled {missing_count} missing values in column '{column}' with {fill_strategy}: {fill_value}")
+    
+    return cleaned_df
+
+def validate_dataset(df, check_duplicates=True, check_missing=True):
+    """
+    Validate a DataFrame for data quality issues.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        check_duplicates (bool): Check for duplicate rows
+        check_missing (bool): Check for missing values
+    
+    Returns:
+        dict: Dictionary containing validation results
+    """
+    validation_results = {}
+    
+    if check_duplicates:
+        duplicate_count = df.duplicated().sum()
+        validation_results['duplicate_rows'] = duplicate_count
+    
+    if check_missing:
+        missing_values = df.isna().sum().to_dict()
+        validation_results['missing_values'] = missing_values
+        total_missing = sum(missing_values.values())
+        validation_results['total_missing'] = total_missing
+    
+    return validation_results
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data with duplicates and missing values
+    sample_data = {
+        'id': [1, 2, 3, 1, 5, 6, 7, 8],
+        'value': [10.5, np.nan, 15.2, 10.5, 20.1, np.nan, 25.3, 30.0],
+        'category': ['A', 'B', 'A', 'A', 'C', 'B', 'A', 'C']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Validate before cleaning
+    print("Validation before cleaning:")
+    validation = validate_dataset(df)
+    for key, value in validation.items():
+        print(f"{key}: {value}")
+    
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the dataset
+    cleaned_df = clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_strategy='mean')
+    
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    print("\n" + "="*50 + "\n")
+    
+    # Validate after cleaning
+    print("Validation after cleaning:")
+    validation_after = validate_dataset(cleaned_df)
+    for key, value in validation_after.items():
+        print(f"{key}: {value}")
