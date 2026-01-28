@@ -132,4 +132,113 @@ def create_data_summary(data):
             'median': data[col].median()
         }
     
+    return summaryimport pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fillna_method=None, fillna_value=None):
+    """
+    Clean a pandas DataFrame by handling missing values and duplicates.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows.
+        fillna_method (str): Method for filling missing values ('ffill', 'bfill', etc.).
+        fillna_value: Scalar value to fill missing values with.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if fillna_method:
+        cleaned_df.fillna(method=fillna_method, inplace=True)
+    elif fillna_value is not None:
+        cleaned_df.fillna(fillna_value, inplace=True)
+    
+    # Remove duplicates
+    if drop_duplicates:
+        cleaned_df.drop_duplicates(inplace=True)
+    
+    # Reset index after cleaning
+    cleaned_df.reset_index(drop=True, inplace=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
+
+def get_data_summary(df):
+    """
+    Generate a summary of the DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+    
+    Returns:
+        dict: Summary statistics.
+    """
+    summary = {
+        'shape': df.shape,
+        'columns': list(df.columns),
+        'dtypes': df.dtypes.to_dict(),
+        'missing_values': df.isnull().sum().to_dict(),
+        'unique_counts': {col: df[col].nunique() for col in df.columns}
+    }
+    
+    numeric_cols = df.select_dtypes(include=['number']).columns
+    if len(numeric_cols) > 0:
+        summary['numeric_stats'] = df[numeric_cols].describe().to_dict()
+    
     return summary
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'A': [1, 2, None, 4, 5],
+        'B': [1, 2, 3, 2, 1],
+        'C': ['x', 'y', 'z', 'x', 'y']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned = clean_dataset(df, fillna_value=0)
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print("\n" + "="*50 + "\n")
+    
+    # Validate
+    is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
+    print(f"Validation: {is_valid} - {message}")
+    print("\n" + "="*50 + "\n")
+    
+    # Get summary
+    summary = get_data_summary(cleaned)
+    print("Data Summary:")
+    print(f"Shape: {summary['shape']}")
+    print(f"Missing values: {summary['missing_values']}")
