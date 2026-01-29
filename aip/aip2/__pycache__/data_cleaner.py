@@ -125,3 +125,141 @@ def validate_cleaning(df_before, df_after, column):
         'max': df_after[column].max()
     }
     return {'before': stats_before, 'after': stats_after}
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        multiplier: IQR multiplier (default 1.5)
+    
+    Returns:
+        Filtered DataFrame without outliers
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling to range [0, 1].
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if min_val == max_val:
+        data[f'{column}_normalized'] = 0.5
+    else:
+        data[f'{column}_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    
+    return data
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using Z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to standardize
+    
+    Returns:
+        DataFrame with standardized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        data[f'{column}_standardized'] = 0
+    else:
+        data[f'{column}_standardized'] = (data[column] - mean_val) / std_val
+    
+    return data
+
+def clean_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values in the dataset.
+    
+    Args:
+        data: pandas DataFrame
+        strategy: imputation strategy ('mean', 'median', 'mode', 'drop')
+        columns: list of columns to process (None for all columns)
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = data.columns
+    
+    data_clean = data.copy()
+    
+    for col in columns:
+        if col not in data_clean.columns:
+            continue
+            
+        if data_clean[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = data_clean[col].mean()
+            elif strategy == 'median':
+                fill_value = data_clean[col].median()
+            elif strategy == 'mode':
+                fill_value = data_clean[col].mode()[0] if not data_clean[col].mode().empty else 0
+            elif strategy == 'drop':
+                data_clean = data_clean.dropna(subset=[col])
+                continue
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            data_clean[col] = data_clean[col].fillna(fill_value)
+    
+    return data_clean
+
+def validate_dataframe(data, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        data: pandas DataFrame to validate
+        required_columns: list of required column names
+        min_rows: minimum number of rows required
+    
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if not isinstance(data, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if len(data) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in data.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
