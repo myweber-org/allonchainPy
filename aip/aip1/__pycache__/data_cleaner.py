@@ -201,3 +201,39 @@ if __name__ == "__main__":
     print("Summary statistics after cleaning:")
     for key, value in stats.items():
         print(f"{key}: {value:.2f}")
+def remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    unique_list = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            unique_list.append(item)
+    return unique_list
+
+def clean_numeric_data(values):
+    """
+    Clean numeric data by converting strings to floats and removing None values.
+    Returns a list of cleaned numeric values.
+    """
+    cleaned = []
+    for val in values:
+        if val is None:
+            continue
+        try:
+            cleaned.append(float(val))
+        except (ValueError, TypeError):
+            continue
+    return cleaned
+
+def validate_email_format(email_string):
+    """
+    Basic email format validation.
+    Returns True if email contains '@' and '.', False otherwise.
+    """
+    if not isinstance(email_string, str):
+        return False
+    return '@' in email_string and '.' in email_string.split('@')[-1]
