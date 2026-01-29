@@ -245,3 +245,76 @@ if __name__ == "__main__":
     
     print("\nCleaned data shape:", cleaned_data.shape)
     print("Cleaned statistics:", calculate_summary_statistics(cleaned_data, 'values'))
+import pandas as pd
+
+def clean_dataframe(df, drop_na=True, rename_columns=None):
+    """
+    Clean a pandas DataFrame by removing null values and standardizing column names.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_na (bool): If True, drop rows with any null values.
+        rename_columns (dict): Dictionary mapping old column names to new names.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_na:
+        cleaned_df = cleaned_df.dropna()
+    
+    if rename_columns:
+        cleaned_df = cleaned_df.rename(columns=rename_columns)
+    
+    cleaned_df.columns = cleaned_df.columns.str.strip().str.lower().str.replace(' ', '_')
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and required columns.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+    
+    Returns:
+        bool: True if validation passes, False otherwise.
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+def sample_data_cleaning():
+    """
+    Example usage of the data cleaning functions.
+    """
+    data = {
+        'Name': ['Alice', 'Bob', None, 'David'],
+        'Age': [25, 30, 35, None],
+        'Salary': [50000, 60000, 75000, 80000]
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataframe(df, drop_na=True)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    is_valid = validate_dataframe(cleaned, required_columns=['name', 'age', 'salary'])
+    print(f"\nDataFrame validation: {is_valid}")
+    
+    return cleaned
+
+if __name__ == "__main__":
+    sample_data_cleaning()
