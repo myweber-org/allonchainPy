@@ -608,4 +608,78 @@ if __name__ == "__main__":
     cleaned_data = clean_csv_data('sample_data.csv', output_path='cleaned_data.csv')
     if cleaned_data is not None:
         is_valid = validate_dataframe(cleaned_data)
-        print(f"Data validation result: {is_valid}")
+        print(f"Data validation result: {is_valid}")import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns=None, threshold=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    
+    return df_clean.reset_index(drop=True)
+
+def normalize_minmax(df, columns=None):
+    """
+    Normalize data using min-max scaling
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_normalized = df.copy()
+    for col in columns:
+        if col in df.columns:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val != min_val:
+                df_normalized[col] = (df[col] - min_val) / (max_val - min_val)
+    
+    return df_normalized
+
+def remove_missing_rows(df, threshold=0.5):
+    """
+    Remove rows with missing values above threshold
+    """
+    missing_percentage = df.isnull().sum(axis=1) / df.shape[1]
+    return df[missing_percentage <= threshold].reset_index(drop=True)
+
+def clean_dataset(df, outlier_threshold=1.5, normalize=True, missing_threshold=0.5):
+    """
+    Complete data cleaning pipeline
+    """
+    df_clean = remove_missing_rows(df, threshold=missing_threshold)
+    df_clean = remove_outliers_iqr(df_clean, threshold=outlier_threshold)
+    
+    if normalize:
+        df_clean = normalize_minmax(df_clean)
+    
+    return df_clean
+
+def validate_data(df, check_duplicates=True, check_types=True):
+    """
+    Validate cleaned dataset
+    """
+    validation_report = {}
+    
+    if check_duplicates:
+        validation_report['duplicate_rows'] = df.duplicated().sum()
+    
+    if check_types:
+        validation_report['dtypes'] = df.dtypes.to_dict()
+    
+    validation_report['shape'] = df.shape
+    validation_report['missing_values'] = df.isnull().sum().to_dict()
+    
+    return validation_report
