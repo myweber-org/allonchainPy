@@ -1,119 +1,91 @@
 
-import numpy as np
 import pandas as pd
-from scipy import stats
+import numpy as np
+from typing import Optional
 
-class DataCleaner:
-    def __init__(self, df):
-        self.df = df.copy()
-        self.original_shape = df.shape
-        
-    def remove_outliers_iqr(self, columns=None, threshold=1.5):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-        
-        df_clean = self.df.copy()
-        for col in columns:
-            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
-                Q1 = self.df[col].quantile(0.25)
-                Q3 = self.df[col].quantile(0.75)
-                IQR = Q3 - Q1
-                lower_bound = Q1 - threshold * IQR
-                upper_bound = Q3 + threshold * IQR
-                
-                mask = (self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)
-                df_clean = df_clean[mask]
-        
-        removed_count = self.original_shape[0] - df_clean.shape[0]
-        self.df = df_clean.reset_index(drop=True)
-        return removed_count
+def clean_csv_data(
+    input_path: str,
+    output_path: str,
+    missing_strategy: str = 'mean',
+    columns_to_drop: Optional[list] = None
+) -> pd.DataFrame:
+    """
+    Clean CSV data by handling missing values and removing specified columns.
     
-    def normalize_minmax(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-        
-        df_normalized = self.df.copy()
-        for col in columns:
-            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
-                min_val = self.df[col].min()
-                max_val = self.df[col].max()
-                if max_val > min_val:
-                    df_normalized[col] = (self.df[col] - min_val) / (max_val - min_val)
-        
-        self.df = df_normalized
-        return self
+    Args:
+        input_path: Path to input CSV file
+        output_path: Path to save cleaned CSV file
+        missing_strategy: Strategy for handling missing values ('mean', 'median', 'drop', 'zero')
+        columns_to_drop: List of column names to remove
     
-    def standardize_zscore(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-        
-        df_standardized = self.df.copy()
-        for col in columns:
-            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
-                mean_val = self.df[col].mean()
-                std_val = self.df[col].std()
-                if std_val > 0:
-                    df_standardized[col] = (self.df[col] - mean_val) / std_val
-        
-        self.df = df_standardized
-        return self
+    Returns:
+        Cleaned DataFrame
+    """
     
-    def fill_missing_median(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-        
-        df_filled = self.df.copy()
-        for col in columns:
-            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
-                median_val = self.df[col].median()
-                df_filled[col] = self.df[col].fillna(median_val)
-        
-        self.df = df_filled
-        return self
+    df = pd.read_csv(input_path)
     
-    def get_cleaned_data(self):
-        return self.df.copy()
+    if columns_to_drop:
+        df = df.drop(columns=columns_to_drop, errors='ignore')
     
-    def get_summary(self):
-        summary = {
-            'original_rows': self.original_shape[0],
-            'cleaned_rows': self.df.shape[0],
-            'original_columns': self.original_shape[1],
-            'cleaned_columns': self.df.shape[1],
-            'rows_removed': self.original_shape[0] - self.df.shape[0],
-            'missing_values': self.df.isnull().sum().sum()
-        }
-        return summary
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if missing_strategy == 'mean':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    elif missing_strategy == 'median':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+    elif missing_strategy == 'zero':
+        df[numeric_cols] = df[numeric_cols].fillna(0)
+    elif missing_strategy == 'drop':
+        df = df.dropna(subset=numeric_cols)
+    
+    df.to_csv(output_path, index=False)
+    
+    print(f"Data cleaned successfully. Rows: {len(df)}, Columns: {len(df.columns)}")
+    print(f"Cleaned data saved to: {output_path}")
+    
+    return df
 
-def example_usage():
-    np.random.seed(42)
-    data = {
-        'feature1': np.random.normal(100, 15, 1000),
-        'feature2': np.random.exponential(50, 1000),
-        'feature3': np.random.uniform(0, 1, 1000),
-        'category': np.random.choice(['A', 'B', 'C'], 1000)
-    }
+def detect_outliers_iqr(df: pd.DataFrame, column: str, threshold: float = 1.5) -> pd.Series:
+    """
+    Detect outliers using IQR method.
     
-    df = pd.DataFrame(data)
-    df.loc[np.random.choice(1000, 50), 'feature1'] = np.nan
-    df.loc[np.random.choice(1000, 20), 'feature2'] = 1000
+    Args:
+        df: Input DataFrame
+        column: Column name to check for outliers
+        threshold: IQR multiplier threshold
     
-    cleaner = DataCleaner(df)
-    print(f"Original shape: {df.shape}")
+    Returns:
+        Boolean Series indicating outliers
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    outliers_removed = cleaner.remove_outliers_iqr(['feature1', 'feature2'])
-    print(f"Outliers removed: {outliers_removed}")
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    cleaner.fill_missing_median()
-    cleaner.normalize_minmax(['feature1', 'feature2', 'feature3'])
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
     
-    cleaned_df = cleaner.get_cleaned_data()
-    summary = cleaner.get_summary()
+    outliers = (df[column] < lower_bound) | (df[column] > upper_bound)
     
-    print(f"Cleaned shape: {cleaned_df.shape}")
-    print(f"Summary: {summary}")
-    
-    return cleaned_df
+    return outliers
 
 if __name__ == "__main__":
-    cleaned_data = example_usage()
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [10, np.nan, 30, 40, 50],
+        'C': ['x', 'y', 'z', 'x', 'y']
+    })
+    
+    sample_data.to_csv('sample_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data(
+        input_path='sample_data.csv',
+        output_path='cleaned_data.csv',
+        missing_strategy='mean',
+        columns_to_drop=['C']
+    )
+    
+    print("\nSample cleaned data:")
+    print(cleaned_df.head())
