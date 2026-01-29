@@ -260,4 +260,57 @@ def validate_dataframe(dataframe, required_columns):
         print(f"Missing required columns: {missing_columns}")
         return False
     
+    return Trueimport pandas as pd
+import numpy as np
+
+def clean_dataframe(df):
+    """
+    Cleans a pandas DataFrame by removing duplicate rows,
+    standardizing column names, and filling missing numeric values.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+
+    # Standardize column names: lowercase and replace spaces with underscores
+    df_cleaned.columns = df_cleaned.columns.str.lower().str.replace(' ', '_')
+
+    # Fill missing numeric values with the column median
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].apply(
+        lambda col: col.fillna(col.median())
+    )
+
+    return df_cleaned
+
+def validate_dataframe(df):
+    """
+    Validates the DataFrame for required columns and data types.
+    """
+    required_columns = ['id', 'value']
+    if not all(col in df.columns for col in required_columns):
+        raise ValueError(f"DataFrame must contain columns: {required_columns}")
+
+    if not pd.api.types.is_numeric_dtype(df['value']):
+        raise TypeError("Column 'value' must be numeric")
+
     return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'ID': [1, 2, 2, 3, 4],
+        'Value': [10.5, 20.0, 20.0, None, 40.2],
+        'Category': ['A', 'B', 'B', 'C', 'A']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    try:
+        validate_dataframe(df)
+        cleaned_df = clean_dataframe(df)
+        print("\nCleaned DataFrame:")
+        print(cleaned_df)
+    except (ValueError, TypeError) as e:
+        print(f"Validation error: {e}")
