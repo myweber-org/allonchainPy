@@ -263,3 +263,95 @@ def validate_dataframe(data, required_columns=None, min_rows=1):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, handle_nulls='drop', null_threshold=0.5):
+    """
+    Clean a pandas DataFrame by handling duplicates and null values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    drop_duplicates (bool): Whether to drop duplicate rows
+    handle_nulls (str): Strategy for null handling - 'drop', 'fill_mean', 'fill_median', 'fill_mode'
+    null_threshold (float): Threshold for column null percentage to drop column
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    
+    cleaned_df = df.copy()
+    
+    # Drop columns with high percentage of nulls
+    null_percentages = cleaned_df.isnull().sum() / len(cleaned_df)
+    columns_to_drop = null_percentages[null_percentages > null_threshold].index
+    cleaned_df = cleaned_df.drop(columns=columns_to_drop)
+    
+    # Drop duplicate rows
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Handle remaining null values
+    if handle_nulls == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif handle_nulls == 'fill_mean':
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+    elif handle_nulls == 'fill_median':
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    elif handle_nulls == 'fill_mode':
+        for col in cleaned_df.columns:
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None)
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (bool, str) - Validation result and message
+    """
+    
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame validation passed"
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, 2, 4, None],
+        'B': [5, None, 7, 8, 9],
+        'C': [10, 11, 12, None, None],
+        'D': ['x', 'y', 'x', 'z', 'y']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame (drop nulls):")
+    cleaned = clean_dataset(df, handle_nulls='drop')
+    print(cleaned)
+    
+    is_valid, message = validate_dataframe(cleaned, min_rows=2)
+    print(f"\nValidation: {is_valid} - {message}")
