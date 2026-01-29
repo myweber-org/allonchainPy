@@ -1,91 +1,54 @@
 
 import pandas as pd
-import numpy as np
-from typing import Optional
+import re
 
-def clean_csv_data(
-    input_path: str,
-    output_path: str,
-    missing_strategy: str = 'mean',
-    columns_to_drop: Optional[list] = None
-) -> pd.DataFrame:
+def clean_dataframe(df, columns_to_clean=None, remove_duplicates=True, normalize_text=True):
     """
-    Clean CSV data by handling missing values and removing specified columns.
-    
-    Args:
-        input_path: Path to input CSV file
-        output_path: Path to save cleaned CSV file
-        missing_strategy: Strategy for handling missing values ('mean', 'median', 'drop', 'zero')
-        columns_to_drop: List of column names to remove
-    
-    Returns:
-        Cleaned DataFrame
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
     """
+    df_clean = df.copy()
     
-    df = pd.read_csv(input_path)
+    if remove_duplicates:
+        initial_rows = len(df_clean)
+        df_clean = df_clean.drop_duplicates()
+        removed = initial_rows - len(df_clean)
+        print(f"Removed {removed} duplicate rows.")
     
-    if columns_to_drop:
-        df = df.drop(columns=columns_to_drop, errors='ignore')
+    if normalize_text and columns_to_clean:
+        for col in columns_to_clean:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].apply(_normalize_string)
+                print(f"Normalized text in column: {col}")
     
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    return df_clean
+
+def _normalize_string(text):
+    """
+    Normalize a string: lowercase, remove extra whitespace, and special characters.
+    """
+    if pd.isna(text):
+        return text
     
-    if missing_strategy == 'mean':
-        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
-    elif missing_strategy == 'median':
-        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
-    elif missing_strategy == 'zero':
-        df[numeric_cols] = df[numeric_cols].fillna(0)
-    elif missing_strategy == 'drop':
-        df = df.dropna(subset=numeric_cols)
+    text = str(text)
+    text = text.lower()
+    text = re.sub(r'\s+', ' ', text)
+    text = text.strip()
+    text = re.sub(r'[^\w\s]', '', text)
     
-    df.to_csv(output_path, index=False)
+    return text
+
+def validate_email_column(df, email_column):
+    """
+    Validate email addresses in a specified column.
+    """
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame.")
     
-    print(f"Data cleaned successfully. Rows: {len(df)}, Columns: {len(df.columns)}")
-    print(f"Cleaned data saved to: {output_path}")
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    df['email_valid'] = df[email_column].apply(lambda x: bool(re.match(pattern, str(x))) if pd.notna(x) else False)
+    
+    valid_count = df['email_valid'].sum()
+    total_count = len(df)
+    print(f"Valid emails: {valid_count}/{total_count} ({valid_count/total_count*100:.2f}%)")
     
     return df
-
-def detect_outliers_iqr(df: pd.DataFrame, column: str, threshold: float = 1.5) -> pd.Series:
-    """
-    Detect outliers using IQR method.
-    
-    Args:
-        df: Input DataFrame
-        column: Column name to check for outliers
-        threshold: IQR multiplier threshold
-    
-    Returns:
-        Boolean Series indicating outliers
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - threshold * IQR
-    upper_bound = Q3 + threshold * IQR
-    
-    outliers = (df[column] < lower_bound) | (df[column] > upper_bound)
-    
-    return outliers
-
-if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'A': [1, 2, np.nan, 4, 5],
-        'B': [10, np.nan, 30, 40, 50],
-        'C': ['x', 'y', 'z', 'x', 'y']
-    })
-    
-    sample_data.to_csv('sample_data.csv', index=False)
-    
-    cleaned_df = clean_csv_data(
-        input_path='sample_data.csv',
-        output_path='cleaned_data.csv',
-        missing_strategy='mean',
-        columns_to_drop=['C']
-    )
-    
-    print("\nSample cleaned data:")
-    print(cleaned_df.head())
