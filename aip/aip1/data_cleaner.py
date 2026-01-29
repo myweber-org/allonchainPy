@@ -405,3 +405,103 @@ if __name__ == "__main__":
     cleaned_df = clean_dataset(df, ['value'])
     print(f"Cleaned dataset shape: {cleaned_df.shape}")
     print(f"Outliers removed: {len(df) - len(cleaned_df)}")
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, drop_na=True, rename_columns=True):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing column names.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    drop_na (bool): Whether to drop rows with any null values
+    rename_columns (bool): Whether to standardize column names
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    df_clean = df.copy()
+    
+    if drop_na:
+        df_clean = df_clean.dropna()
+    
+    if rename_columns:
+        df_clean.columns = (
+            df_clean.columns
+            .str.strip()
+            .str.lower()
+            .str.replace(' ', '_')
+            .str.replace(r'[^\w_]', '', regex=True)
+        )
+    
+    numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) > 0:
+        df_clean[numeric_cols] = df_clean[numeric_cols].fillna(df_clean[numeric_cols].mean())
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    dict: Validation results with status and messages
+    """
+    validation_result = {
+        'is_valid': True,
+        'messages': [],
+        'row_count': len(df),
+        'column_count': len(df.columns)
+    }
+    
+    if df.empty:
+        validation_result['is_valid'] = False
+        validation_result['messages'].append('DataFrame is empty')
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_result['is_valid'] = False
+            validation_result['messages'].append(f'Missing required columns: {missing_columns}')
+    
+    null_counts = df.isnull().sum()
+    if null_counts.sum() > 0:
+        validation_result['messages'].append(f'Found {null_counts.sum()} null values across columns')
+    
+    return validation_result
+
+def sample_data():
+    """
+    Create sample DataFrame for testing.
+    
+    Returns:
+    pd.DataFrame: Sample DataFrame with mixed data
+    """
+    data = {
+        'User ID': [1, 2, 3, 4, 5],
+        'User Name': ['Alice', 'Bob', None, 'David', 'Eve'],
+        'Age': [25, 30, 35, None, 28],
+        'Score': [85.5, 92.0, 78.5, 88.0, 95.5],
+        'Join Date': ['2023-01-15', '2023-02-20', '2023-03-10', None, '2023-05-05']
+    }
+    return pd.DataFrame(data)
+
+if __name__ == '__main__':
+    df = sample_data()
+    print("Original DataFrame:")
+    print(df)
+    print("\nDataFrame Info:")
+    print(df.info())
+    
+    cleaned_df = clean_dataframe(df, drop_na=True, rename_columns=True)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    validation = validate_dataframe(cleaned_df, required_columns=['user_id', 'user_name', 'age'])
+    print("\nValidation Results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
