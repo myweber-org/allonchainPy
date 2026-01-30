@@ -207,3 +207,63 @@ if __name__ == "__main__":
     
     print("\nFirst 5 rows of cleaned data:")
     print(cleaned_df.head())
+def remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    
+    Args:
+        data_list: A list containing elements that may have duplicates.
+    
+    Returns:
+        A new list with duplicates removed.
+    """
+    seen = set()
+    result = []
+    
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    
+    return result
+
+def clean_data_with_key(data_list, key_func=None):
+    """
+    Remove duplicates based on a key function.
+    
+    Args:
+        data_list: A list containing elements.
+        key_func: A function to extract comparison key (optional).
+    
+    Returns:
+        A new list with duplicates removed based on key.
+    """
+    seen = set()
+    result = []
+    
+    for item in data_list:
+        key = key_func(item) if key_func else item
+        if key not in seen:
+            seen.add(key)
+            result.append(item)
+    
+    return result
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = [1, 2, 2, 3, 4, 4, 5]
+    cleaned = remove_duplicates(sample_data)
+    print(f"Original: {sample_data}")
+    print(f"Cleaned: {cleaned}")
+    
+    # Example with complex data
+    complex_data = [
+        {"id": 1, "name": "Alice"},
+        {"id": 2, "name": "Bob"},
+        {"id": 1, "name": "Alice"},
+        {"id": 3, "name": "Charlie"}
+    ]
+    
+    cleaned_complex = clean_data_with_key(complex_data, key_func=lambda x: x["id"])
+    print(f"\nOriginal complex: {complex_data}")
+    print(f"Cleaned complex: {cleaned_complex}")
