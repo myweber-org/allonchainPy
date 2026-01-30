@@ -1,4 +1,3 @@
-
 import pandas as pd
 
 def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
@@ -7,8 +6,8 @@ def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     
     Parameters:
     df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to drop duplicate rows. Default True.
-    fill_missing (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'. Default 'mean'.
+    drop_duplicates (bool): If True, remove duplicate rows.
+    fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop').
     
     Returns:
     pd.DataFrame: Cleaned DataFrame.
@@ -24,38 +23,13 @@ def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
         numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
         for col in numeric_cols:
             if fill_missing == 'mean':
-                cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
             elif fill_missing == 'median':
-                cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
     elif fill_missing == 'mode':
         for col in cleaned_df.columns:
-            cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None, inplace=True)
+            mode_value = cleaned_df[col].mode()
+            if not mode_value.empty:
+                cleaned_df[col] = cleaned_df[col].fillna(mode_value.iloc[0])
     
     return cleaned_df
-
-def validate_dataset(df, check_duplicates=True, check_missing=True):
-    """
-    Validate a DataFrame by checking for duplicates and missing values.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    check_duplicates (bool): Whether to check for duplicate rows. Default True.
-    check_missing (bool): Whether to check for missing values. Default True.
-    
-    Returns:
-    dict: Dictionary containing validation results.
-    """
-    validation_results = {}
-    
-    if check_duplicates:
-        duplicate_count = df.duplicated().sum()
-        validation_results['duplicate_rows'] = duplicate_count
-        validation_results['has_duplicates'] = duplicate_count > 0
-    
-    if check_missing:
-        missing_counts = df.isnull().sum()
-        validation_results['missing_counts'] = missing_counts.to_dict()
-        validation_results['total_missing'] = missing_counts.sum()
-        validation_results['has_missing'] = missing_counts.sum() > 0
-    
-    return validation_results
