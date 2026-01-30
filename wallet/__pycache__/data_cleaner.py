@@ -164,4 +164,115 @@ if __name__ == "__main__":
         required_columns=['id', 'value', 'category'],
         numeric_columns=['id', 'value']
     )
-    print("\nValidation result:", validation)
+    print("\nValidation result:", validation)import pandas as pd
+import re
+
+def clean_dataframe(df, columns_to_clean=None, remove_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df: pandas DataFrame to clean.
+        columns_to_clean: List of column names to apply text normalization.
+                         If None, all object dtype columns are cleaned.
+        remove_duplicates: Boolean indicating whether to remove duplicate rows.
+        normalize_text: Boolean indicating whether to normalize text in specified columns.
+    
+    Returns:
+        Cleaned pandas DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if remove_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if normalize_text and not cleaned_df.empty:
+        if columns_to_clean is None:
+            text_columns = cleaned_df.select_dtypes(include=['object']).columns
+        else:
+            text_columns = [col for col in columns_to_clean if col in cleaned_df.columns]
+        
+        for col in text_columns:
+            if cleaned_df[col].dtype == 'object':
+                cleaned_df[col] = cleaned_df[col].apply(_normalize_string)
+                print(f"Normalized text in column: {col}")
+    
+    return cleaned_df
+
+def _normalize_string(text):
+    """
+    Normalize a string by converting to lowercase, removing extra whitespace,
+    and standardizing common patterns.
+    
+    Args:
+        text: Input string to normalize.
+    
+    Returns:
+        Normalized string.
+    """
+    if not isinstance(text, str):
+        return text
+    
+    # Convert to lowercase
+    normalized = text.lower()
+    
+    # Remove leading/trailing whitespace
+    normalized = normalized.strip()
+    
+    # Replace multiple spaces with single space
+    normalized = re.sub(r'\s+', ' ', normalized)
+    
+    # Remove special characters except basic punctuation
+    normalized = re.sub(r'[^\w\s.,!?-]', '', normalized)
+    
+    return normalized
+
+def validate_email_column(df, email_column):
+    """
+    Validate email addresses in a specified column.
+    
+    Args:
+        df: pandas DataFrame containing email column.
+        email_column: Name of the column containing email addresses.
+    
+    Returns:
+        DataFrame with additional 'email_valid' boolean column.
+    """
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+    
+    validated_df = df.copy()
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    
+    validated_df['email_valid'] = validated_df[email_column].apply(
+        lambda x: bool(re.match(email_pattern, str(x))) if pd.notnull(x) else False
+    )
+    
+    valid_count = validated_df['email_valid'].sum()
+    total_count = len(validated_df)
+    print(f"Valid emails: {valid_count}/{total_count} ({valid_count/total_count*100:.1f}%)")
+    
+    return validated_df
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     # Create sample data
+#     data = {
+#         'name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson  '],
+#         'email': ['john@example.com', 'jane@example', 'john@example.com', 'bob@example.com'],
+#         'notes': ['Important client', '  Regular customer  ', 'Important client', 'New lead']
+#     }
+#     
+#     df = pd.DataFrame(data)
+#     print("Original DataFrame:")
+#     print(df)
+#     print("\nCleaned DataFrame:")
+#     cleaned = clean_dataframe(df, columns_to_clean=['name', 'notes'])
+#     print(cleaned)
+#     
+#     print("\nValidated emails:")
+#     validated = validate_email_column(cleaned, 'email')
+#     print(validated[['email', 'email_valid']])
