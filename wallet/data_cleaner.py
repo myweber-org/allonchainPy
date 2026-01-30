@@ -71,3 +71,18 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B'], min_rows=3)
     print(f"\nData validation passed: {is_valid}")
+import re
+
+def clean_string(text):
+    """
+    Clean and normalize a string by:
+    1. Stripping leading/trailing whitespace
+    2. Replacing multiple spaces with a single space
+    3. Converting to lowercase
+    """
+    if not isinstance(text, str):
+        raise TypeError("Input must be a string")
+    
+    text = text.strip()
+    text = re.sub(r'\s+', ' ', text)
+    return text.lower()
