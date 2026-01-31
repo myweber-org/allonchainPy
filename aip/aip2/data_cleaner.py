@@ -406,4 +406,90 @@ if __name__ == "__main__":
     # Get summary statistics
     summary = get_data_summary(cleaned_df)
     print(f"\nNumeric statistics for 'salary':")
-    print(summary['numeric_stats']['salary'])
+    print(summary['numeric_stats']['salary'])import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=False, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df: Input pandas DataFrame
+        drop_duplicates: Whether to remove duplicate rows
+        fill_missing: Whether to fill missing values
+        fill_value: Value to use for filling missing data
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+        print(f"Removed {len(df) - len(cleaned_df)} duplicate rows")
+    
+    if fill_missing:
+        missing_count = cleaned_df.isnull().sum().sum()
+        cleaned_df = cleaned_df.fillna(fill_value)
+        print(f"Filled {missing_count} missing values with {fill_value}")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate that a DataFrame meets basic requirements.
+    
+    Args:
+        df: DataFrame to validate
+        required_columns: List of column names that must be present
+    
+    Returns:
+        Boolean indicating if validation passed
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+def get_data_summary(df):
+    """
+    Generate a summary of the DataFrame including shape and column types.
+    
+    Args:
+        df: Input DataFrame
+    
+    Returns:
+        Dictionary containing summary information
+    """
+    summary = {
+        'rows': df.shape[0],
+        'columns': df.shape[1],
+        'dtypes': df.dtypes.to_dict(),
+        'memory_usage': df.memory_usage(deep=True).sum()
+    }
+    return summary
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, 2, 3, None],
+        'B': [4, None, 6, 6, 8],
+        'C': ['x', 'y', 'y', 'z', 'z']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_value=0)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    summary = get_data_summary(cleaned)
+    print("\nData Summary:")
+    for key, value in summary.items():
+        print(f"{key}: {value}")
