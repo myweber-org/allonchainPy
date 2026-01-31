@@ -4,7 +4,7 @@ import pandas as pd
 
 def remove_outliers_iqr(df, column):
     """
-    Remove outliers from a DataFrame column using the IQR method.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
@@ -27,20 +27,17 @@ def remove_outliers_iqr(df, column):
     
     return filtered_df
 
-def calculate_basic_stats(df, column):
+def calculate_statistics(df, column):
     """
-    Calculate basic statistics for a DataFrame column.
+    Calculate basic statistics for a column after outlier removal.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
     column (str): Column name to analyze
     
     Returns:
-    dict: Dictionary containing statistics
+    dict: Dictionary containing statistical measures
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
     stats = {
         'mean': df[column].mean(),
         'median': df[column].median(),
@@ -52,54 +49,62 @@ def calculate_basic_stats(df, column):
     
     return stats
 
-def normalize_column(df, column):
+def clean_dataset(df, numeric_columns):
     """
-    Normalize a column using min-max scaling.
+    Clean dataset by removing outliers from multiple numeric columns.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    column (str): Column name to normalize
+    numeric_columns (list): List of column names to clean
     
     Returns:
-    pd.DataFrame: DataFrame with normalized column
+    pd.DataFrame: Cleaned DataFrame
+    dict: Statistics for each cleaned column
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    cleaned_df = df.copy()
+    statistics = {}
     
-    df_copy = df.copy()
-    min_val = df_copy[column].min()
-    max_val = df_copy[column].max()
+    for col in numeric_columns:
+        if col in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[col]):
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            removed_count = original_count - len(cleaned_df)
+            
+            stats = calculate_statistics(cleaned_df, col)
+            stats['outliers_removed'] = removed_count
+            statistics[col] = stats
     
-    if max_val == min_val:
-        df_copy[f'{column}_normalized'] = 0.5
-    else:
-        df_copy[f'{column}_normalized'] = (df_copy[column] - min_val) / (max_val - min_val)
-    
-    return df_copy
-
-def example_usage():
-    """
-    Example usage of the data cleaning functions.
-    """
-    np.random.seed(42)
-    data = {
-        'values': np.random.normal(100, 15, 1000)
-    }
-    df = pd.DataFrame(data)
-    
-    print("Original DataFrame shape:", df.shape)
-    print("Original statistics:", calculate_basic_stats(df, 'values'))
-    
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    print("\nCleaned DataFrame shape:", cleaned_df.shape)
-    print("Cleaned statistics:", calculate_basic_stats(cleaned_df, 'values'))
-    
-    normalized_df = normalize_column(cleaned_df, 'values')
-    print("\nNormalized column statistics:", 
-          calculate_basic_stats(normalized_df, 'values_normalized'))
-    
-    return normalized_df
+    return cleaned_df, statistics
 
 if __name__ == "__main__":
-    result_df = example_usage()
-    print("\nProcessing completed successfully.")
+    # Example usage
+    np.random.seed(42)
+    
+    # Create sample data with outliers
+    data = {
+        'temperature': np.random.normal(25, 5, 1000),
+        'humidity': np.random.normal(60, 15, 1000),
+        'pressure': np.random.normal(1013, 10, 1000)
+    }
+    
+    # Add some outliers
+    data['temperature'][:50] = np.random.uniform(50, 100, 50)
+    data['humidity'][:30] = np.random.uniform(0, 10, 30)
+    
+    df = pd.DataFrame(data)
+    
+    print("Original dataset shape:", df.shape)
+    print("\nOriginal statistics:")
+    for col in df.columns:
+        print(f"{col}: mean={df[col].mean():.2f}, std={df[col].std():.2f}")
+    
+    # Clean the dataset
+    numeric_cols = ['temperature', 'humidity', 'pressure']
+    cleaned_df, stats = clean_dataset(df, numeric_cols)
+    
+    print("\nCleaned dataset shape:", cleaned_df.shape)
+    print("\nCleaned statistics:")
+    for col, col_stats in stats.items():
+        print(f"\n{col}:")
+        for stat_name, value in col_stats.items():
+            print(f"  {stat_name}: {value:.2f}" if isinstance(value, float) else f"  {stat_name}: {value}")
