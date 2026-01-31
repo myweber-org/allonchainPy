@@ -1,100 +1,103 @@
 
+import numpy as np
 import pandas as pd
-import re
+from scipy import stats
 
-def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
-    """
-    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+def remove_outliers_iqr(df, columns):
+    cleaned_df = df.copy()
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+            cleaned_df = cleaned_df[mask]
+    return cleaned_df.reset_index(drop=True)
+
+def remove_outliers_zscore(df, columns, threshold=3):
+    cleaned_df = df.copy()
+    for col in columns:
+        if col in df.columns:
+            z_scores = np.abs(stats.zscore(df[col].dropna()))
+            mask = z_scores < threshold
+            valid_indices = df[col].dropna().index[mask]
+            cleaned_df = cleaned_df.loc[valid_indices.union(df[df[col].isna()].index)]
+    return cleaned_df.reset_index(drop=True)
+
+def normalize_minmax(df, columns):
+    normalized_df = df.copy()
+    for col in columns:
+        if col in df.columns:
+            col_min = df[col].min()
+            col_max = df[col].max()
+            if col_max != col_min:
+                normalized_df[col] = (df[col] - col_min) / (col_max - col_min)
+            else:
+                normalized_df[col] = 0
+    return normalized_df
+
+def normalize_zscore(df, columns):
+    normalized_df = df.copy()
+    for col in columns:
+        if col in df.columns:
+            col_mean = df[col].mean()
+            col_std = df[col].std()
+            if col_std > 0:
+                normalized_df[col] = (df[col] - col_mean) / col_std
+            else:
+                normalized_df[col] = 0
+    return normalized_df
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    processed_df = df.copy()
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
     
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean
-        column_mapping (dict, optional): Dictionary mapping old column names to new ones
-        drop_duplicates (bool): Whether to remove duplicate rows
-        normalize_text (bool): Whether to normalize text columns (strip, lower case)
+    for col in columns:
+        if col in df.columns and df[col].dtype in [np.float64, np.int64]:
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0] if not df[col].mode().empty else 0
+            elif strategy == 'zero':
+                fill_value = 0
+            else:
+                fill_value = df[col].mean()
+            
+            processed_df[col] = df[col].fillna(fill_value)
     
-    Returns:
-        pd.DataFrame: Cleaned DataFrame
-    """
+    return processed_df
+
+def get_data_summary(df):
+    summary = {
+        'original_shape': df.shape,
+        'missing_values': df.isnull().sum().to_dict(),
+        'data_types': df.dtypes.to_dict(),
+        'numeric_columns': df.select_dtypes(include=[np.number]).columns.tolist(),
+        'categorical_columns': df.select_dtypes(include=['object']).columns.tolist()
+    }
+    return summary
+
+def clean_dataset(df, numeric_columns=None, outlier_method='iqr', normalize_method=None, missing_strategy='mean'):
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
     cleaned_df = df.copy()
     
-    if column_mapping:
-        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy, columns=numeric_columns)
     
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates().reset_index(drop=True)
+    if outlier_method == 'iqr':
+        cleaned_df = remove_outliers_iqr(cleaned_df, numeric_columns)
+    elif outlier_method == 'zscore':
+        cleaned_df = remove_outliers_zscore(cleaned_df, numeric_columns)
     
-    if normalize_text:
-        for col in cleaned_df.select_dtypes(include=['object']).columns:
-            cleaned_df[col] = cleaned_df[col].astype(str).str.strip().str.lower()
+    if normalize_method == 'minmax':
+        cleaned_df = normalize_minmax(cleaned_df, numeric_columns)
+    elif normalize_method == 'zscore':
+        cleaned_df = normalize_zscore(cleaned_df, numeric_columns)
     
     return cleaned_df
-
-def remove_special_characters(text, keep_pattern=r'[a-zA-Z0-9\s]'):
-    """
-    Remove special characters from text, keeping only specified patterns.
-    
-    Args:
-        text (str): Input text
-        keep_pattern (str): Regex pattern of characters to keep
-    
-    Returns:
-        str: Cleaned text
-    """
-    if pd.isna(text):
-        return text
-    
-    text = str(text)
-    return re.sub(f'[^{keep_pattern}]', '', text)
-
-def validate_email(email):
-    """
-    Validate email format using regex.
-    
-    Args:
-        email (str): Email address to validate
-    
-    Returns:
-        bool: True if email is valid, False otherwise
-    """
-    if pd.isna(email):
-        return False
-    
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return bool(re.match(pattern, str(email).strip()))
-
-def clean_numeric_column(series, fill_na=0):
-    """
-    Clean numeric column by converting to numeric type and filling NaN values.
-    
-    Args:
-        series (pd.Series): Numeric column to clean
-        fill_na: Value to fill NaN with
-    
-    Returns:
-        pd.Series: Cleaned numeric series
-    """
-    cleaned_series = pd.to_numeric(series, errors='coerce')
-    return cleaned_series.fillna(fill_na)
-
-if __name__ == "__main__":
-    sample_data = {
-        'Name': ['John Doe', 'Jane Smith', 'John Doe', ' Bob Johnson '],
-        'Email': ['john@example.com', 'jane@example', 'john@example.com', 'bob@company.co.uk'],
-        'Age': ['25', '30', '25', 'forty'],
-        'Phone': ['(123) 456-7890', '987-654-3210', '(123) 456-7890', '555 123 4567']
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\n")
-    
-    cleaned = clean_dataframe(df, drop_duplicates=True, normalize_text=True)
-    print("Cleaned DataFrame:")
-    print(cleaned)
-    print("\n")
-    
-    cleaned['Email_Valid'] = cleaned['Email'].apply(validate_email)
-    cleaned['Age_Clean'] = clean_numeric_column(cleaned['Age'])
-    print("DataFrame with validation and numeric cleaning:")
-    print(cleaned[['Name', 'Email', 'Email_Valid', 'Age', 'Age_Clean']])
