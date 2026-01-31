@@ -191,4 +191,135 @@ def remove_outliers_iqr(df, column, multiplier=1.5):
     removed_count = initial_count - len(filtered_df)
     
     print(f"Removed {removed_count} outliers from '{column}' using IQR method")
-    return filtered_df
+    return filtered_dfimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns):
+    """
+    Remove outliers using IQR method for specified columns.
+    Returns cleaned DataFrame and outlier indices.
+    """
+    clean_df = df.copy()
+    outlier_indices = []
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        
+        col_outliers = df[(df[col] < lower_bound) | (df[col] > upper_bound)].index
+        outlier_indices.extend(col_outliers)
+        clean_df = clean_df[(clean_df[col] >= lower_bound) & (clean_df[col] <= upper_bound)]
+    
+    return clean_df, list(set(outlier_indices))
+
+def normalize_minmax(df, columns):
+    """
+    Apply min-max normalization to specified columns.
+    """
+    normalized_df = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        col_min = df[col].min()
+        col_max = df[col].max()
+        
+        if col_max - col_min > 0:
+            normalized_df[col] = (df[col] - col_min) / (col_max - col_min)
+        else:
+            normalized_df[col] = 0
+    
+    return normalized_df
+
+def standardize_zscore(df, columns):
+    """
+    Apply z-score standardization to specified columns.
+    """
+    standardized_df = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        col_mean = df[col].mean()
+        col_std = df[col].std()
+        
+        if col_std > 0:
+            standardized_df[col] = (df[col] - col_mean) / col_std
+        else:
+            standardized_df[col] = 0
+    
+    return standardized_df
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values using specified strategy.
+    """
+    if columns is None:
+        columns = df.columns
+    
+    processed_df = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        if df[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0] if not df[col].mode().empty else 0
+            elif strategy == 'drop':
+                processed_df = processed_df.dropna(subset=[col])
+                continue
+            else:
+                fill_value = 0
+            
+            processed_df[col] = processed_df[col].fillna(fill_value)
+    
+    return processed_df
+
+def validate_dataframe(df, required_columns=None, numeric_columns=None):
+    """
+    Validate DataFrame structure and content.
+    """
+    validation_result = {
+        'is_valid': True,
+        'missing_columns': [],
+        'non_numeric_columns': [],
+        'empty_dataframe': False
+    }
+    
+    if df.empty:
+        validation_result['is_valid'] = False
+        validation_result['empty_dataframe'] = True
+        return validation_result
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            validation_result['is_valid'] = False
+            validation_result['missing_columns'] = missing
+    
+    if numeric_columns:
+        non_numeric = []
+        for col in numeric_columns:
+            if col in df.columns:
+                if not np.issubdtype(df[col].dtype, np.number):
+                    non_numeric.append(col)
+        
+        if non_numeric:
+            validation_result['is_valid'] = False
+            validation_result['non_numeric_columns'] = non_numeric
+    
+    return validation_result
