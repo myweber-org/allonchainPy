@@ -304,3 +304,77 @@ def remove_outliers(df, column, threshold=3):
     mask = z_scores < threshold
     
     return df[mask].reset_index(drop=True)
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def standardize_zscore(df, column):
+    mean_val = df[column].mean()
+    std_val = df[column].std()
+    df[column + '_standardized'] = (df[column] - mean_val) / std_val
+    return df
+
+def handle_missing_values(df, strategy='mean'):
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        for col in numeric_cols:
+            df[col].fillna(df[col].mean(), inplace=True)
+    elif strategy == 'median':
+        for col in numeric_cols:
+            df[col].fillna(df[col].median(), inplace=True)
+    elif strategy == 'mode':
+        for col in numeric_cols:
+            df[col].fillna(df[col].mode()[0], inplace=True)
+    
+    return df
+
+def clean_dataset(df, numeric_columns=None, outlier_removal=True, 
+                  normalization='minmax', missing_strategy='mean'):
+    
+    df_clean = df.copy()
+    
+    if numeric_columns is None:
+        numeric_columns = df_clean.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_clean = handle_missing_values(df_clean, strategy=missing_strategy)
+    
+    if outlier_removal:
+        for col in numeric_columns:
+            if col in df_clean.columns:
+                df_clean = remove_outliers_iqr(df_clean, col)
+    
+    for col in numeric_columns:
+        if col in df_clean.columns:
+            if normalization == 'minmax':
+                df_clean = normalize_minmax(df_clean, col)
+            elif normalization == 'zscore':
+                df_clean = standardize_zscore(df_clean, col)
+    
+    return df_clean
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, 3, 100, 5, 6, 7, 8, 9, 10],
+        'B': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+        'C': [5, 15, 25, 35, 45, 55, 65, 75, 85, 95]
+    })
+    
+    cleaned_data = clean_dataset(sample_data, numeric_columns=['A', 'B', 'C'])
+    print("Original data shape:", sample_data.shape)
+    print("Cleaned data shape:", cleaned_data.shape)
+    print("\nCleaned data preview:")
+    print(cleaned_data.head())
