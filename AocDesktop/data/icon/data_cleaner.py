@@ -147,3 +147,51 @@ def remove_outliers_iqr(data, column):
     
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
     return filtered_data
+import pandas as pd
+import numpy as np
+
+def clean_data(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Cleans a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    cleaned_df = df.copy()
+
+    if drop_duplicates:
+        initial_rows = cleaned_df.shape[0]
+        cleaned_df.drop_duplicates(inplace=True)
+        removed = initial_rows - cleaned_df.shape[0]
+        print(f"Removed {removed} duplicate row(s).")
+
+    if cleaned_df.isnull().sum().any():
+        print("Handling missing values...")
+        if fill_missing == 'mean':
+            cleaned_df.fillna(cleaned_df.mean(numeric_only=True), inplace=True)
+        elif fill_missing == 'median':
+            cleaned_df.fillna(cleaned_df.median(numeric_only=True), inplace=True)
+        elif fill_missing == 'mode':
+            for col in cleaned_df.columns:
+                if cleaned_df[col].dtype == 'object':
+                    cleaned_df[col].fillna(cleaned_df[col].mode()[0], inplace=True)
+                else:
+                    cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
+        elif fill_missing == 'drop':
+            cleaned_df.dropna(inplace=True)
+        else:
+            print(f"Warning: Unknown fill method '{fill_missing}'. Missing values retained.")
+
+    print(f"Data cleaning complete. Final shape: {cleaned_df.shape}")
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, np.nan, 5],
+        'B': [10, np.nan, 10, 40, 50],
+        'C': ['x', 'y', 'x', 'y', np.nan]
+    }
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaning data...")
+    result = clean_data(df, fill_missing='mode')
+    print("\nCleaned DataFrame:")
+    print(result)
