@@ -721,3 +721,88 @@ if __name__ == "__main__":
     print("\nFilling missing values...")
     filled = cleaner.fill_missing_mean()
     print("Missing values filled")
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
+def clean_dataset(input_file, output_file):
+    """
+    Load a CSV file, remove duplicate rows, standardize date formats,
+    fill missing numeric values with column median, and save cleaned data.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        # Remove exact duplicate rows
+        initial_count = len(df)
+        df.drop_duplicates(inplace=True)
+        removed_duplicates = initial_count - len(df)
+        
+        # Standardize date columns (assuming columns with 'date' in name)
+        date_columns = [col for col in df.columns if 'date' in col.lower()]
+        for col in date_columns:
+            df[col] = pd.to_datetime(df[col], errors='coerce')
+        
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            median_val = df[col].median()
+            df[col].fillna(median_val, inplace=True)
+        
+        # Convert categorical columns to uppercase for consistency
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if col not in date_columns:
+                df[col] = df[col].astype(str).str.upper()
+        
+        # Save cleaned dataset
+        df.to_csv(output_file, index=False)
+        
+        # Generate summary statistics
+        summary = {
+            'original_rows': initial_count,
+            'cleaned_rows': len(df),
+            'duplicates_removed': removed_duplicates,
+            'missing_values_filled': df.isnull().sum().sum(),
+            'cleaned_columns': list(df.columns),
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        return summary
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+        return None
+
+def validate_dataframe(df):
+    """
+    Perform basic validation checks on a DataFrame.
+    """
+    validation_results = {
+        'has_data': not df.empty,
+        'row_count': len(df),
+        'column_count': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'data_types': df.dtypes.to_dict()
+    }
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    result = clean_dataset(input_csv, output_csv)
+    
+    if result:
+        print("Data cleaning completed successfully!")
+        print(f"Summary: {result}")
+        
+        # Load and validate cleaned data
+        cleaned_df = pd.read_csv(output_csv)
+        validation = validate_dataframe(cleaned_df)
+        print(f"Validation results: {validation}")
