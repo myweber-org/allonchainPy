@@ -119,3 +119,71 @@ if __name__ == "__main__":
     import sys
     target_directory = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
     organize_files(target_directory)
+import os
+import shutil
+from pathlib import Path
+
+def organize_files(directory="."):
+    """
+    Organizes files in the specified directory by moving them into
+    subfolders based on their file extensions.
+    """
+    base_path = Path(directory)
+    
+    # Define categories and their associated file extensions
+    categories = {
+        "Images": [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg"],
+        "Documents": [".pdf", ".docx", ".txt", ".xlsx", ".pptx", ".md"],
+        "Audio": [".mp3", ".wav", ".flac", ".aac"],
+        "Video": [".mp4", ".avi", ".mov", ".mkv"],
+        "Archives": [".zip", ".tar", ".gz", ".rar", ".7z"],
+        "Code": [".py", ".js", ".html", ".css", ".java", ".cpp", ".c"],
+    }
+    
+    # Create category folders if they don't exist
+    for category in categories:
+        (base_path / category).mkdir(exist_ok=True)
+    
+    # Create a default 'Other' folder for uncategorized files
+    other_folder = base_path / "Other"
+    other_folder.mkdir(exist_ok=True)
+    
+    # Track moved files for reporting
+    moved_files = []
+    
+    # Iterate through all items in the directory
+    for item in base_path.iterdir():
+        # Skip directories and hidden files
+        if item.is_dir() or item.name.startswith('.'):
+            continue
+        
+        file_extension = item.suffix.lower()
+        moved = False
+        
+        # Find the appropriate category for the file
+        for category, extensions in categories.items():
+            if file_extension in extensions:
+                target_folder = base_path / category
+                shutil.move(str(item), str(target_folder / item.name))
+                moved_files.append((item.name, category))
+                moved = True
+                break
+        
+        # If no category matched, move to 'Other'
+        if not moved:
+            shutil.move(str(item), str(other_folder / item.name))
+            moved_files.append((item.name, "Other"))
+    
+    # Print summary
+    if moved_files:
+        print(f"Organized {len(moved_files)} file(s):")
+        for filename, category in moved_files:
+            print(f"  {filename} -> {category}/")
+    else:
+        print("No files were moved.")
+    
+    return moved_files
+
+if __name__ == "__main__":
+    # Example usage: organize files in the current directory
+    organize_files()
