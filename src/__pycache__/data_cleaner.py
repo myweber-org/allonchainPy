@@ -107,4 +107,60 @@ if __name__ == "__main__":
     for col, col_stats in stats.items():
         print(f"\n{col}:")
         for stat_name, value in col_stats.items():
-            print(f"  {stat_name}: {value:.2f}" if isinstance(value, float) else f"  {stat_name}: {value}")
+            print(f"  {stat_name}: {value:.2f}" if isinstance(value, float) else f"  {stat_name}: {value}")import pandas as pd
+
+def clean_data(df):
+    # Remove duplicate rows
+    df = df.drop_duplicates()
+    
+    # Fill missing numeric values with column mean
+    numeric_cols = df.select_dtypes(include=['number']).columns
+    df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    
+    # Fill missing categorical values with mode
+    categorical_cols = df.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if df[col].isnull().any():
+            df[col] = df[col].fillna(df[col].mode()[0])
+    
+    # Remove rows where critical columns are still null
+    critical_columns = ['id', 'timestamp']
+    if all(col in df.columns for col in critical_columns):
+        df = df.dropna(subset=critical_columns)
+    
+    return df
+
+def validate_data(df):
+    # Check for remaining null values
+    if df.isnull().sum().sum() > 0:
+        print("Warning: Data still contains null values")
+        return False
+    
+    # Check for negative values in positive-only columns
+    positive_columns = ['age', 'price', 'quantity']
+    for col in positive_columns:
+        if col in df.columns:
+            if (df[col] < 0).any():
+                print(f"Warning: Column {col} contains negative values")
+                return False
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = pd.DataFrame({
+        'id': [1, 2, 2, 3, None],
+        'name': ['Alice', 'Bob', 'Bob', None, 'Eve'],
+        'age': [25, 30, 30, None, -5],
+        'score': [85.5, 92.0, 92.0, 78.5, None]
+    })
+    
+    print("Original data:")
+    print(sample_data)
+    
+    cleaned_data = clean_data(sample_data)
+    print("\nCleaned data:")
+    print(cleaned_data)
+    
+    is_valid = validate_data(cleaned_data)
+    print(f"\nData validation passed: {is_valid}")
