@@ -295,3 +295,41 @@ def validate_dataframe(df, required_columns=None):
             raise ValueError(f"Missing required columns: {missing_cols}")
     
     return True
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def clean_dataset(file_path):
+    data = pd.read_csv(file_path)
+    numeric_columns = data.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_columns:
+        original_count = len(data)
+        data = remove_outliers_iqr(data, col)
+        removed_count = original_count - len(data)
+        print(f"Removed {removed_count} outliers from column '{col}'")
+    
+    cleaned_file_path = file_path.replace('.csv', '_cleaned.csv')
+    data.to_csv(cleaned_file_path, index=False)
+    print(f"Cleaned data saved to: {cleaned_file_path}")
+    return data
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.uniform(0, 200, 1000)
+    })
+    sample_data.loc[::100, 'A'] = 500
+    sample_data.loc[::50, 'B'] = 300
+    
+    sample_data.to_csv('sample_dataset.csv', index=False)
+    cleaned = clean_dataset('sample_dataset.csv')
+    print(f"Original shape: 1000x3, Cleaned shape: {cleaned.shape}")
