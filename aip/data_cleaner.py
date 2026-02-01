@@ -79,3 +79,74 @@ def save_cleaned_data(df, output_path):
     except Exception as e:
         print(f"Error saving file: {str(e)}")
         return False
+def remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    
+    Args:
+        data_list: List of items that may contain duplicates.
+    
+    Returns:
+        List with duplicates removed.
+    """
+    seen = set()
+    result = []
+    
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    
+    return result
+
+def clean_numeric_data(values):
+    """
+    Clean numeric data by converting strings to floats and removing None values.
+    
+    Args:
+        values: List of numeric values as strings or numbers.
+    
+    Returns:
+        List of cleaned numeric values.
+    """
+    cleaned = []
+    
+    for value in values:
+        if value is None:
+            continue
+        
+        try:
+            if isinstance(value, str):
+                cleaned.append(float(value))
+            else:
+                cleaned.append(float(value))
+        except (ValueError, TypeError):
+            continue
+    
+    return cleaned
+
+def validate_email_format(email):
+    """
+    Basic email format validation.
+    
+    Args:
+        email: String to validate as email.
+    
+    Returns:
+        Boolean indicating if email format is valid.
+    """
+    if not email or not isinstance(email, str):
+        return False
+    
+    parts = email.split('@')
+    
+    if len(parts) != 2:
+        return False
+    
+    if not parts[0] or not parts[1]:
+        return False
+    
+    if '.' not in parts[1]:
+        return False
+    
+    return True
