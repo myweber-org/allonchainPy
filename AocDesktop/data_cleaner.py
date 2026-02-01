@@ -1,106 +1,104 @@
-
-import numpy as np
 import pandas as pd
+import numpy as np
+from scipy import stats
 
-def remove_outliers_iqr(data, column, multiplier=1.5):
+def clean_dataset(df, numeric_columns=None, method='median', z_threshold=3):
     """
-    Remove outliers using the Interquartile Range method.
+    Clean dataset by handling missing values and removing outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    numeric_columns (list): List of numeric column names to process
+    method (str): Imputation method ('mean', 'median', 'mode')
+    z_threshold (float): Z-score threshold for outlier detection
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
     """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    df_clean = df.copy()
     
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
     
-    lower_bound = Q1 - multiplier * IQR
-    upper_bound = Q3 + multiplier * IQR
-    
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
-
-def normalize_minmax(data, column):
-    """
-    Normalize data to range [0, 1] using min-max scaling.
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    min_val = data[column].min()
-    max_val = data[column].max()
-    
-    if max_val == min_val:
-        return data[column].apply(lambda x: 0.5)
-    
-    normalized = (data[column] - min_val) / (max_val - min_val)
-    return normalized
-
-def standardize_zscore(data, column):
-    """
-    Standardize data using z-score normalization.
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    
-    if std_val == 0:
-        return data[column].apply(lambda x: 0)
-    
-    standardized = (data[column] - mean_val) / std_val
-    return standardized
-
-def handle_missing_values(data, strategy='mean', columns=None):
-    """
-    Handle missing values using specified strategy.
-    """
-    if columns is None:
-        columns = data.columns
-    
-    data_filled = data.copy()
-    
-    for col in columns:
-        if col not in data.columns:
+    for col in numeric_columns:
+        if col not in df_clean.columns:
             continue
             
-        if strategy == 'mean':
-            fill_value = data[col].mean()
-        elif strategy == 'median':
-            fill_value = data[col].median()
-        elif strategy == 'mode':
-            fill_value = data[col].mode()[0] if not data[col].mode().empty else np.nan
-        elif strategy == 'constant':
-            fill_value = 0
-        else:
-            raise ValueError(f"Unknown strategy: {strategy}")
+        col_data = df_clean[col]
         
-        data_filled[col] = data[col].fillna(fill_value)
+        missing_mask = col_data.isnull()
+        if missing_mask.any():
+            if method == 'mean':
+                fill_value = col_data.mean()
+            elif method == 'median':
+                fill_value = col_data.median()
+            elif method == 'mode':
+                fill_value = col_data.mode()[0] if not col_data.mode().empty else 0
+            else:
+                fill_value = 0
+                
+            df_clean.loc[missing_mask, col] = fill_value
+        
+        if len(col_data) > 10:
+            z_scores = np.abs(stats.zscore(df_clean[col]))
+            outlier_mask = z_scores > z_threshold
+            
+            if outlier_mask.any():
+                median_val = df_clean[col].median()
+                df_clean.loc[outlier_mask, col] = median_val
     
-    return data_filled
+    return df_clean
 
-def clean_dataset(data, outlier_columns=None, normalize_columns=None, 
-                  standardize_columns=None, missing_strategy='mean'):
+def validate_dataframe(df, required_columns=None, min_rows=1):
     """
-    Comprehensive data cleaning pipeline.
+    Validate dataframe structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): Dataframe to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, message)
     """
-    cleaned_data = data.copy()
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
     
-    if outlier_columns:
-        for col in outlier_columns:
-            if col in cleaned_data.columns:
-                cleaned_data = remove_outliers_iqr(cleaned_data, col)
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
     
-    cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy)
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
     
-    if normalize_columns:
-        for col in normalize_columns:
-            if col in cleaned_data.columns:
-                cleaned_data[col + '_normalized'] = normalize_minmax(cleaned_data, col)
+    return True, "DataFrame is valid"
+
+def get_summary_statistics(df):
+    """
+    Generate summary statistics for numeric columns.
     
-    if standardize_columns:
-        for col in standardize_columns:
-            if col in cleaned_data.columns:
-                cleaned_data[col + '_standardized'] = standardize_zscore(cleaned_data, col)
+    Parameters:
+    df (pd.DataFrame): Input dataframe
     
-    return cleaned_data
+    Returns:
+    pd.DataFrame: Summary statistics
+    """
+    numeric_df = df.select_dtypes(include=[np.number])
+    
+    if numeric_df.empty:
+        return pd.DataFrame()
+    
+    stats_dict = {
+        'count': numeric_df.count(),
+        'mean': numeric_df.mean(),
+        'std': numeric_df.std(),
+        'min': numeric_df.min(),
+        '25%': numeric_df.quantile(0.25),
+        '50%': numeric_df.quantile(0.50),
+        '75%': numeric_df.quantile(0.75),
+        'max': numeric_df.max(),
+        'missing': numeric_df.isnull().sum()
+    }
+    
+    return pd.DataFrame(stats_dict)
