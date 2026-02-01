@@ -52,4 +52,64 @@ def clean_dataset(input_file, output_file, outlier_method='iqr', normalize_metho
     return df
 
 if __name__ == "__main__":
-    cleaned_df = clean_dataset('raw_data.csv', 'cleaned_data.csv')
+    cleaned_df = clean_dataset('raw_data.csv', 'cleaned_data.csv')import pandas as pd
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing null values and duplicates.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to be cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Remove duplicate rows
+    df_cleaned = df_cleaned.drop_duplicates()
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def validate_data(df, required_columns):
+    """
+    Validate that the DataFrame contains all required columns.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        bool: True if all required columns are present, False otherwise.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        print(f"Missing columns: {missing_columns}")
+        return False
+    
+    return True
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     sample_data = {
+#         'A': [1, 2, None, 4, 1],
+#         'B': [5, 6, 7, None, 5],
+#         'C': ['x', 'y', 'z', 'x', 'x']
+#     }
+#     
+#     df = pd.DataFrame(sample_data)
+#     print("Original DataFrame:")
+#     print(df)
+#     
+#     cleaned_df = clean_dataset(df)
+#     print("\nCleaned DataFrame:")
+#     print(cleaned_df)
+#     
+#     required_cols = ['A', 'B', 'C']
+#     is_valid = validate_data(cleaned_df, required_cols)
+#     print(f"\nData validation result: {is_valid}")
