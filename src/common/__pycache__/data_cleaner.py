@@ -293,4 +293,70 @@ if __name__ == "__main__":
     
     cleaned_df = clean_dataset(df, ['A', 'B'])
     print("\nCleaned DataFrame:")
-    print(cleaned_df)
+    print(cleaned_df)import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    if subset:
+        return df.drop_duplicates(subset=subset, keep='first')
+    else:
+        return df.drop_duplicates(keep='first')
+
+def convert_column_types(df, column_type_map):
+    """
+    Convert columns to specified data types.
+    """
+    for column, dtype in column_type_map.items():
+        if column in df.columns:
+            try:
+                df[column] = df[column].astype(dtype)
+            except ValueError:
+                print(f"Warning: Could not convert column '{column}' to {dtype}")
+    return df
+
+def handle_missing_values(df, strategy='drop', fill_value=None):
+    """
+    Handle missing values in DataFrame.
+    """
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill':
+        if fill_value is not None:
+            return df.fillna(fill_value)
+        else:
+            return df.fillna(0)
+    else:
+        return df
+
+def clean_dataframe(df, deduplicate=True, type_conversion=None, missing_strategy='drop'):
+    """
+    Main function to clean DataFrame with multiple operations.
+    """
+    cleaned_df = df.copy()
+    
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if type_conversion:
+        cleaned_df = convert_column_types(cleaned_df, type_conversion)
+    
+    cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    if len(df) < min_rows:
+        raise ValueError(f"DataFrame must have at least {min_rows} rows")
+    
+    return True
