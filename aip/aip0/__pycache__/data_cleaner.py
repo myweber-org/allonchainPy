@@ -283,4 +283,74 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid = validate_dataframe(cleaned, required_columns=['id', 'value'])
-    print(f"\nData validation result: {is_valid}")
+    print(f"\nData validation result: {is_valid}")import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+        fill_missing (str or dict): Method to fill missing values. 
+            Options: 'mean', 'median', 'mode', or a dictionary of column:value pairs.
+            If None, missing values are not filled.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing is not None:
+        if isinstance(fill_missing, dict):
+            cleaned_df = cleaned_df.fillna(fill_missing)
+        elif fill_missing == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_missing == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        elif fill_missing == 'mode':
+            for col in cleaned_df.columns:
+                if cleaned_df[col].dtype == 'object':
+                    mode_val = cleaned_df[col].mode()
+                    if not mode_val.empty:
+                        cleaned_df[col] = cleaned_df[col].fillna(mode_val[0])
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None, unique_constraints=None):
+    """
+    Validate a DataFrame for required columns and unique constraints.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+        unique_constraints (list): List of column names that should have unique values.
+    
+    Returns:
+        dict: Dictionary with validation results and issues found.
+    """
+    validation_result = {
+        'is_valid': True,
+        'issues': []
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_result['is_valid'] = False
+            validation_result['issues'].append(f"Missing required columns: {missing_columns}")
+    
+    if unique_constraints:
+        for column in unique_constraints:
+            if column in df.columns:
+                duplicate_count = df[column].duplicated().sum()
+                if duplicate_count > 0:
+                    validation_result['is_valid'] = False
+                    validation_result['issues'].append(
+                        f"Column '{column}' has {duplicate_count} duplicate values"
+                    )
+    
+    return validation_result
