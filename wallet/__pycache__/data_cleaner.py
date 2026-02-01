@@ -157,3 +157,96 @@ def validate_dataframe(df, required_columns=None, min_rows=1):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in data")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    removed_count = len(data) - len(filtered_data)
+    
+    return filtered_data, removed_count
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in data")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def handle_missing_values(data, strategy='mean'):
+    """
+    Handle missing values using specified strategy.
+    """
+    if strategy == 'mean':
+        return data.fillna(data.mean())
+    elif strategy == 'median':
+        return data.fillna(data.median())
+    elif strategy == 'mode':
+        return data.fillna(data.mode().iloc[0])
+    elif strategy == 'drop':
+        return data.dropna()
+    else:
+        raise ValueError(f"Unknown strategy: {strategy}")
+
+def clean_dataset(data, numeric_columns, outlier_multiplier=1.5, normalize=True, missing_strategy='mean'):
+    """
+    Comprehensive data cleaning pipeline.
+    """
+    cleaned_data = data.copy()
+    
+    # Handle missing values
+    cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy)
+    
+    # Remove outliers for each numeric column
+    total_removed = 0
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            cleaned_data, removed = remove_outliers_iqr(cleaned_data, column, outlier_multiplier)
+            total_removed += removed
+    
+    # Normalize numeric columns if requested
+    if normalize:
+        for column in numeric_columns:
+            if column in cleaned_data.columns:
+                cleaned_data[f'{column}_normalized'] = normalize_minmax(cleaned_data, column)
+    
+    return cleaned_data, total_removed
+
+def validate_data(data, required_columns, min_rows=10):
+    """
+    Validate dataset structure and content.
+    """
+    missing_columns = [col for col in required_columns if col not in data.columns]
+    
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    if len(data) < min_rows:
+        raise ValueError(f"Dataset has only {len(data)} rows, minimum required is {min_rows}")
+    
+    if data.isnull().sum().sum() > 0:
+        print(f"Warning: Dataset contains {data.isnull().sum().sum()} missing values")
+    
+    return True
