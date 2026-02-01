@@ -144,4 +144,87 @@ def validate_dataframe(df, required_columns=None):
         if missing_columns:
             return False, f"Missing required columns: {missing_columns}"
     
-    return True, "DataFrame is valid"
+    return True, "DataFrame is valid"import pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+
+    def remove_duplicates(self):
+        self.df = self.df.drop_duplicates()
+        return self
+
+    def handle_missing_values(self, strategy='mean', fill_value=None):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if strategy == 'mean':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mean())
+        elif strategy == 'median':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].median())
+        elif strategy == 'mode':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mode().iloc[0])
+        elif strategy == 'constant' and fill_value is not None:
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(fill_value)
+        
+        return self
+
+    def detect_outliers_zscore(self, threshold=3):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        z_scores = np.abs(stats.zscore(self.df[numeric_cols]))
+        outlier_mask = (z_scores > threshold).any(axis=1)
+        return outlier_mask
+
+    def remove_outliers(self, method='zscore', **kwargs):
+        if method == 'zscore':
+            threshold = kwargs.get('threshold', 3)
+            outlier_mask = self.detect_outliers_zscore(threshold)
+            self.df = self.df[~outlier_mask]
+        return self
+
+    def normalize_data(self, method='minmax'):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if method == 'minmax':
+            self.df[numeric_cols] = (self.df[numeric_cols] - self.df[numeric_cols].min()) / (self.df[numeric_cols].max() - self.df[numeric_cols].min())
+        elif method == 'standard':
+            self.df[numeric_cols] = (self.df[numeric_cols] - self.df[numeric_cols].mean()) / self.df[numeric_cols].std()
+        
+        return self
+
+    def get_cleaned_data(self):
+        return self.df
+
+    def get_summary(self):
+        cleaned_shape = self.df.shape
+        rows_removed = self.original_shape[0] - cleaned_shape[0]
+        cols_removed = self.original_shape[1] - cleaned_shape[1]
+        
+        summary = {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': cleaned_shape[0],
+            'cleaned_columns': cleaned_shape[1],
+            'rows_removed': rows_removed,
+            'columns_removed': cols_removed
+        }
+        return summary
+
+def load_and_clean_data(filepath, cleaning_steps=None):
+    df = pd.read_csv(filepath)
+    cleaner = DataCleaner(df)
+    
+    if cleaning_steps:
+        for step in cleaning_steps:
+            if step['action'] == 'remove_duplicates':
+                cleaner.remove_duplicates()
+            elif step['action'] == 'handle_missing':
+                cleaner.handle_missing_values(**step.get('params', {}))
+            elif step['action'] == 'remove_outliers':
+                cleaner.remove_outliers(**step.get('params', {}))
+            elif step['action'] == 'normalize':
+                cleaner.normalize_data(**step.get('params', {}))
+    
+    return cleaner.get_cleaned_data(), cleaner.get_summary()
