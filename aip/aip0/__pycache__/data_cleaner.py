@@ -197,3 +197,90 @@ if __name__ == "__main__":
     cleaned = remove_duplicates_preserve_order(sample_data)
     print(f"Original: {sample_data}")
     print(f"Cleaned: {cleaned}")
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+def clean_dataframe(df: pd.DataFrame, 
+                    drop_duplicates: bool = True,
+                    fill_missing: Optional[str] = 'mean',
+                    columns_to_standardize: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Clean a pandas DataFrame by removing duplicates, handling missing values,
+    and standardizing specified columns.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        if fill_missing == 'mean':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+        elif fill_missing == 'median':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].median())
+        elif fill_missing == 'zero':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(0)
+    
+    if columns_to_standardize:
+        for col in columns_to_standardize:
+            if col in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[col]):
+                mean = cleaned_df[col].mean()
+                std = cleaned_df[col].std()
+                if std > 0:
+                    cleaned_df[col] = (cleaned_df[col] - mean) / std
+    
+    return cleaned_df
+
+def validate_dataframe(df: pd.DataFrame, 
+                       required_columns: List[str],
+                       min_rows: int = 1) -> bool:
+    """
+    Validate that a DataFrame meets basic requirements.
+    """
+    if len(df) < min_rows:
+        return False
+    
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        return False
+    
+    return True
+
+def export_cleaned_data(df: pd.DataFrame, 
+                        filename: str, 
+                        format: str = 'csv') -> None:
+    """
+    Export cleaned DataFrame to file.
+    """
+    if format == 'csv':
+        df.to_csv(filename, index=False)
+    elif format == 'excel':
+        df.to_excel(filename, index=False)
+    elif format == 'json':
+        df.to_json(filename, orient='records')
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4],
+        'value': [10.5, 20.3, 20.3, None, 40.7],
+        'category': ['A', 'B', 'B', 'C', 'A']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataframe(df, 
+                              drop_duplicates=True,
+                              fill_missing='mean',
+                              columns_to_standardize=['value'])
+    
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    is_valid = validate_dataframe(cleaned, required_columns=['id', 'value'])
+    print(f"\nData validation result: {is_valid}")
