@@ -235,3 +235,86 @@ def main():
 
 if __name__ == "__main__":
     main()
+import requests
+import json
+import logging
+from datetime import datetime
+from typing import Optional, Dict, Any
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+class WeatherFetcher:
+    BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
+    
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        
+    def get_weather(self, city: str, country_code: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        query = f"{city},{country_code}" if country_code else city
+        params = {
+            'q': query,
+            'appid': self.api_key,
+            'units': 'metric'
+        }
+        
+        try:
+            logger.info(f"Fetching weather data for {query}")
+            response = requests.get(self.BASE_URL, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            processed_data = self._process_weather_data(data)
+            logger.info(f"Successfully fetched weather data for {query}")
+            return processed_data
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Network error occurred: {e}")
+            return None
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON response: {e}")
+            return None
+        except KeyError as e:
+            logger.error(f"Unexpected data structure in response: {e}")
+            return None
+    
+    def _process_weather_data(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            'location': raw_data.get('name', 'Unknown'),
+            'country': raw_data.get('sys', {}).get('country', 'Unknown'),
+            'temperature': raw_data.get('main', {}).get('temp', 0),
+            'feels_like': raw_data.get('main', {}).get('feels_like', 0),
+            'humidity': raw_data.get('main', {}).get('humidity', 0),
+            'pressure': raw_data.get('main', {}).get('pressure', 0),
+            'weather': raw_data.get('weather', [{}])[0].get('description', 'Unknown'),
+            'wind_speed': raw_data.get('wind', {}).get('speed', 0),
+            'wind_direction': raw_data.get('wind', {}).get('deg', 0),
+            'visibility': raw_data.get('visibility', 0),
+            'cloudiness': raw_data.get('clouds', {}).get('all', 0),
+            'sunrise': datetime.fromtimestamp(raw_data.get('sys', {}).get('sunrise', 0)).isoformat(),
+            'sunset': datetime.fromtimestamp(raw_data.get('sys', {}).get('sunset', 0)).isoformat(),
+            'timestamp': datetime.now().isoformat()
+        }
+    
+    def save_to_file(self, data: Dict[str, Any], filename: str = "weather_data.json"):
+        try:
+            with open(filename, 'w') as f:
+                json.dump(data, f, indent=2)
+            logger.info(f"Weather data saved to {filename}")
+        except IOError as e:
+            logger.error(f"Failed to save data to file: {e}")
+
+def main():
+    API_KEY = "your_api_key_here"
+    fetcher = WeatherFetcher(API_KEY)
+    
+    weather_data = fetcher.get_weather("London", "UK")
+    
+    if weather_data:
+        print(json.dumps(weather_data, indent=2))
+        fetcher.save_to_file(weather_data)
+    else:
+        print("Failed to fetch weather data")
+
+if __name__ == "__main__":
+    main()
