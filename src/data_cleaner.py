@@ -189,3 +189,77 @@ if __name__ == "__main__":
         print(cleaned.describe())
     else:
         print("Data validation failed")
+import pandas as pd
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing null values and duplicate rows.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to be cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    df_cleaned = df.copy()
+    
+    df_cleaned = df_cleaned.dropna()
+    
+    df_cleaned = df_cleaned.drop_duplicates()
+    
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and required columns.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        bool: True if validation passes, False otherwise.
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    
+    if df.empty:
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False
+    
+    return True
+
+def sample_data_cleaning():
+    """
+    Example usage of the data cleaning functions.
+    """
+    data = {
+        'name': ['Alice', 'Bob', 'Charlie', None, 'Alice'],
+        'age': [25, 30, 35, 40, 25],
+        'city': ['NYC', 'LA', 'Chicago', None, 'NYC']
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nShape:", df.shape)
+    
+    if validate_dataframe(df, required_columns=['name', 'age']):
+        cleaned_df = clean_dataset(df)
+        print("\nCleaned DataFrame:")
+        print(cleaned_df)
+        print("\nCleaned shape:", cleaned_df.shape)
+    else:
+        print("DataFrame validation failed")
+
+if __name__ == "__main__":
+    sample_data_cleaning()
