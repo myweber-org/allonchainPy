@@ -373,3 +373,113 @@ def clean_dataset(df, numeric_columns):
         cleaned_df = normalize_minmax(cleaned_df, col)
     cleaned_df = handle_missing_values(cleaned_df)
     return cleaned_df
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def clean_numeric_data(df, columns=None):
+    """
+    Clean numeric data by removing outliers from specified columns.
+    If no columns specified, clean all numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    
+    for column in columns:
+        if column in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[column]):
+            try:
+                cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            except Exception as e:
+                print(f"Warning: Could not clean column '{column}': {e}")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    bool: True if validation passes
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    return True
+
+def main():
+    """
+    Example usage of data cleaning functions.
+    """
+    np.random.seed(42)
+    
+    data = {
+        'id': range(1, 101),
+        'value': np.random.normal(100, 15, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    print("Original DataFrame shape:", df.shape)
+    print("Original statistics:")
+    print(df['value'].describe())
+    
+    cleaned_df = clean_numeric_data(df, columns=['value'])
+    
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("Cleaned statistics:")
+    print(cleaned_df['value'].describe())
+    
+    try:
+        validate_dataframe(cleaned_df, required_columns=['id', 'value', 'category'])
+        print("\nData validation passed")
+    except Exception as e:
+        print(f"\nData validation failed: {e}")
+
+if __name__ == "__main__":
+    main()
