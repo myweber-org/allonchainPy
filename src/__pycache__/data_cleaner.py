@@ -1,49 +1,4 @@
 
-def remove_duplicates(input_list):
-    """
-    Remove duplicate elements from a list while preserving order.
-    
-    Args:
-        input_list (list): The list from which duplicates are to be removed.
-    
-    Returns:
-        list: A new list with duplicates removed.
-    """
-    seen = set()
-    result = []
-    
-    for item in input_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    
-    return result
-
-def clean_data_with_threshold(data, threshold=None):
-    """
-    Clean data by removing duplicates, optionally with a frequency threshold.
-    
-    Args:
-        data (list): Input data list.
-        threshold (int, optional): Minimum frequency to keep an item. Defaults to None.
-    
-    Returns:
-        list: Cleaned data list.
-    """
-    cleaned = remove_duplicates(data)
-    
-    if threshold is not None and threshold > 0:
-        from collections import Counter
-        counts = Counter(data)
-        cleaned = [item for item in cleaned if counts[item] >= threshold]
-    
-    return cleaned
-
-if __name__ == "__main__":
-    sample_data = [1, 2, 2, 3, 4, 4, 4, 5, 1, 6]
-    print("Original data:", sample_data)
-    print("Without duplicates:", remove_duplicates(sample_data))
-    print("With threshold 2:", clean_data_with_threshold(sample_data, threshold=2))
 import numpy as np
 import pandas as pd
 
@@ -53,7 +8,7 @@ def remove_outliers_iqr(df, column):
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
+    column (str): Column name to process
     
     Returns:
     pd.DataFrame: DataFrame with outliers removed
@@ -70,7 +25,7 @@ def remove_outliers_iqr(df, column):
     
     filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
-    return filtered_df.reset_index(drop=True)
+    return filtered_df
 
 def calculate_statistics(df, column):
     """
@@ -92,7 +47,7 @@ def calculate_statistics(df, column):
         'std': df[column].std(),
         'min': df[column].min(),
         'max': df[column].max(),
-        'count': len(df[column])
+        'count': df[column].count()
     }
     
     return stats
@@ -107,7 +62,7 @@ def clean_dataset(df, columns_to_clean):
     
     Returns:
     pd.DataFrame: Cleaned DataFrame
-    dict: Dictionary of statistics for each cleaned column
+    dict: Statistics for each cleaned column
     """
     cleaned_df = df.copy()
     all_stats = {}
@@ -127,56 +82,30 @@ def clean_dataset(df, columns_to_clean):
 if __name__ == "__main__":
     # Example usage
     np.random.seed(42)
-    sample_data = {
-        'temperature': np.random.normal(25, 5, 1000),
-        'humidity': np.random.normal(60, 15, 1000),
-        'pressure': np.random.normal(1013, 10, 1000)
+    data = {
+        'temperature': np.random.normal(25, 5, 100),
+        'humidity': np.random.normal(60, 15, 100),
+        'pressure': np.random.normal(1013, 10, 100)
     }
     
     # Add some outliers
-    sample_df = pd.DataFrame(sample_data)
-    sample_df.loc[1000] = [100, 200, 500]  # Extreme outlier
-    sample_df.loc[1001] = [-50, -30, 800]  # Negative outlier
+    data['temperature'][0] = 100
+    data['humidity'][1] = 150
+    data['pressure'][2] = 2000
     
-    print("Original dataset shape:", sample_df.shape)
+    df = pd.DataFrame(data)
     
-    columns_to_process = ['temperature', 'humidity', 'pressure']
-    cleaned_df, statistics = clean_dataset(sample_df, columns_to_process)
+    print("Original dataset shape:", df.shape)
+    print("\nOriginal statistics:")
+    for col in df.columns:
+        print(f"{col}: mean={df[col].mean():.2f}, std={df[col].std():.2f}")
+    
+    # Clean the dataset
+    columns_to_clean = ['temperature', 'humidity', 'pressure']
+    cleaned_df, stats = clean_dataset(df, columns_to_clean)
     
     print("\nCleaned dataset shape:", cleaned_df.shape)
-    print("\nStatistics for cleaned columns:")
-    
-    for col, stats in statistics.items():
-        print(f"\n{col}:")
-        for key, value in stats.items():
-            print(f"  {key}: {value:.2f}" if isinstance(value, float) else f"  {key}: {value}")
-import pandas as pd
-import numpy as np
-
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-
-def clean_dataset(input_file, output_file):
-    df = pd.read_csv(input_file)
-    
-    numeric_columns = df.select_dtypes(include=[np.number]).columns
-    
-    for col in numeric_columns:
-        original_count = len(df)
-        df = remove_outliers_iqr(df, col)
-        removed_count = original_count - len(df)
-        print(f"Removed {removed_count} outliers from column: {col}")
-    
-    df.to_csv(output_file, index=False)
-    print(f"Cleaned data saved to: {output_file}")
-    return df
-
-if __name__ == "__main__":
-    input_path = "raw_data.csv"
-    output_path = "cleaned_data.csv"
-    cleaned_df = clean_dataset(input_path, output_path)
+    print("\nCleaned statistics:")
+    for col, col_stats in stats.items():
+        print(f"{col}: mean={col_stats['mean']:.2f}, std={col_stats['std']:.2f}, "
+              f"outliers removed={col_stats['outliers_removed']}")
