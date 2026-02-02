@@ -37,3 +37,82 @@ if __name__ == "__main__":
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {cleaned.shape}")
     print(f"Removed outliers: {len(sample_data) - len(cleaned)}")
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Parameters:
+    data (numpy.ndarray): The dataset
+    column (int): Index of the column to clean
+    
+    Returns:
+    numpy.ndarray: Data with outliers removed
+    """
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Input data must be a numpy array")
+    
+    if column >= data.shape[1]:
+        raise IndexError("Column index out of bounds")
+    
+    col_data = data[:, column]
+    
+    Q1 = np.percentile(col_data, 25)
+    Q3 = np.percentile(col_data, 75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    mask = (col_data >= lower_bound) & (col_data <= upper_bound)
+    
+    return data[mask]
+
+def calculate_statistics(data, column):
+    """
+    Calculate basic statistics for a column after outlier removal.
+    
+    Parameters:
+    data (numpy.ndarray): The dataset
+    column (int): Index of the column to analyze
+    
+    Returns:
+    dict: Dictionary containing statistics
+    """
+    cleaned_data = remove_outliers_iqr(data, column)
+    col_data = cleaned_data[:, column]
+    
+    stats = {
+        'mean': np.mean(col_data),
+        'median': np.median(col_data),
+        'std': np.std(col_data),
+        'min': np.min(col_data),
+        'max': np.max(col_data),
+        'count': len(col_data)
+    }
+    
+    return stats
+
+def example_usage():
+    """
+    Example demonstrating how to use the data cleaning functions.
+    """
+    np.random.seed(42)
+    
+    sample_data = np.random.randn(100, 3)
+    sample_data[0, 0] = 10
+    sample_data[1, 0] = -10
+    
+    print("Original data shape:", sample_data.shape)
+    
+    cleaned = remove_outliers_iqr(sample_data, 0)
+    print("Cleaned data shape:", cleaned.shape)
+    
+    stats = calculate_statistics(sample_data, 0)
+    print("Statistics after cleaning:")
+    for key, value in stats.items():
+        print(f"{key}: {value:.4f}")
+
+if __name__ == "__main__":
+    example_usage()
