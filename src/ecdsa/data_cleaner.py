@@ -1,125 +1,122 @@
 import pandas as pd
+import numpy as np
+from typing import List, Union
 
-def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+def remove_duplicates(df: pd.DataFrame, subset: List[str] = None) -> pd.DataFrame:
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Remove duplicate rows from DataFrame.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
-    fill_missing (str): Strategy to fill missing values. 
-                        Options: 'mean', 'median', 'mode', or 'drop'. Default is 'mean'.
+    Args:
+        df: Input DataFrame
+        subset: Columns to consider for identifying duplicates
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame.
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def convert_column_types(df: pd.DataFrame, 
+                         column_types: dict) -> pd.DataFrame:
+    """
+    Convert columns to specified data types.
+    
+    Args:
+        df: Input DataFrame
+        column_types: Dictionary mapping column names to target types
+    
+    Returns:
+        DataFrame with converted column types
+    """
+    df_converted = df.copy()
+    for column, dtype in column_types.items():
+        if column in df_converted.columns:
+            try:
+                df_converted[column] = df_converted[column].astype(dtype)
+            except (ValueError, TypeError):
+                df_converted[column] = pd.to_numeric(df_converted[column], errors='coerce')
+    return df_converted
+
+def handle_missing_values(df: pd.DataFrame, 
+                          strategy: str = 'mean',
+                          columns: List[str] = None) -> pd.DataFrame:
+    """
+    Handle missing values in DataFrame columns.
+    
+    Args:
+        df: Input DataFrame
+        strategy: Imputation strategy ('mean', 'median', 'mode', 'drop')
+        columns: Specific columns to process
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    df_processed = df.copy()
+    
+    if columns is None:
+        columns = df_processed.columns
+    
+    for column in columns:
+        if column not in df_processed.columns:
+            continue
+            
+        if strategy == 'drop':
+            df_processed = df_processed.dropna(subset=[column])
+        elif strategy == 'mean':
+            df_processed[column] = df_processed[column].fillna(df_processed[column].mean())
+        elif strategy == 'median':
+            df_processed[column] = df_processed[column].fillna(df_processed[column].median())
+        elif strategy == 'mode':
+            df_processed[column] = df_processed[column].fillna(df_processed[column].mode()[0])
+    
+    return df_processed
+
+def clean_dataframe(df: pd.DataFrame,
+                    deduplicate: bool = True,
+                    type_conversions: dict = None,
+                    missing_strategy: str = 'mean') -> pd.DataFrame:
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        df: Input DataFrame
+        deduplicate: Whether to remove duplicates
+        type_conversions: Dictionary for column type conversions
+        missing_strategy: Strategy for handling missing values
+    
+    Returns:
+        Cleaned DataFrame
     """
     cleaned_df = df.copy()
     
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
     
-    if fill_missing == 'drop':
-        cleaned_df = cleaned_df.dropna()
-    elif fill_missing in ['mean', 'median', 'mode']:
-        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
-        for col in numeric_cols:
-            if fill_missing == 'mean':
-                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
-            elif fill_missing == 'median':
-                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
-            elif fill_missing == 'mode':
-                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0])
+    if type_conversions:
+        cleaned_df = convert_column_types(cleaned_df, type_conversions)
+    
+    if missing_strategy:
+        cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
     
     return cleaned_df
 
-def validate_dataframe(df, required_columns=None):
+def validate_dataframe(df: pd.DataFrame,
+                       required_columns: List[str] = None) -> bool:
     """
-    Validate a DataFrame for basic integrity checks.
+    Validate DataFrame structure and content.
     
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of column names that must be present.
+    Args:
+        df: DataFrame to validate
+        required_columns: List of columns that must be present
     
     Returns:
-    tuple: (is_valid, message)
+        Boolean indicating if DataFrame is valid
     """
     if df.empty:
-        return False, "DataFrame is empty"
+        return False
     
     if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            return False, f"Missing required columns: {missing_cols}"
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False
     
-    return True, "DataFrame is valid"
-
-if __name__ == "__main__":
-    sample_data = {
-        'A': [1, 2, 2, 4, None],
-        'B': [5, None, 7, 8, 9],
-        'C': ['x', 'y', 'y', 'z', 'x']
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\nCleaned DataFrame (drop duplicates, fill with mean):")
-    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
-    print(cleaned)
-    
-    is_valid, message = validate_dataframe(cleaned)
-    print(f"\nValidation: {message}")
-import pandas as pd
-import re
-
-def clean_dataframe(df, columns_to_clean=None):
-    """
-    Clean a pandas DataFrame by removing duplicates and normalizing string columns.
-    """
-    df_clean = df.copy()
-    
-    # Remove duplicate rows
-    initial_rows = df_clean.shape[0]
-    df_clean = df_clean.drop_duplicates()
-    removed_duplicates = initial_rows - df_clean.shape[0]
-    
-    # If specific columns are provided, clean only those; otherwise clean all object columns
-    if columns_to_clean is None:
-        columns_to_clean = df_clean.select_dtypes(include=['object']).columns.tolist()
-    
-    for column in columns_to_clean:
-        if column in df_clean.columns and df_clean[column].dtype == 'object':
-            df_clean[column] = df_clean[column].apply(_normalize_string)
-    
-    return df_clean, removed_duplicates
-
-def _normalize_string(text):
-    """
-    Normalize a string by converting to lowercase, removing extra whitespace,
-    and stripping special characters.
-    """
-    if pd.isna(text):
-        return text
-    
-    text = str(text)
-    text = text.lower()
-    text = re.sub(r'\s+', ' ', text)
-    text = text.strip()
-    return text
-
-def validate_email_column(df, email_column):
-    """
-    Validate email addresses in a specified column and return a boolean series.
-    """
-    if email_column not in df.columns:
-        raise ValueError(f"Column '{email_column}' not found in DataFrame")
-    
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return df[email_column].apply(lambda x: bool(re.match(email_pattern, str(x))) if pd.notna(x) else False)def remove_duplicates_preserve_order(sequence):
-    seen = set()
-    result = []
-    for item in sequence:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
+    return True
