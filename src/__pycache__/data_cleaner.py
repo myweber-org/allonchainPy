@@ -300,4 +300,127 @@ def validate_data(df, required_columns, numeric_columns):
             if not pd.api.types.is_numeric_dtype(df[col]):
                 raise TypeError(f"Column {col} must be numeric")
     
-    return True
+    return Trueimport pandas as pd
+import numpy as np
+from scipy import stats
+
+def clean_dataset(df, numeric_columns=None, method='median', z_threshold=3):
+    """
+    Clean dataset by handling missing values and removing outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    numeric_columns (list): List of numeric column names to process
+    method (str): Imputation method ('mean', 'median', 'mode')
+    z_threshold (float): Z-score threshold for outlier detection
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    if df.empty:
+        return df
+    
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_clean = df.copy()
+    
+    # Handle missing values
+    for col in numeric_columns:
+        if col in df_clean.columns:
+            if df_clean[col].isnull().any():
+                if method == 'mean':
+                    fill_value = df_clean[col].mean()
+                elif method == 'median':
+                    fill_value = df_clean[col].median()
+                elif method == 'mode':
+                    fill_value = df_clean[col].mode()[0]
+                else:
+                    fill_value = df_clean[col].median()
+                
+                df_clean[col].fillna(fill_value, inplace=True)
+    
+    # Remove outliers using z-score method
+    if z_threshold > 0:
+        z_scores = np.abs(stats.zscore(df_clean[numeric_columns], nan_policy='omit'))
+        outlier_mask = (z_scores < z_threshold).all(axis=1)
+        df_clean = df_clean[outlier_mask].reset_index(drop=True)
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): Dataframe to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    tuple: (is_valid, message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
+
+def get_data_summary(df):
+    """
+    Generate summary statistics for the dataframe.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    
+    Returns:
+    dict: Summary statistics
+    """
+    summary = {
+        'shape': df.shape,
+        'missing_values': df.isnull().sum().to_dict(),
+        'data_types': df.dtypes.astype(str).to_dict(),
+        'numeric_stats': {}
+    }
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        summary['numeric_stats'][col] = {
+            'mean': df[col].mean(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            'max': df[col].max(),
+            'median': df[col].median()
+        }
+    
+    return summary
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5, 100],
+        'B': [10, 20, 30, np.nan, 50, 60],
+        'C': ['x', 'y', 'z', 'x', 'y', 'z']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nSummary:")
+    print(get_data_summary(df))
+    
+    # Clean the data
+    df_clean = clean_dataset(df, numeric_columns=['A', 'B'], z_threshold=2)
+    print("\nCleaned DataFrame:")
+    print(df_clean)
+    
+    # Validate
+    is_valid, message = validate_dataframe(df_clean, required_columns=['A', 'B', 'C'])
+    print(f"\nValidation: {is_valid} - {message}")
