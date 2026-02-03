@@ -315,3 +315,11 @@ def clean_dataset(df, missing_strategy='remove', outlier_strategy='cap'):
             df_clean = cap_outliers(df_clean, col)
     
     return df_clean
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
