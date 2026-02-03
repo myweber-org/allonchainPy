@@ -1,56 +1,65 @@
-import pandas as pd
 
-def clean_dataset(df, drop_duplicates=True):
+import numpy as np
+
+def remove_outliers_iqr(data, column):
     """
-    Clean a pandas DataFrame by removing null values and optionally duplicates.
+    Remove outliers from a pandas DataFrame column using the IQR method.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean.
-        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame.
+    pd.DataFrame: DataFrame with outliers removed
     """
-    cleaned_df = df.dropna()
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    return cleaned_df
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
 
-def validate_data(df, required_columns):
+def calculate_statistics(data, column):
     """
-    Validate that the DataFrame contains all required columns.
+    Calculate basic statistics for a DataFrame column.
     
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_columns (list): List of column names that must be present.
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
     
     Returns:
-        bool: True if all required columns are present, False otherwise.
+    dict: Dictionary containing statistical measures
     """
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    
-    if missing_columns:
-        print(f"Missing columns: {missing_columns}")
-        return False
-    
-    return True
-
-if __name__ == "__main__":
-    sample_data = {
-        'name': ['Alice', 'Bob', 'Charlie', None, 'Alice'],
-        'age': [25, 30, None, 40, 25],
-        'score': [85, 92, 78, 88, 85]
+    stats = {
+        'mean': np.mean(data[column]),
+        'median': np.median(data[column]),
+        'std': np.std(data[column]),
+        'min': np.min(data[column]),
+        'max': np.max(data[column]),
+        'count': len(data[column])
     }
+    return stats
+
+def normalize_column(data, column):
+    """
+    Normalize a DataFrame column using min-max scaling.
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\nCleaned DataFrame:")
-    cleaned = clean_dataset(df)
-    print(cleaned)
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to normalize
     
-    required_cols = ['name', 'age']
-    is_valid = validate_data(cleaned, required_cols)
-    print(f"\nData validation result: {is_valid}")
+    Returns:
+    pd.DataFrame: DataFrame with normalized column
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val != min_val:
+        data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    else:
+        data[column + '_normalized'] = 0
+    
+    return data
