@@ -424,3 +424,171 @@ if __name__ == "__main__":
     # Validate
     is_valid, message = validate_dataframe(df_clean, required_columns=['A', 'B', 'C'])
     print(f"\nValidation: {is_valid} - {message}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, threshold=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        threshold: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data.copy()
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        threshold: Z-score threshold (default 3)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = np.abs(stats.zscore(data[column].dropna()))
+    filtered_indices = np.where(z_scores < threshold)[0]
+    
+    filtered_data = data.iloc[filtered_indices].copy()
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    data_copy = data.copy()
+    min_val = data_copy[column].min()
+    max_val = data_copy[column].max()
+    
+    if max_val == min_val:
+        data_copy[f'{column}_normalized'] = 0.5
+    else:
+        data_copy[f'{column}_normalized'] = (data_copy[column] - min_val) / (max_val - min_val)
+    
+    return data_copy
+
+def normalize_zscore(data, column):
+    """
+    Normalize data using Z-score standardization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        DataFrame with standardized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    data_copy = data.copy()
+    mean_val = data_copy[column].mean()
+    std_val = data_copy[column].std()
+    
+    if std_val == 0:
+        data_copy[f'{column}_standardized'] = 0
+    else:
+        data_copy[f'{column}_standardized'] = (data_copy[column] - mean_val) / std_val
+    
+    return data_copy
+
+def clean_dataset(data, numeric_columns=None, outlier_method='iqr', normalize_method='minmax'):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        data: pandas DataFrame
+        numeric_columns: list of numeric columns to process (default: all numeric)
+        outlier_method: 'iqr', 'zscore', or None
+        normalize_method: 'minmax', 'zscore', or None
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column not in cleaned_data.columns:
+            continue
+            
+        if outlier_method == 'iqr':
+            cleaned_data = remove_outliers_iqr(cleaned_data, column)
+        elif outlier_method == 'zscore':
+            cleaned_data = remove_outliers_zscore(cleaned_data, column)
+        
+        if normalize_method == 'minmax':
+            cleaned_data = normalize_minmax(cleaned_data, column)
+        elif normalize_method == 'zscore':
+            cleaned_data = normalize_zscore(cleaned_data, column)
+    
+    return cleaned_data
+
+def validate_data(data, required_columns=None, allow_nan=True, nan_threshold=0.3):
+    """
+    Validate dataset structure and quality.
+    
+    Args:
+        data: pandas DataFrame
+        required_columns: list of required column names
+        allow_nan: whether to allow NaN values
+        nan_threshold: maximum allowed NaN ratio per column
+    
+    Returns:
+        tuple: (is_valid, validation_message)
+    """
+    validation_messages = []
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in data.columns]
+        if missing_columns:
+            validation_messages.append(f"Missing required columns: {missing_columns}")
+    
+    if not allow_nan:
+        nan_columns = data.columns[data.isna().any()].tolist()
+        if nan_columns:
+            validation_messages.append(f"Columns with NaN values: {nan_columns}")
+    else:
+        for column in data.columns:
+            nan_ratio = data[column].isna().mean()
+            if nan_ratio > nan_threshold:
+                validation_messages.append(f"Column '{column}' has {nan_ratio:.1%} NaN values")
+    
+    is_valid = len(validation_messages) == 0
+    validation_message = "Data validation passed" if is_valid else "; ".join(validation_messages)
+    
+    return is_valid, validation_message
