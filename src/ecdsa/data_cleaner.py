@@ -81,3 +81,120 @@ def clean_dataset(df, config):
                 cleaner.drop_missing(column)
     
     return cleaner.get_cleaned_data()
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_strategy='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    drop_duplicates (bool): Whether to remove duplicate rows
+    fill_missing (bool): Whether to fill missing values
+    fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', 'zero')
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed_rows = initial_rows - len(cleaned_df)
+        print(f"Removed {removed_rows} duplicate rows")
+    
+    if fill_missing:
+        missing_count = cleaned_df.isnull().sum().sum()
+        if missing_count > 0:
+            print(f"Found {missing_count} missing values")
+            
+            for column in cleaned_df.columns:
+                if cleaned_df[column].dtype in ['int64', 'float64']:
+                    if fill_strategy == 'mean':
+                        cleaned_df[column].fillna(cleaned_df[column].mean(), inplace=True)
+                    elif fill_strategy == 'median':
+                        cleaned_df[column].fillna(cleaned_df[column].median(), inplace=True)
+                    elif fill_strategy == 'zero':
+                        cleaned_df[column].fillna(0, inplace=True)
+                elif cleaned_df[column].dtype == 'object':
+                    cleaned_df[column].fillna(cleaned_df[column].mode()[0] if not cleaned_df[column].mode().empty else '', inplace=True)
+        
+        print(f"Missing values filled using {fill_strategy} strategy")
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate the structure and content of a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    bool: True if validation passes, False otherwise
+    """
+    if df.empty:
+        print("Error: DataFrame is empty")
+        return False
+    
+    if len(df) < min_rows:
+        print(f"Error: DataFrame has less than {min_rows} rows")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Error: Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+def save_cleaned_data(df, output_path, format='csv'):
+    """
+    Save cleaned DataFrame to file.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to save
+    output_path (str): Path to save the file
+    format (str): File format ('csv', 'excel', 'json')
+    """
+    try:
+        if format == 'csv':
+            df.to_csv(output_path, index=False)
+        elif format == 'excel':
+            df.to_excel(output_path, index=False)
+        elif format == 'json':
+            df.to_json(output_path, orient='records')
+        else:
+            raise ValueError(f"Unsupported format: {format}")
+        
+        print(f"Data saved successfully to {output_path}")
+    except Exception as e:
+        print(f"Error saving data: {str(e)}")
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', None, 'Eve'],
+        'age': [25, 30, 30, None, 35, 40],
+        'score': [85.5, 92.0, 92.0, 78.5, 88.0, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataset(df, fill_strategy='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    if validate_data(cleaned_df, required_columns=['id', 'name', 'age']):
+        print("\nData validation passed")
+    else:
+        print("\nData validation failed")
