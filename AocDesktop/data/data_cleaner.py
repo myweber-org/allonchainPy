@@ -267,3 +267,154 @@ if __name__ == "__main__":
     print(f"Cleaned shape: {cleaned_data.shape}")
     print("\nSummary statistics:")
     print(stats_summary.head())
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers using Interquartile Range method.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: column name to process
+        threshold: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df.copy()
+
+def normalize_minmax(dataframe, columns=None):
+    """
+    Normalize specified columns using Min-Max scaling.
+    
+    Args:
+        dataframe: pandas DataFrame
+        columns: list of column names to normalize (default: all numeric columns)
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    result_df = dataframe.copy()
+    
+    for col in columns:
+        if col in result_df.columns and np.issubdtype(result_df[col].dtype, np.number):
+            col_min = result_df[col].min()
+            col_max = result_df[col].max()
+            
+            if col_max != col_min:
+                result_df[col] = (result_df[col] - col_min) / (col_max - col_min)
+            else:
+                result_df[col] = 0
+    
+    return result_df
+
+def standardize_zscore(dataframe, columns=None):
+    """
+    Standardize specified columns using Z-score normalization.
+    
+    Args:
+        dataframe: pandas DataFrame
+        columns: list of column names to standardize (default: all numeric columns)
+    
+    Returns:
+        DataFrame with standardized columns
+    """
+    if columns is None:
+        columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    result_df = dataframe.copy()
+    
+    for col in columns:
+        if col in result_df.columns and np.issubdtype(result_df[col].dtype, np.number):
+            mean_val = result_df[col].mean()
+            std_val = result_df[col].std()
+            
+            if std_val > 0:
+                result_df[col] = (result_df[col] - mean_val) / std_val
+            else:
+                result_df[col] = 0
+    
+    return result_df
+
+def handle_missing_values(dataframe, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns.
+    
+    Args:
+        dataframe: pandas DataFrame
+        strategy: imputation strategy ('mean', 'median', 'mode', 'constant', 'drop')
+        columns: list of column names to process (default: all columns)
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = dataframe.columns.tolist()
+    
+    result_df = dataframe.copy()
+    
+    for col in columns:
+        if col not in result_df.columns:
+            continue
+            
+        if result_df[col].isnull().any():
+            if strategy == 'mean' and np.issubdtype(result_df[col].dtype, np.number):
+                fill_value = result_df[col].mean()
+            elif strategy == 'median' and np.issubdtype(result_df[col].dtype, np.number):
+                fill_value = result_df[col].median()
+            elif strategy == 'mode':
+                fill_value = result_df[col].mode()[0] if not result_df[col].mode().empty else None
+            elif strategy == 'constant':
+                fill_value = 0 if np.issubdtype(result_df[col].dtype, np.number) else ''
+            elif strategy == 'drop':
+                result_df = result_df.dropna(subset=[col])
+                continue
+            else:
+                raise ValueError(f"Unsupported strategy '{strategy}' for column '{col}'")
+            
+            result_df[col] = result_df[col].fillna(fill_value)
+    
+    return result_df
+
+def validate_dataframe(dataframe, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        dataframe: pandas DataFrame to validate
+        required_columns: list of required column names
+        min_rows: minimum number of rows required
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if len(dataframe) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in dataframe.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
