@@ -108,3 +108,47 @@ def main():
 
 if __name__ == '__main__':
     main()
+import os
+import sys
+from pathlib import Path
+
+def rename_files_sequentially(directory, prefix="file", extension=".txt"):
+    try:
+        path = Path(directory)
+        if not path.exists() or not path.is_dir():
+            print(f"Error: Directory '{directory}' does not exist.")
+            return
+        
+        files = [f for f in path.iterdir() if f.is_file()]
+        if not files:
+            print("No files found in directory.")
+            return
+        
+        sorted_files = sorted(files, key=lambda x: x.stat().st_mtime)
+        
+        for index, file_path in enumerate(sorted_files, start=1):
+            new_name = f"{prefix}_{index:03d}{extension}"
+            new_path = file_path.parent / new_name
+            
+            if new_path.exists():
+                print(f"Skipping {file_path.name}: {new_name} already exists.")
+                continue
+            
+            file_path.rename(new_path)
+            print(f"Renamed: {file_path.name} -> {new_name}")
+    
+    except PermissionError:
+        print("Permission denied. Try running with appropriate privileges.")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python file_renamer.py <directory_path> [prefix] [extension]")
+        sys.exit(1)
+    
+    dir_path = sys.argv[1]
+    prefix_arg = sys.argv[2] if len(sys.argv) > 2 else "file"
+    ext_arg = sys.argv[3] if len(sys.argv) > 3 else ".txt"
+    
+    rename_files_sequentially(dir_path, prefix_arg, ext_arg)
