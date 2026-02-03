@@ -1,83 +1,126 @@
+import numpy as np
 import pandas as pd
 
-def remove_duplicates(df, subset=None, keep='first'):
+def detect_outliers_iqr(data, column, threshold=1.5):
     """
-    Remove duplicate rows from a DataFrame.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    subset (list, optional): Column labels to consider for duplicates.
-    keep (str, optional): Which duplicates to keep.
-    
-    Returns:
-    pd.DataFrame: DataFrame with duplicates removed.
+    Detect outliers using IQR method
     """
-    if df.empty:
-        return df
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
-    return cleaned_df
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
 
-def clean_numeric_columns(df, columns):
+def remove_outliers(data, column, threshold=1.5):
     """
-    Clean numeric columns by converting to appropriate types.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    columns (list): List of column names to clean.
-    
-    Returns:
-    pd.DataFrame: DataFrame with cleaned numeric columns.
+    Remove outliers from DataFrame
     """
-    for col in columns:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-    return df
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
 
-def validate_dataframe(df, required_columns):
+def normalize_minmax(data, column):
     """
-    Validate that DataFrame contains required columns.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    required_columns (list): List of required column names.
-    
-    Returns:
-    bool: True if all required columns are present.
+    Normalize column using min-max scaling
     """
-    missing_columns = [col for col in required_columns if col not in df.columns]
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if missing_columns:
-        print(f"Missing columns: {missing_columns}")
-        return False
+    min_val = data[column].min()
+    max_val = data[column].max()
     
-    return True
+    if min_val == max_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
 
-def clean_data_pipeline(df, config):
+def standardize_zscore(data, column):
     """
-    Execute a complete data cleaning pipeline.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    config (dict): Configuration dictionary with cleaning options.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
+    Standardize column using z-score normalization
     """
-    if not validate_dataframe(df, config.get('required_columns', [])):
-        raise ValueError("DataFrame missing required columns")
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if config.get('remove_duplicates', False):
-        df = remove_duplicates(
-            df, 
-            subset=config.get('duplicate_subset'),
-            keep=config.get('duplicate_keep', 'first')
-        )
+    mean_val = data[column].mean()
+    std_val = data[column].std()
     
-    if config.get('clean_numeric', False):
-        df = clean_numeric_columns(
-            df, 
-            config.get('numeric_columns', [])
-        )
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
     
-    return df
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame
+    """
+    if columns is None:
+        columns = data.columns
+    
+    data_filled = data.copy()
+    
+    for column in columns:
+        if column not in data.columns:
+            continue
+            
+        if data[column].isnull().any():
+            if strategy == 'mean':
+                fill_value = data[column].mean()
+            elif strategy == 'median':
+                fill_value = data[column].median()
+            elif strategy == 'mode':
+                fill_value = data[column].mode()[0]
+            elif strategy == 'zero':
+                fill_value = 0
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            data_filled[column] = data[column].fillna(fill_value)
+    
+    return data_filled
+
+def clean_dataset(data, numeric_columns=None, outlier_threshold=1.5, 
+                  normalization_method='standardize', missing_strategy='mean'):
+    """
+    Comprehensive dataset cleaning pipeline
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    # Handle missing values
+    cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy, 
+                                         columns=numeric_columns)
+    
+    # Remove outliers for each numeric column
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            cleaned_data = remove_outliers(cleaned_data, column, outlier_threshold)
+    
+    # Apply normalization
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            if normalization_method == 'normalize':
+                cleaned_data[column] = normalize_minmax(cleaned_data, column)
+            elif normalization_method == 'standardize':
+                cleaned_data[column] = standardize_zscore(cleaned_data, column)
+    
+    return cleaned_data
