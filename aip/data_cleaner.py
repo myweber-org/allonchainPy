@@ -1,44 +1,64 @@
 
-import pandas as pd
 import numpy as np
-from scipy import stats
 
-def load_data(filepath):
-    return pd.read_csv(filepath)
-
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas DataFrame column using the IQR method.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
     IQR = Q3 - Q1
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
 
-def normalize_column(df, column):
-    df[column] = (df[column] - df[column].min()) / (df[column].max() - df[column].min())
-    return df
+def calculate_summary_statistics(data, column):
+    """
+    Calculate summary statistics for a DataFrame column.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
+    stats = {
+        'mean': np.mean(data[column]),
+        'median': np.median(data[column]),
+        'std': np.std(data[column]),
+        'min': np.min(data[column]),
+        'max': np.max(data[column]),
+        'count': len(data[column])
+    }
+    return stats
 
-def clean_dataset(input_file, output_file):
-    df = load_data(input_file)
+def normalize_column(data, column):
+    """
+    Normalize a column using min-max scaling.
     
-    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to normalize
     
-    for col in numeric_columns:
-        df = remove_outliers_iqr(df, col)
+    Returns:
+    pd.DataFrame: DataFrame with normalized column
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
     
-    for col in numeric_columns:
-        df = normalize_column(df, col)
+    if max_val - min_val != 0:
+        data[f'{column}_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    else:
+        data[f'{column}_normalized'] = 0
     
-    df.to_csv(output_file, index=False)
-    print(f"Cleaned data saved to {output_file}")
-    return df
-
-if __name__ == "__main__":
-    cleaned_df = clean_dataset('raw_data.csv', 'cleaned_data.csv')def remove_duplicates_preserve_order(input_list):
-    seen = set()
-    result = []
-    for item in input_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
+    return data
