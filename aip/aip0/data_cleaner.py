@@ -104,4 +104,137 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
     removed = len(df) - len(filtered_df)
     print(f"Removed {removed} outliers from column '{column}'")
     
-    return filtered_df
+    return filtered_dfimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns):
+    """
+    Remove outliers from specified columns using IQR method.
+    Returns cleaned DataFrame and outlier indices.
+    """
+    clean_df = df.copy()
+    outlier_indices = []
+    
+    for col in columns:
+        if col not in clean_df.columns:
+            continue
+            
+        Q1 = clean_df[col].quantile(0.25)
+        Q3 = clean_df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        
+        col_outliers = clean_df[(clean_df[col] < lower_bound) | (clean_df[col] > upper_bound)].index
+        outlier_indices.extend(col_outliers)
+        
+        clean_df = clean_df[(clean_df[col] >= lower_bound) & (clean_df[col] <= upper_bound)]
+    
+    return clean_df, list(set(outlier_indices))
+
+def normalize_minmax(df, columns):
+    """
+    Normalize specified columns using min-max scaling.
+    Returns DataFrame with normalized columns.
+    """
+    normalized_df = df.copy()
+    
+    for col in columns:
+        if col not in normalized_df.columns:
+            continue
+            
+        col_min = normalized_df[col].min()
+        col_max = normalized_df[col].max()
+        
+        if col_max - col_min > 0:
+            normalized_df[col] = (normalized_df[col] - col_min) / (col_max - col_min)
+        else:
+            normalized_df[col] = 0
+    
+    return normalized_df
+
+def z_score_normalize(df, columns):
+    """
+    Normalize specified columns using z-score normalization.
+    Returns DataFrame with z-score normalized columns.
+    """
+    normalized_df = df.copy()
+    
+    for col in columns:
+        if col not in normalized_df.columns:
+            continue
+            
+        col_mean = normalized_df[col].mean()
+        col_std = normalized_df[col].std()
+        
+        if col_std > 0:
+            normalized_df[col] = (normalized_df[col] - col_mean) / col_std
+        else:
+            normalized_df[col] = 0
+    
+    return normalized_df
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame.
+    Strategies: 'mean', 'median', 'mode', 'drop'
+    """
+    if columns is None:
+        columns = df.columns
+    
+    processed_df = df.copy()
+    
+    if strategy == 'drop':
+        return processed_df.dropna(subset=columns)
+    
+    for col in columns:
+        if col not in processed_df.columns:
+            continue
+            
+        if processed_df[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = processed_df[col].mean()
+            elif strategy == 'median':
+                fill_value = processed_df[col].median()
+            elif strategy == 'mode':
+                fill_value = processed_df[col].mode()[0]
+            else:
+                fill_value = 0
+            
+            processed_df[col] = processed_df[col].fillna(fill_value)
+    
+    return processed_df
+
+def get_data_summary(df):
+    """
+    Generate comprehensive data summary statistics.
+    """
+    summary = {
+        'shape': df.shape,
+        'dtypes': df.dtypes.to_dict(),
+        'missing_values': df.isnull().sum().to_dict(),
+        'numeric_stats': {},
+        'categorical_stats': {}
+    }
+    
+    for col in df.columns:
+        if pd.api.types.is_numeric_dtype(df[col]):
+            summary['numeric_stats'][col] = {
+                'mean': df[col].mean(),
+                'std': df[col].std(),
+                'min': df[col].min(),
+                '25%': df[col].quantile(0.25),
+                '50%': df[col].median(),
+                '75%': df[col].quantile(0.75),
+                'max': df[col].max(),
+                'skewness': df[col].skew(),
+                'kurtosis': df[col].kurtosis()
+            }
+        else:
+            summary['categorical_stats'][col] = {
+                'unique_count': df[col].nunique(),
+                'top_values': df[col].value_counts().head(5).to_dict()
+            }
+    
+    return summary
