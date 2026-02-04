@@ -128,3 +128,11 @@ if __name__ == "__main__":
     columns = ["feature1", "feature2", "feature3"]
     result = clean_dataset(data_file, columns)
     print(f"Cleaned data saved to: {result}")
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
