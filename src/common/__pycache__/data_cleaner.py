@@ -208,3 +208,136 @@ def main():
 
 if __name__ == "__main__":
     cleaned_data = main()
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    factor (float): Multiplier for IQR (default 1.5)
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize a column using min-max scaling to [0, 1] range.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to normalize
+    
+    Returns:
+    pd.Series: Normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    col_data = data[column]
+    min_val = col_data.min()
+    max_val = col_data.max()
+    
+    if max_val == min_val:
+        return pd.Series([0.5] * len(col_data), index=col_data.index)
+    
+    normalized = (col_data - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize a column using z-score normalization.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to standardize
+    
+    Returns:
+    pd.Series: Standardized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    col_data = data[column]
+    mean_val = col_data.mean()
+    std_val = col_data.std()
+    
+    if std_val == 0:
+        return pd.Series([0] * len(col_data), index=col_data.index)
+    
+    standardized = (col_data - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    strategy (str): Imputation strategy ('mean', 'median', 'mode', 'drop')
+    columns (list): List of columns to process (None for all numeric columns)
+    
+    Returns:
+    pd.DataFrame: DataFrame with missing values handled
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    result = data.copy()
+    
+    for col in columns:
+        if col not in result.columns:
+            continue
+            
+        if strategy == 'drop':
+            result = result.dropna(subset=[col])
+        elif strategy == 'mean':
+            result[col] = result[col].fillna(result[col].mean())
+        elif strategy == 'median':
+            result[col] = result[col].fillna(result[col].median())
+        elif strategy == 'mode':
+            result[col] = result[col].fillna(result[col].mode()[0])
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+    
+    return result
+
+def create_summary_statistics(data):
+    """
+    Create a summary statistics DataFrame.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    pd.DataFrame: Summary statistics
+    """
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    
+    summary = pd.DataFrame({
+        'mean': data[numeric_cols].mean(),
+        'median': data[numeric_cols].median(),
+        'std': data[numeric_cols].std(),
+        'min': data[numeric_cols].min(),
+        'max': data[numeric_cols].max(),
+        'missing': data[numeric_cols].isnull().sum(),
+        'missing_pct': (data[numeric_cols].isnull().sum() / len(data)) * 100
+    })
+    
+    return summary
