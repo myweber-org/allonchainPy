@@ -79,4 +79,101 @@ if __name__ == "__main__":
     output_file = sys.argv[2]
     key_column = sys.argv[3]
     
-    remove_duplicates(input_file, output_file, key_column)
+    remove_duplicates(input_file, output_file, key_column)import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=False, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default True.
+    fill_missing (bool): Whether to fill missing values. Default False.
+    fill_value: Value to use for filling missing data. Default 0.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    return True, "Data validation passed"
+
+def normalize_column(df, column_name):
+    """
+    Normalize a numeric column to range [0, 1].
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column_name (str): Name of column to normalize.
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    if not pd.api.types.is_numeric_dtype(df[column_name]):
+        raise ValueError(f"Column '{column_name}' is not numeric")
+    
+    col_min = df[column_name].min()
+    col_max = df[column_name].max()
+    
+    if col_max == col_min:
+        df[f"{column_name}_normalized"] = 0.5
+    else:
+        df[f"{column_name}_normalized"] = (df[column_name] - col_min) / (col_max - col_min)
+    
+    return df
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4],
+        'value': [10, 20, 20, None, 40],
+        'category': ['A', 'B', 'B', 'C', 'A']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print()
+    
+    cleaned = clean_dataset(df, fill_missing=True, fill_value=0)
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print()
+    
+    is_valid, message = validate_data(cleaned, required_columns=['id', 'value'])
+    print(f"Validation: {is_valid} - {message}")
+    print()
+    
+    normalized = normalize_column(cleaned, 'value')
+    print("DataFrame with normalized 'value' column:")
+    print(normalized)
