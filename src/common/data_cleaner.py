@@ -293,3 +293,11 @@ if __name__ == "__main__":
     for col in cleaned_df.columns:
         stats = calculate_statistics(cleaned_df, col)
         print(f"{col}: {stats}")
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
