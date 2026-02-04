@@ -222,4 +222,77 @@ if __name__ == "__main__":
     
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("\nCleaned statistics for column 'A':")
-    print(calculate_basic_stats(cleaned_df, 'A'))
+    print(calculate_basic_stats(cleaned_df, 'A'))import pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, fill_strategy='mean', drop_threshold=0.5):
+    """
+    Load and clean a CSV file by handling missing values.
+    
+    Parameters:
+    filepath (str): Path to the CSV file.
+    fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', or 'zero').
+    drop_threshold (float): Drop columns with missing values exceeding this ratio (0.0 to 1.0).
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(filepath)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    # Calculate missing ratio per column
+    missing_ratio = df.isnull().sum() / len(df)
+    
+    # Drop columns with missing ratio above threshold
+    columns_to_drop = missing_ratio[missing_ratio > drop_threshold].index
+    df_cleaned = df.drop(columns=columns_to_drop)
+    
+    # Fill remaining missing values based on strategy
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    
+    if fill_strategy == 'mean':
+        for col in numeric_cols:
+            df_cleaned[col].fillna(df_cleaned[col].mean(), inplace=True)
+    elif fill_strategy == 'median':
+        for col in numeric_cols:
+            df_cleaned[col].fillna(df_cleaned[col].median(), inplace=True)
+    elif fill_strategy == 'mode':
+        for col in numeric_cols:
+            df_cleaned[col].fillna(df_cleaned[col].mode()[0], inplace=True)
+    elif fill_strategy == 'zero':
+        df_cleaned.fillna(0, inplace=True)
+    else:
+        raise ValueError("Invalid fill_strategy. Choose from 'mean', 'median', 'mode', or 'zero'.")
+    
+    # For non-numeric columns, fill with most frequent value
+    non_numeric_cols = df_cleaned.select_dtypes(exclude=[np.number]).columns
+    for col in non_numeric_cols:
+        df_cleaned[col].fillna(df_cleaned[col].mode()[0], inplace=True)
+    
+    return df_cleaned
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to CSV.
+    
+    Parameters:
+    df (pd.DataFrame): Cleaned DataFrame.
+    output_path (str): Path to save the cleaned CSV.
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to: {output_path}")
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    try:
+        cleaned_df = clean_csv_data(input_file, fill_strategy='median', drop_threshold=0.3)
+        save_cleaned_data(cleaned_df, output_file)
+        print(f"Original shape: {pd.read_csv(input_file).shape}")
+        print(f"Cleaned shape: {cleaned_df.shape}")
+    except Exception as e:
+        print(f"Error during data cleaning: {e}")
