@@ -152,4 +152,113 @@ def example_usage():
     return cleaned_df
 
 if __name__ == "__main__":
-    cleaned_data = example_usage()
+    cleaned_data = example_usage()import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, output_path=None, fill_method='mean'):
+    """
+    Clean a CSV file by handling missing values.
+    
+    Args:
+        file_path (str): Path to the input CSV file.
+        output_path (str, optional): Path to save cleaned CSV. If None, returns DataFrame.
+        fill_method (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop').
+    
+    Returns:
+        pd.DataFrame or None: Cleaned DataFrame if output_path is None, else None.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Original data shape: {df.shape}")
+        
+        if fill_method == 'drop':
+            df_cleaned = df.dropna()
+            print(f"Data shape after dropping NA: {df_cleaned.shape}")
+        else:
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            for col in numeric_cols:
+                if df[col].isnull().any():
+                    if fill_method == 'mean':
+                        fill_value = df[col].mean()
+                    elif fill_method == 'median':
+                        fill_value = df[col].median()
+                    elif fill_method == 'mode':
+                        fill_value = df[col].mode()[0]
+                    else:
+                        raise ValueError("fill_method must be 'mean', 'median', 'mode', or 'drop'")
+                    df[col].fillna(fill_value, inplace=True)
+                    print(f"Filled missing values in column '{col}' with {fill_method}: {fill_value}")
+            
+            df_cleaned = df
+        
+        if output_path:
+            df_cleaned.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+            return None
+        else:
+            return df_cleaned
+            
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {e}")
+        return None
+
+def validate_dataframe(df, check_duplicates=True, check_types=True):
+    """
+    Validate a DataFrame for common data quality issues.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        check_duplicates (bool): Whether to check for duplicate rows.
+        check_types (bool): Whether to check column data types.
+    
+    Returns:
+        dict: Dictionary containing validation results.
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': 0,
+        'type_issues': []
+    }
+    
+    if check_duplicates:
+        validation_results['duplicate_rows'] = df.duplicated().sum()
+    
+    if check_types:
+        for col in df.columns:
+            if df[col].dtype == 'object':
+                try:
+                    pd.to_numeric(df[col])
+                    validation_results['type_issues'].append(
+                        f"Column '{col}' contains numeric data stored as text"
+                    )
+                except ValueError:
+                    pass
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [5, np.nan, np.nan, 8, 9],
+        'C': ['x', 'y', 'z', 'x', 'y']
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('test_data.csv', fill_method='median')
+    
+    if cleaned_df is not None:
+        validation = validate_dataframe(cleaned_df)
+        print("\nData Validation Results:")
+        for key, value in validation.items():
+            print(f"{key}: {value}")
+    
+    import os
+    if os.path.exists('test_data.csv'):
+        os.remove('test_data.csv')
