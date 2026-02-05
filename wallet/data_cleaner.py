@@ -1,148 +1,79 @@
-
-import numpy as np
 import pandas as pd
-from scipy import stats
+import numpy as np
 
-class DataCleaner:
-    def __init__(self, df):
-        self.df = df.copy()
-        self.original_shape = df.shape
-        
-    def remove_outliers_iqr(self, columns=None, factor=1.5):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-        
-        df_clean = self.df.copy()
-        for col in columns:
-            if col in df_clean.columns:
-                Q1 = df_clean[col].quantile(0.25)
-                Q3 = df_clean[col].quantile(0.75)
-                IQR = Q3 - Q1
-                lower_bound = Q1 - factor * IQR
-                upper_bound = Q3 + factor * IQR
-                df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
-        
-        self.df = df_clean
-        return self
-    
-    def remove_outliers_zscore(self, columns=None, threshold=3):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-        
-        df_clean = self.df.copy()
-        for col in columns:
-            if col in df_clean.columns:
-                z_scores = np.abs(stats.zscore(df_clean[col].dropna()))
-                df_clean = df_clean[(z_scores < threshold) | df_clean[col].isna()]
-        
-        self.df = df_clean
-        return self
-    
-    def normalize_minmax(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-        
-        df_norm = self.df.copy()
-        for col in columns:
-            if col in df_norm.columns and df_norm[col].nunique() > 1:
-                min_val = df_norm[col].min()
-                max_val = df_norm[col].max()
-                if max_val != min_val:
-                    df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
-        
-        self.df = df_norm
-        return self
-    
-    def normalize_zscore(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-        
-        df_norm = self.df.copy()
-        for col in columns:
-            if col in df_norm.columns and df_norm[col].nunique() > 1:
-                mean_val = df_norm[col].mean()
-                std_val = df_norm[col].std()
-                if std_val > 0:
-                    df_norm[col] = (df_norm[col] - mean_val) / std_val
-        
-        self.df = df_norm
-        return self
-    
-    def fill_missing_mean(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-        
-        df_filled = self.df.copy()
-        for col in columns:
-            if col in df_filled.columns:
-                df_filled[col] = df_filled[col].fillna(df_filled[col].mean())
-        
-        self.df = df_filled
-        return self
-    
-    def fill_missing_median(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-        
-        df_filled = self.df.copy()
-        for col in columns:
-            if col in df_filled.columns:
-                df_filled[col] = df_filled[col].fillna(df_filled[col].median())
-        
-        self.df = df_filled
-        return self
-    
-    def get_cleaned_data(self):
-        return self.df
-    
-    def get_removed_count(self):
-        return self.original_shape[0] - self.df.shape[0]
-    
-    def get_summary(self):
-        summary = {
-            'original_rows': self.original_shape[0],
-            'cleaned_rows': self.df.shape[0],
-            'rows_removed': self.get_removed_count(),
-            'columns': self.df.shape[1],
-            'missing_values': self.df.isnull().sum().sum()
-        }
-        return summary
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    if subset is None:
+        subset = df.columns.tolist()
+    return df.drop_duplicates(subset=subset, keep='first')
 
-def create_sample_data():
-    np.random.seed(42)
-    data = {
-        'feature_a': np.random.normal(100, 15, 1000),
-        'feature_b': np.random.exponential(50, 1000),
-        'feature_c': np.random.uniform(0, 1, 1000),
-        'category': np.random.choice(['A', 'B', 'C'], 1000)
-    }
+def convert_column_types(df, column_type_map):
+    """
+    Convert specified columns to given data types.
+    """
+    for column, dtype in column_type_map.items():
+        if column in df.columns:
+            df[column] = df[column].astype(dtype)
+    return df
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values using specified strategy.
+    """
+    if columns is None:
+        columns = df.columns[df.isnull().any()].tolist()
     
-    df = pd.DataFrame(data)
-    
-    indices = np.random.choice(df.index, size=50, replace=False)
-    df.loc[indices, 'feature_a'] = np.random.normal(300, 50, 50)
-    
-    indices = np.random.choice(df.index, size=30, replace=False)
-    df.loc[indices, 'feature_b'] = np.nan
+    for column in columns:
+        if strategy == 'mean' and pd.api.types.is_numeric_dtype(df[column]):
+            df[column].fillna(df[column].mean(), inplace=True)
+        elif strategy == 'median' and pd.api.types.is_numeric_dtype(df[column]):
+            df[column].fillna(df[column].median(), inplace=True)
+        elif strategy == 'mode':
+            df[column].fillna(df[column].mode()[0], inplace=True)
+        elif strategy == 'drop':
+            df.dropna(subset=[column], inplace=True)
     
     return df
 
-if __name__ == "__main__":
-    sample_df = create_sample_data()
-    print("Original data shape:", sample_df.shape)
-    print("Missing values:", sample_df.isnull().sum().sum())
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize specified column using given method.
+    """
+    if method == 'minmax':
+        min_val = df[column].min()
+        max_val = df[column].max()
+        if max_val != min_val:
+            df[column] = (df[column] - min_val) / (max_val - min_val)
+    elif method == 'zscore':
+        mean_val = df[column].mean()
+        std_val = df[column].std()
+        if std_val != 0:
+            df[column] = (df[column] - mean_val) / std_val
     
-    cleaner = DataCleaner(sample_df)
+    return df
+
+def clean_dataframe(df, operations):
+    """
+    Apply multiple cleaning operations to DataFrame.
+    """
+    for operation in operations:
+        if operation['type'] == 'remove_duplicates':
+            df = remove_duplicates(df, operation.get('subset'))
+        elif operation['type'] == 'convert_types':
+            df = convert_column_types(df, operation['type_map'])
+        elif operation['type'] == 'handle_missing':
+            df = handle_missing_values(
+                df, 
+                operation.get('strategy', 'mean'),
+                operation.get('columns')
+            )
+        elif operation['type'] == 'normalize':
+            df = normalize_column(
+                df,
+                operation['column'],
+                operation.get('method', 'minmax')
+            )
     
-    cleaner.remove_outliers_iqr(['feature_a', 'feature_b'])
-    cleaner.fill_missing_median(['feature_b'])
-    cleaner.normalize_minmax(['feature_a', 'feature_b', 'feature_c'])
-    
-    cleaned_df = cleaner.get_cleaned_data()
-    summary = cleaner.get_summary()
-    
-    print("\nCleaned data shape:", cleaned_df.shape)
-    print("Rows removed:", summary['rows_removed'])
-    print("Missing values after cleaning:", summary['missing_values'])
-    print("\nFirst 5 rows of cleaned data:")
-    print(cleaned_df.head())
+    return df
