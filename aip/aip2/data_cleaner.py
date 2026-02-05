@@ -141,3 +141,162 @@ def example_usage():
 
 if __name__ == "__main__":
     example_usage()
+import pandas as pd
+import numpy as np
+from typing import Union, List, Dict
+
+def remove_duplicates(df: pd.DataFrame, subset: Union[List[str], None] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        subset: Columns to consider for identifying duplicates
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def handle_missing_values(df: pd.DataFrame, 
+                         strategy: str = 'mean',
+                         columns: Union[List[str], None] = None) -> pd.DataFrame:
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        strategy: 'mean', 'median', 'mode', or 'drop'
+        columns: Specific columns to process
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    df_copy = df.copy()
+    
+    if columns is None:
+        columns = df_copy.columns
+    
+    for col in columns:
+        if col in df_copy.columns and df_copy[col].isnull().any():
+            if strategy == 'mean':
+                df_copy[col].fillna(df_copy[col].mean(), inplace=True)
+            elif strategy == 'median':
+                df_copy[col].fillna(df_copy[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df_copy[col].fillna(df_copy[col].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                df_copy = df_copy.dropna(subset=[col])
+    
+    return df_copy
+
+def normalize_column(df: pd.DataFrame, 
+                    column: str,
+                    method: str = 'minmax') -> pd.DataFrame:
+    """
+    Normalize a column in DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        column: Column to normalize
+        method: 'minmax' or 'zscore'
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    df_copy = df.copy()
+    
+    if column not in df_copy.columns:
+        return df_copy
+    
+    if method == 'minmax':
+        min_val = df_copy[column].min()
+        max_val = df_copy[column].max()
+        if max_val != min_val:
+            df_copy[column] = (df_copy[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = df_copy[column].mean()
+        std_val = df_copy[column].std()
+        if std_val != 0:
+            df_copy[column] = (df_copy[column] - mean_val) / std_val
+    
+    return df_copy
+
+def detect_outliers(df: pd.DataFrame, 
+                   column: str,
+                   method: str = 'iqr',
+                   threshold: float = 1.5) -> Dict:
+    """
+    Detect outliers in a column.
+    
+    Args:
+        df: Input DataFrame
+        column: Column to analyze
+        method: 'iqr' or 'zscore'
+        threshold: Threshold for outlier detection
+    
+    Returns:
+        Dictionary with outlier information
+    """
+    if column not in df.columns:
+        return {'error': f'Column {column} not found'}
+    
+    data = df[column].dropna()
+    
+    if method == 'iqr':
+        Q1 = data.quantile(0.25)
+        Q3 = data.quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        outliers = data[(data < lower_bound) | (data > upper_bound)]
+    
+    elif method == 'zscore':
+        mean_val = data.mean()
+        std_val = data.std()
+        if std_val == 0:
+            return {'outliers': pd.Series([]), 'count': 0}
+        z_scores = np.abs((data - mean_val) / std_val)
+        outliers = data[z_scores > threshold]
+    
+    return {
+        'outliers': outliers,
+        'count': len(outliers),
+        'percentage': (len(outliers) / len(data)) * 100
+    }
+
+def clean_dataset(df: pd.DataFrame,
+                 remove_dups: bool = True,
+                 handle_nulls: bool = True,
+                 null_strategy: str = 'mean',
+                 normalize_cols: Union[List[str], None] = None,
+                 normalize_method: str = 'minmax') -> pd.DataFrame:
+    """
+    Comprehensive dataset cleaning pipeline.
+    
+    Args:
+        df: Input DataFrame
+        remove_dups: Whether to remove duplicates
+        handle_nulls: Whether to handle missing values
+        null_strategy: Strategy for handling nulls
+        normalize_cols: Columns to normalize
+        normalize_method: Normalization method
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if remove_dups:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if handle_nulls:
+        cleaned_df = handle_missing_values(cleaned_df, strategy=null_strategy)
+    
+    if normalize_cols:
+        for col in normalize_cols:
+            if col in cleaned_df.columns:
+                cleaned_df = normalize_column(cleaned_df, col, normalize_method)
+    
+    return cleaned_df
