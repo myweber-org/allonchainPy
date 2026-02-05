@@ -1,73 +1,42 @@
 
-import pandas as pd
-import re
+import numpy as np
 
-def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+def remove_outliers_iqr(data, column):
     """
-    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    Remove outliers from a pandas DataFrame column using the IQR method.
     
-    Args:
-        df: Input pandas DataFrame
-        column_mapping: Dictionary to rename columns
-        drop_duplicates: Whether to remove duplicate rows
-        normalize_text: Whether to normalize text columns
+    Parameters:
+    data (pd.DataFrame): The input DataFrame.
+    column (str): The column name to process.
     
     Returns:
-        Cleaned pandas DataFrame
+    pd.DataFrame: DataFrame with outliers removed.
     """
-    cleaned_df = df.copy()
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    if column_mapping:
-        cleaned_df = cleaned_df.rename(columns=column_mapping)
-    
-    if drop_duplicates:
-        initial_rows = len(cleaned_df)
-        cleaned_df = cleaned_df.drop_duplicates()
-        removed = initial_rows - len(cleaned_df)
-        print(f"Removed {removed} duplicate rows")
-    
-    if normalize_text:
-        text_columns = cleaned_df.select_dtypes(include=['object']).columns
-        for col in text_columns:
-            cleaned_df[col] = cleaned_df[col].apply(_normalize_string)
-    
-    return cleaned_df
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
 
-def _normalize_string(text):
+def calculate_summary_stats(data, column):
     """
-    Normalize a string by converting to lowercase, removing extra whitespace,
-    and stripping special characters.
-    """
-    if pd.isna(text):
-        return text
+    Calculate summary statistics for a column after outlier removal.
     
-    normalized = str(text).lower().strip()
-    normalized = re.sub(r'\s+', ' ', normalized)
-    normalized = re.sub(r'[^\w\s-]', '', normalized)
-    
-    return normalized
-
-def validate_email_column(df, email_column):
-    """
-    Validate email addresses in a specified column.
-    
-    Args:
-        df: Input DataFrame
-        email_column: Name of the column containing email addresses
+    Parameters:
+    data (pd.DataFrame): The input DataFrame.
+    column (str): The column name to analyze.
     
     Returns:
-        DataFrame with validation results
+    dict: Dictionary containing count, mean, std, min, and max.
     """
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    
-    validation_results = df.copy()
-    validation_results['email_valid'] = validation_results[email_column].apply(
-        lambda x: bool(re.match(email_pattern, str(x))) if pd.notna(x) else False
-    )
-    
-    valid_count = validation_results['email_valid'].sum()
-    total_count = len(validation_results)
-    
-    print(f"Valid emails: {valid_count}/{total_count} ({valid_count/total_count*100:.1f}%)")
-    
-    return validation_results
+    stats = {
+        'count': data[column].count(),
+        'mean': data[column].mean(),
+        'std': data[column].std(),
+        'min': data[column].min(),
+        'max': data[column].max()
+    }
+    return stats
