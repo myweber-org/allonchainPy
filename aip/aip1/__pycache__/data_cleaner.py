@@ -550,4 +550,54 @@ def example_usage():
     return cleaned_df
 
 if __name__ == "__main__":
-    cleaned_data = example_usage()
+    cleaned_data = example_usage()import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_path, output_path):
+    """
+    Load CSV data, handle missing values, and save cleaned version.
+    """
+    try:
+        df = pd.read_csv(input_path)
+        
+        # Display initial info
+        print(f"Original shape: {df.shape}")
+        print(f"Missing values per column:")
+        print(df.isnull().sum())
+        
+        # Fill numeric columns with median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df[col].isnull().any():
+                median_val = df[col].median()
+                df[col].fillna(median_val, inplace=True)
+        
+        # Fill categorical columns with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if df[col].isnull().any():
+                mode_val = df[col].mode()[0]
+                df[col].fillna(mode_val, inplace=True)
+        
+        # Remove duplicates
+        df.drop_duplicates(inplace=True)
+        
+        # Save cleaned data
+        df.to_csv(output_path, index=False)
+        
+        print(f"Cleaned shape: {df.shape}")
+        print(f"Cleaned data saved to: {output_path}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {input_path}")
+        return False
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+        return False
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    clean_csv_data(input_file, output_file)
