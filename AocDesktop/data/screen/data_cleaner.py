@@ -106,3 +106,185 @@ if __name__ == "__main__":
             print("Data cleaning completed successfully. Data is valid.")
         else:
             print("Data cleaning completed with warnings. Check validation results.")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, threshold=1.5):
+    """
+    Remove outliers using IQR method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        threshold: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in data")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        Series with normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in data")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return pd.Series([0.5] * len(data), index=data.index)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to standardize
+    
+    Returns:
+        Series with standardized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in data")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return pd.Series([0] * len(data), index=data.index)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def detect_skewness(data, column):
+    """
+    Detect skewness in data.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to analyze
+    
+    Returns:
+        Dictionary with skewness statistics
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in data")
+    
+    skew_val = stats.skew(data[column].dropna())
+    
+    result = {
+        'skewness': skew_val,
+        'skew_type': 'right_skewed' if skew_val > 0.5 else 
+                    'left_skewed' if skew_val < -0.5 else 
+                    'approximately_symmetric',
+        'abs_skewness': abs(skew_val)
+    }
+    
+    return result
+
+def clean_dataset(data, numeric_columns=None, outlier_threshold=1.5):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        data: pandas DataFrame
+        numeric_columns: list of numeric columns to clean (default: all numeric)
+        outlier_threshold: IQR threshold for outlier removal
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_data = data.copy()
+    
+    if numeric_columns is None:
+        numeric_columns = cleaned_data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            # Remove outliers
+            q1 = cleaned_data[column].quantile(0.25)
+            q3 = cleaned_data[column].quantile(0.75)
+            iqr = q3 - q1
+            
+            lower_bound = q1 - outlier_threshold * iqr
+            upper_bound = q3 + outlier_threshold * iqr
+            
+            mask = (cleaned_data[column] >= lower_bound) & (cleaned_data[column] <= upper_bound)
+            cleaned_data = cleaned_data[mask]
+    
+    # Reset index after filtering
+    cleaned_data = cleaned_data.reset_index(drop=True)
+    
+    return cleaned_data
+
+def create_cleaning_report(data, cleaned_data, numeric_columns=None):
+    """
+    Generate a report comparing original and cleaned data.
+    
+    Args:
+        data: original DataFrame
+        cleaned_data: cleaned DataFrame
+        numeric_columns: columns to include in report
+    
+    Returns:
+        Dictionary with cleaning statistics
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    report = {
+        'original_rows': len(data),
+        'cleaned_rows': len(cleaned_data),
+        'rows_removed': len(data) - len(cleaned_data),
+        'removal_percentage': ((len(data) - len(cleaned_data)) / len(data)) * 100,
+        'column_stats': {}
+    }
+    
+    for column in numeric_columns:
+        if column in data.columns:
+            original_stats = {
+                'mean': data[column].mean(),
+                'std': data[column].std(),
+                'min': data[column].min(),
+                'max': data[column].max()
+            }
+            
+            cleaned_stats = {
+                'mean': cleaned_data[column].mean(),
+                'std': cleaned_data[column].std(),
+                'min': cleaned_data[column].min(),
+                'max': cleaned_data[column].max()
+            }
+            
+            report['column_stats'][column] = {
+                'original': original_stats,
+                'cleaned': cleaned_stats,
+                'mean_change_percentage': ((cleaned_stats['mean'] - original_stats['mean']) / original_stats['mean']) * 100 if original_stats['mean'] != 0 else 0
+            }
+    
+    return report
