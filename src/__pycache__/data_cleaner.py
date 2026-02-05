@@ -97,3 +97,11 @@ if __name__ == "__main__":
     cleaned_df = clean_numeric_data(df, columns=['A'])
     print("\nCleaned DataFrame (outliers in column 'A' removed):")
     print(cleaned_df)
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
