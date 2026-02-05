@@ -249,3 +249,61 @@ if __name__ == "__main__":
     print("Cleaned shape:", cleaned_data.shape)
     print("\nSummary statistics:")
     print(stats)
+import pandas as pd
+import re
+
+def clean_dataframe(df, columns_to_clean=None, remove_duplicates=True, case_sensitive=False):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing string columns.
+    """
+    df_clean = df.copy()
+    
+    if remove_duplicates:
+        df_clean = df_clean.drop_duplicates()
+    
+    if columns_to_clean is None:
+        columns_to_clean = df_clean.select_dtypes(include=['object']).columns
+    
+    for col in columns_to_clean:
+        if col in df_clean.columns and df_clean[col].dtype == 'object':
+            df_clean[col] = df_clean[col].apply(lambda x: normalize_string(x, case_sensitive))
+    
+    return df_clean
+
+def normalize_string(s, case_sensitive=False):
+    """
+    Normalize a string by stripping whitespace and optionally converting to lowercase.
+    """
+    if not isinstance(s, str):
+        return s
+    
+    s = s.strip()
+    
+    if not case_sensitive:
+        s = s.lower()
+    
+    s = re.sub(r'\s+', ' ', s)
+    
+    return s
+
+def validate_email(email):
+    """
+    Validate email format using a simple regex pattern.
+    """
+    if not isinstance(email, str):
+        return False
+    
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def get_cleaning_report(original_df, cleaned_df):
+    """
+    Generate a report comparing original and cleaned DataFrames.
+    """
+    report = {
+        'original_rows': len(original_df),
+        'cleaned_rows': len(cleaned_df),
+        'duplicates_removed': len(original_df) - len(cleaned_df) if len(original_df) > len(cleaned_df) else 0,
+        'columns_cleaned': list(cleaned_df.select_dtypes(include=['object']).columns)
+    }
+    return report
