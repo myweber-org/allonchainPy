@@ -222,3 +222,11 @@ if __name__ == "__main__":
     cleaned_df = cleaner.get_cleaned_data()
     print(f"\nCleaned data shape: {cleaned_df.shape}")
     print(f"Cleaned data preview:\n{cleaned_df.head()}")
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
