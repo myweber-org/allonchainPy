@@ -427,4 +427,150 @@ if __name__ == "__main__":
     
     # Validate the cleaned data
     is_valid, message = validate_data(cleaned, allow_nan=False)
-    print(f"\nData validation: {is_valid} - {message}")
+    print(f"\nData validation: {is_valid} - {message}")import numpy as np
+import pandas as pd
+
+def remove_missing_rows(df, columns=None):
+    """
+    Remove rows with missing values from specified columns or entire DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names or None for all columns
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if columns:
+        return df.dropna(subset=columns)
+    return df.dropna()
+
+def fill_missing_with_mean(df, columns):
+    """
+    Fill missing values in specified columns with column mean.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names
+    
+    Returns:
+        DataFrame with filled values
+    """
+    df_filled = df.copy()
+    for col in columns:
+        if col in df.columns:
+            df_filled[col] = df_filled[col].fillna(df_filled[col].mean())
+    return df_filled
+
+def detect_outliers_iqr(df, column, threshold=1.5):
+    """
+    Detect outliers using Interquartile Range method.
+    
+    Args:
+        df: pandas DataFrame
+        column: column name to check for outliers
+        threshold: IQR multiplier (default 1.5)
+    
+    Returns:
+        Boolean Series indicating outliers
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    return (df[column] < lower_bound) | (df[column] > upper_bound)
+
+def cap_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Cap outliers to specified bounds.
+    
+    Args:
+        df: pandas DataFrame
+        column: column name to process
+        method: 'iqr' for IQR method or 'percentile' for percentile method
+        threshold: parameter for outlier detection
+    
+    Returns:
+        DataFrame with capped values
+    """
+    df_capped = df.copy()
+    
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+    elif method == 'percentile':
+        lower_bound = df[column].quantile(threshold / 100)
+        upper_bound = df[column].quantile(1 - threshold / 100)
+    else:
+        raise ValueError("Method must be 'iqr' or 'percentile'")
+    
+    df_capped[column] = df_capped[column].clip(lower=lower_bound, upper=upper_bound)
+    return df_capped
+
+def standardize_columns(df, columns):
+    """
+    Standardize specified columns to have zero mean and unit variance.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to standardize
+    
+    Returns:
+        DataFrame with standardized columns
+    """
+    df_standardized = df.copy()
+    for col in columns:
+        if col in df.columns:
+            mean = df_standardized[col].mean()
+            std = df_standardized[col].std()
+            if std > 0:
+                df_standardized[col] = (df_standardized[col] - mean) / std
+    return df_standardized
+
+def normalize_columns(df, columns):
+    """
+    Normalize specified columns to range [0, 1].
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to normalize
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    df_normalized = df.copy()
+    for col in columns:
+        if col in df.columns:
+            min_val = df_normalized[col].min()
+            max_val = df_normalized[col].max()
+            if max_val > min_val:
+                df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+    return df_normalized
+
+def get_data_summary(df):
+    """
+    Generate summary statistics for DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+    
+    Returns:
+        Dictionary with summary statistics
+    """
+    summary = {
+        'shape': df.shape,
+        'missing_values': df.isnull().sum().to_dict(),
+        'data_types': df.dtypes.to_dict(),
+        'numeric_stats': df.describe().to_dict() if not df.select_dtypes(include=[np.number]).empty else {},
+        'categorical_stats': {col: df[col].value_counts().to_dict() 
+                            for col in df.select_dtypes(include=['object']).columns}
+    }
+    return summary
