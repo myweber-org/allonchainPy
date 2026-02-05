@@ -600,4 +600,112 @@ if __name__ == "__main__":
     # Example usage
     input_file = "raw_data.csv"
     output_file = "cleaned_data.csv"
-    clean_csv_data(input_file, output_file)
+    clean_csv_data(input_file, output_file)import pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, fill_method='mean', drop_threshold=0.5):
+    """
+    Load and clean CSV data by handling missing values.
+    
+    Parameters:
+    filepath (str): Path to the CSV file
+    fill_method (str): Method for filling missing values ('mean', 'median', 'mode', 'zero')
+    drop_threshold (float): Drop columns with missing ratio above this threshold
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    try:
+        df = pd.read_csv(filepath)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    # Calculate missing ratio per column
+    missing_ratio = df.isnull().sum() / len(df)
+    
+    # Drop columns with high missing ratio
+    columns_to_drop = missing_ratio[missing_ratio > drop_threshold].index
+    df = df.drop(columns=columns_to_drop)
+    
+    # Fill missing values based on method
+    for column in df.columns:
+        if df[column].isnull().any():
+            if fill_method == 'mean' and pd.api.types.is_numeric_dtype(df[column]):
+                df[column].fillna(df[column].mean(), inplace=True)
+            elif fill_method == 'median' and pd.api.types.is_numeric_dtype(df[column]):
+                df[column].fillna(df[column].median(), inplace=True)
+            elif fill_method == 'mode':
+                df[column].fillna(df[column].mode()[0], inplace=True)
+            elif fill_method == 'zero':
+                df[column].fillna(0, inplace=True)
+            else:
+                # For non-numeric columns or unsupported methods, use forward fill
+                df[column].fillna(method='ffill', inplace=True)
+    
+    # Remove duplicate rows
+    df = df.drop_duplicates()
+    
+    # Reset index
+    df.reset_index(drop=True, inplace=True)
+    
+    return df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    # Check if DataFrame is empty
+    if df.empty:
+        validation_results['is_valid'] = False
+        validation_results['errors'].append('DataFrame is empty')
+    
+    # Check required columns
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f'Missing required columns: {missing_columns}')
+    
+    # Check for infinite values in numeric columns
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if np.any(np.isinf(df[col])):
+            validation_results['warnings'].append(f'Column {col} contains infinite values')
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, 2, 3, np.nan, 5],
+        'C': [1, 1, 1, 1, 1],
+        'D': [10, 20, 30, 40, 50]
+    }
+    
+    # Create test DataFrame
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    # Test cleaning function
+    cleaned_df = clean_csv_data('test_data.csv', fill_method='mean')
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    
+    # Test validation
+    validation = validate_dataframe(cleaned_df, required_columns=['A', 'B', 'C'])
+    print("\nValidation Results:")
+    print(validation)
