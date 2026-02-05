@@ -98,3 +98,47 @@ def clean_dataset(df, outlier_threshold=3, normalize=True):
         cleaner.normalize_data(method='minmax')
     
     return cleaner.get_cleaned_data(), cleaner.get_summary()
+import pandas as pd
+import numpy as np
+
+def clean_data(input_file, output_file):
+    """
+    Load CSV data, handle missing values, remove duplicates,
+    and save cleaned data to a new file.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Fill missing numeric values with column mean
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+        
+        # Remove rows where critical columns are still null
+        critical_columns = ['id', 'timestamp']
+        for col in critical_columns:
+            if col in df.columns:
+                df = df.dropna(subset=[col])
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Data cleaned successfully. Saved to {output_file}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: File {input_file} not found.")
+        return False
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return False
+
+if __name__ == "__main__":
+    # Example usage
+    clean_data("raw_data.csv", "cleaned_data.csv")
