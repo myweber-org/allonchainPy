@@ -289,4 +289,114 @@ if __name__ == "__main__":
     
     print(f"Original shape: {raw_data.shape}")
     print(f"Cleaned shape: {cleaned_data.shape}")
-    print(f"Data cleaning completed. Saved to {output_file}")
+    print(f"Data cleaning completed. Saved to {output_file}")import pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, fill_strategy='mean'):
+    """
+    Load and clean a CSV file by handling missing values.
+    
+    Args:
+        filepath (str): Path to the CSV file.
+        fill_strategy (str): Strategy for filling missing values.
+            Options: 'mean', 'median', 'zero', 'drop'.
+    
+    Returns:
+        pandas.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(filepath)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    
+    if fill_strategy == 'drop':
+        df_cleaned = df.dropna(subset=numeric_columns)
+    else:
+        df_cleaned = df.copy()
+        for col in numeric_columns:
+            if df[col].isnull().any():
+                if fill_strategy == 'mean':
+                    fill_value = df[col].mean()
+                elif fill_strategy == 'median':
+                    fill_value = df[col].median()
+                elif fill_strategy == 'zero':
+                    fill_value = 0
+                else:
+                    raise ValueError(f"Unsupported fill strategy: {fill_strategy}")
+                df_cleaned[col] = df[col].fillna(fill_value)
+    
+    return df_cleaned
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers from a DataFrame column using IQR method.
+    
+    Args:
+        df (pandas.DataFrame): Input DataFrame.
+        column (str): Column name to process.
+        multiplier (float): IQR multiplier for outlier detection.
+    
+    Returns:
+        pandas.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize specified columns to have zero mean and unit variance.
+    
+    Args:
+        df (pandas.DataFrame): Input DataFrame.
+        columns (list): List of column names to standardize.
+            If None, standardize all numeric columns.
+    
+    Returns:
+        pandas.DataFrame: DataFrame with standardized columns.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_standardized = df.copy()
+    
+    for col in columns:
+        if col in df.columns and np.issubdtype(df[col].dtype, np.number):
+            mean_val = df[col].mean()
+            std_val = df[col].std()
+            
+            if std_val > 0:
+                df_standardized[col] = (df[col] - mean_val) / std_val
+            else:
+                df_standardized[col] = 0
+    
+    return df_standardized
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [10, 20, 30, np.nan, 50],
+        'C': ['x', 'y', 'z', 'x', 'y']
+    }
+    
+    df_sample = pd.DataFrame(sample_data)
+    df_sample.to_csv('sample_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('sample_data.csv', fill_strategy='mean')
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    
+    import os
+    os.remove('sample_data.csv')
