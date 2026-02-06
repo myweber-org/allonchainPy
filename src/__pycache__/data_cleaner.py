@@ -221,4 +221,85 @@ def validate_data(df, required_columns):
     missing_columns = [col for col in required_columns if col not in df.columns]
     if missing_columns:
         raise ValueError(f"Missing required columns: {missing_columns}")
-    return True
+    return Trueimport pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, fill_strategy='mean', drop_threshold=0.5):
+    """
+    Load and clean CSV data by handling missing values.
+    
+    Parameters:
+    filepath (str): Path to the CSV file
+    fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', 'zero')
+    drop_threshold (float): Drop columns if missing values exceed this ratio (0.0 to 1.0)
+    
+    Returns:
+    pandas.DataFrame: Cleaned dataframe
+    """
+    try:
+        df = pd.read_csv(filepath)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    original_shape = df.shape
+    
+    # Drop columns with excessive missing values
+    missing_ratio = df.isnull().sum() / len(df)
+    columns_to_drop = missing_ratio[missing_ratio > drop_threshold].index
+    df = df.drop(columns=columns_to_drop)
+    
+    # Fill missing values based on strategy
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if fill_strategy == 'mean':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    elif fill_strategy == 'median':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+    elif fill_strategy == 'mode':
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 0)
+    elif fill_strategy == 'zero':
+        df[numeric_cols] = df[numeric_cols].fillna(0)
+    else:
+        raise ValueError(f"Unknown fill strategy: {fill_strategy}")
+    
+    # For categorical columns, fill with most frequent value
+    categorical_cols = df.select_dtypes(exclude=[np.number]).columns
+    for col in categorical_cols:
+        if df[col].isnull().any():
+            most_frequent = df[col].mode()[0] if not df[col].mode().empty else 'Unknown'
+            df[col] = df[col].fillna(most_frequent)
+    
+    # Remove duplicate rows
+    df = df.drop_duplicates()
+    
+    cleaned_shape = df.shape
+    
+    print(f"Original shape: {original_shape}")
+    print(f"Cleaned shape: {cleaned_shape}")
+    print(f"Dropped columns: {list(columns_to_drop)}")
+    print(f"Removed duplicates: {original_shape[0] - cleaned_shape[0]}")
+    
+    return df
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned dataframe to CSV.
+    
+    Parameters:
+    df (pandas.DataFrame): Cleaned dataframe
+    output_path (str): Path to save the cleaned CSV file
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to: {output_path}")
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    try:
+        cleaned_df = clean_csv_data(input_file, fill_strategy='median', drop_threshold=0.3)
+        save_cleaned_data(cleaned_df, output_file)
+    except Exception as e:
+        print(f"Error during data cleaning: {e}")
