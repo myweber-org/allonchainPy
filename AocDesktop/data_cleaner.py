@@ -215,3 +215,51 @@ def clean_dataset(dataframe, outlier_columns=None, normalize=True, standardize=F
         df_clean = standardize_zscore(df_clean)
     
     return df_clean
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates, handling missing values,
+    and normalizing text columns.
+    """
+    df_clean = df.copy()
+    
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates()
+    
+    if normalize_text:
+        text_columns = df_clean.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            df_clean[col] = df_clean[col].astype(str).str.lower().str.strip()
+    
+    if column_mapping:
+        df_clean = df_clean.rename(columns=column_mapping)
+    
+    return df_clean
+
+def validate_data(df, required_columns=None, numeric_ranges=None):
+    """
+    Validate data integrity by checking required columns and numeric ranges.
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    if numeric_ranges:
+        for col, (min_val, max_val) in numeric_ranges.items():
+            if col in df.select_dtypes(include=[np.number]).columns:
+                invalid_values = df[(df[col] < min_val) | (df[col] > max_val)]
+                if not invalid_values.empty:
+                    print(f"Warning: Column '{col}' has values outside range [{min_val}, {max_val}]")
+    
+    return True
+
+def sample_data(df, n_samples=5, random_state=42):
+    """
+    Return a random sample of the DataFrame for inspection.
+    """
+    if len(df) <= n_samples:
+        return df
+    return df.sample(n=n_samples, random_state=random_state)
