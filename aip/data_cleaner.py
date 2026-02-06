@@ -521,3 +521,62 @@ def validate_dataframe(df):
         if not check(df):
             raise ValueError(message)
     return True
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns
+        
+    def remove_outliers_zscore(self, threshold=3):
+        df_clean = self.df.copy()
+        for col in self.numeric_columns:
+            z_scores = np.abs(stats.zscore(df_clean[col].dropna()))
+            df_clean = df_clean[(z_scores < threshold) | df_clean[col].isna()]
+        return df_clean
+    
+    def normalize_minmax(self):
+        df_normalized = self.df.copy()
+        for col in self.numeric_columns:
+            min_val = df_normalized[col].min()
+            max_val = df_normalized[col].max()
+            if max_val > min_val:
+                df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+        return df_normalized
+    
+    def fill_missing_median(self):
+        df_filled = self.df.copy()
+        for col in self.numeric_columns:
+            median_val = df_filled[col].median()
+            df_filled[col] = df_filled[col].fillna(median_val)
+        return df_filled
+    
+    def get_summary(self):
+        summary = {
+            'original_rows': len(self.df),
+            'original_columns': len(self.df.columns),
+            'numeric_columns': list(self.numeric_columns),
+            'missing_values': self.df.isnull().sum().sum(),
+            'data_types': self.df.dtypes.to_dict()
+        }
+        return summary
+
+def process_dataset(filepath):
+    try:
+        df = pd.read_csv(filepath)
+        cleaner = DataCleaner(df)
+        
+        print("Dataset Summary:")
+        for key, value in cleaner.get_summary().items():
+            print(f"{key}: {value}")
+        
+        df_clean = cleaner.remove_outliers_zscore()
+        df_clean = cleaner.fill_missing_median()
+        df_normalized = cleaner.normalize_minmax()
+        
+        return df_normalized
+    except Exception as e:
+        print(f"Error processing dataset: {e}")
+        return None
