@@ -128,3 +128,11 @@ if __name__ == "__main__":
     print(f"\nCleaned data shape: {cleaned_df.shape}")
     print("\nFirst 5 rows of cleaned data:")
     print(cleaned_df.head())
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
