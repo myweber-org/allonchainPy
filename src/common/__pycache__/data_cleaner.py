@@ -495,3 +495,34 @@ def save_cleaned_data(df, output_path, format='csv'):
 #     cleaned = clean_dataframe(raw_data, ['name', 'address'])
 #     validated = validate_email_column(cleaned, 'email')
 #     save_cleaned_data(validated, 'cleaned_data.csv')
+import pandas as pd
+
+def clean_dataframe(df):
+    """
+    Remove rows with null values and standardize column names.
+    """
+    # Drop rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Standardize column names: lowercase and replace spaces with underscores
+    df_cleaned.columns = df_cleaned.columns.str.lower().str.replace(' ', '_')
+    
+    return df_cleaned
+
+def filter_numeric_columns(df):
+    """
+    Return only numeric columns from the dataframe.
+    """
+    numeric_df = df.select_dtypes(include=['number'])
+    return numeric_df
+
+def calculate_summary_statistics(df):
+    """
+    Calculate summary statistics for numeric columns.
+    """
+    if df.empty:
+        return pd.DataFrame()
+    
+    numeric_df = filter_numeric_columns(df)
+    summary = numeric_df.describe()
+    return summary
