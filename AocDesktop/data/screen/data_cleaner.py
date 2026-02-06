@@ -429,3 +429,11 @@ def validate_data_types(data, expected_types):
             if not np.issubdtype(data[column].dtype, expected_type):
                 return False
     return True
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
