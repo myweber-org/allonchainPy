@@ -425,4 +425,73 @@ def clean_dataset(df, outlier_threshold=1.5, normalize=True, fill_missing=True):
     if normalize:
         cleaner.normalize_minmax()
         
-    return cleaner.get_cleaned_data()
+    return cleaner.get_cleaned_data()import pandas as pd
+import re
+
+def clean_dataframe(df, column_names):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and normalizing
+    specified string columns (strip whitespace, lowercase).
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column_names (list): List of column names to normalize
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    # Remove duplicate rows
+    df_clean = df.drop_duplicates().reset_index(drop=True)
+    
+    # Normalize specified string columns
+    for col in column_names:
+        if col in df_clean.columns:
+            df_clean[col] = df_clean[col].astype(str).apply(
+                lambda x: re.sub(r'\s+', ' ', x.strip().lower())
+            )
+    
+    return df_clean
+
+def validate_email_column(df, email_column):
+    """
+    Validate email addresses in a DataFrame column using regex.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    email_column (str): Name of the email column
+    
+    Returns:
+    pd.DataFrame: DataFrame with valid emails only
+    """
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+    
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    mask = df[email_column].astype(str).str.match(email_pattern)
+    
+    return df[mask].reset_index(drop=True)
+
+def save_cleaned_data(df, output_path, format='csv'):
+    """
+    Save cleaned DataFrame to file in specified format.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to save
+    output_path (str): Output file path
+    format (str): File format ('csv', 'excel', 'json')
+    """
+    if format == 'csv':
+        df.to_csv(output_path, index=False)
+    elif format == 'excel':
+        df.to_excel(output_path, index=False)
+    elif format == 'json':
+        df.to_json(output_path, orient='records')
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     raw_data = pd.read_csv('raw_data.csv')
+#     cleaned = clean_dataframe(raw_data, ['name', 'address'])
+#     validated = validate_email_column(cleaned, 'email')
+#     save_cleaned_data(validated, 'cleaned_data.csv')
