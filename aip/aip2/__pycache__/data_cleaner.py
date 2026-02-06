@@ -122,4 +122,11 @@ if __name__ == "__main__":
     input_file = sys.argv[1]
     output_file = sys.argv[2] if len(sys.argv) > 2 else None
     
-    remove_duplicates(input_file, output_file)
+    remove_duplicates(input_file, output_file)def deduplicate_list(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
