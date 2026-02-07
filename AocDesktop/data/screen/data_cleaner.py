@@ -697,4 +697,35 @@ def validate_data(data, required_columns=None, allow_nan=False):
     if len(numeric_columns) == 0:
         validation_results['warnings'].append('No numeric columns found in dataset')
     
-    return validation_results
+    return validation_resultsimport pandas as pd
+
+def clean_dataframe(df):
+    """
+    Remove duplicate rows and standardize column names.
+    """
+    # Remove duplicates
+    df_cleaned = df.drop_duplicates()
+
+    # Standardize column names: lowercase and replace spaces with underscores
+    df_cleaned.columns = df_cleaned.columns.str.lower().str.replace(' ', '_')
+
+    return df_cleaned
+
+def main():
+    # Example usage
+    data = {
+        'Product Name': ['Widget', 'Gadget', 'Widget', 'Doodad'],
+        'Price': [10, 20, 10, 30],
+        'Quantity': [5, 3, 5, 7]
+    }
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print()
+
+    cleaned_df = clean_dataframe(df)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+
+if __name__ == "__main__":
+    main()
