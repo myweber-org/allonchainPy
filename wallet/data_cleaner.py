@@ -338,3 +338,87 @@ if __name__ == "__main__":
     numeric_cols = ['age', 'income', 'score']
     cleaned_data = clean_dataframe(raw_data, numeric_cols)
     save_cleaned_data(cleaned_data, 'cleaned_dataset.csv')
+import pandas as pd
+import re
+
+def clean_dataframe(df, columns_to_clean=None, remove_duplicates=True, case_normalization='lower'):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing string columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns_to_clean (list, optional): List of column names to clean. If None, all object columns are cleaned.
+    remove_duplicates (bool): Whether to remove duplicate rows.
+    case_normalization (str): One of 'lower', 'upper', or None for case normalization.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    # Remove duplicates
+    if remove_duplicates:
+        initial_rows = len(df_clean)
+        df_clean = df_clean.drop_duplicates()
+        removed = initial_rows - len(df_clean)
+        print(f"Removed {removed} duplicate rows.")
+    
+    # Determine columns to clean
+    if columns_to_clean is None:
+        columns_to_clean = df_clean.select_dtypes(include=['object']).columns.tolist()
+    
+    # Clean each column
+    for col in columns_to_clean:
+        if col in df_clean.columns and df_clean[col].dtype == 'object':
+            # Remove extra whitespace
+            df_clean[col] = df_clean[col].astype(str).str.strip()
+            df_clean[col] = df_clean[col].replace(r'\s+', ' ', regex=True)
+            
+            # Case normalization
+            if case_normalization == 'lower':
+                df_clean[col] = df_clean[col].str.lower()
+            elif case_normalization == 'upper':
+                df_clean[col] = df_clean[col].str.upper()
+            
+            # Replace empty strings with NaN
+            df_clean[col] = df_clean[col].replace(r'^\s*$', pd.NA, regex=True)
+    
+    return df_clean
+
+def validate_email(email_series):
+    """
+    Validate email addresses in a pandas Series.
+    
+    Parameters:
+    email_series (pd.Series): Series containing email addresses.
+    
+    Returns:
+    pd.Series: Boolean Series indicating valid emails.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return email_series.str.match(pattern, na=False)
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    data = {
+        'name': ['John Doe', 'Jane Smith', 'John Doe', '   Alice   '],
+        'email': ['john@example.com', 'jane@example', 'john@example.com', 'alice@example.com'],
+        'age': [25, 30, 25, 28]
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    # Clean the data
+    df_clean = clean_dataframe(df, case_normalization='lower')
+    print("Cleaned DataFrame:")
+    print(df_clean)
+    print("\n")
+    
+    # Validate emails
+    df_clean['valid_email'] = validate_email(df_clean['email'])
+    print("DataFrame with email validation:")
+    print(df_clean)
