@@ -729,3 +729,80 @@ def main():
 
 if __name__ == "__main__":
     main()
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
+def clean_csv_data(input_path, output_path):
+    """
+    Clean CSV data by handling missing values and converting data types.
+    """
+    try:
+        df = pd.read_csv(input_path)
+        
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].median())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+        
+        # Convert date columns if present
+        date_columns = [col for col in df.columns if 'date' in col.lower() or 'time' in col.lower()]
+        for col in date_columns:
+            try:
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+            except:
+                pass
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Reset index after cleaning
+        df = df.reset_index(drop=True)
+        
+        # Save cleaned data
+        df.to_csv(output_path, index=False)
+        print(f"Data cleaning completed. Cleaned data saved to: {output_path}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: Input file not found at {input_path}")
+        return False
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return False
+
+def validate_dataframe(df):
+    """
+    Validate dataframe structure and content.
+    """
+    if df.empty:
+        print("Warning: Dataframe is empty")
+        return False
+    
+    missing_percentage = (df.isnull().sum() / len(df)) * 100
+    high_missing = missing_percentage[missing_percentage > 30]
+    
+    if not high_missing.empty:
+        print(f"Warning: Columns with >30% missing values: {list(high_missing.index)}")
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    success = clean_csv_data(input_file, output_file)
+    
+    if success:
+        cleaned_df = pd.read_csv(output_file)
+        print(f"Data cleaning summary:")
+        print(f"Original shape: Not available (file read directly)")
+        print(f"Cleaned shape: {cleaned_df.shape}")
+        print(f"Columns: {list(cleaned_df.columns)}")
+        print(f"Data types:\n{cleaned_df.dtypes}")
