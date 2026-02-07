@@ -547,4 +547,55 @@ if __name__ == "__main__":
     stats = calculate_basic_stats(cleaned_df, 'values')
     print("\nStatistics for cleaned data:")
     for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+        print(f"{key}: {value:.2f}")import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        subset (list, optional): Column labels to consider for duplicates.
+        keep (str, optional): Which duplicates to keep.
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed.
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    return cleaned_df
+
+def clean_numeric_column(df, column_name):
+    """
+    Clean a numeric column by removing non-numeric characters.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column_name (str): Name of column to clean.
+    
+    Returns:
+        pd.DataFrame: DataFrame with cleaned column.
+    """
+    if column_name not in df.columns:
+        return df
+    
+    df[column_name] = pd.to_numeric(df[column_name], errors='coerce')
+    return df
+
+def validate_dataframe(df, required_columns):
+    """
+    Validate DataFrame contains required columns.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        bool: True if all required columns exist.
+    """
+    existing_columns = set(df.columns)
+    required_set = set(required_columns)
+    
+    return required_set.issubset(existing_columns)
