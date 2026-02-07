@@ -1,50 +1,77 @@
-import pandas as pd
-import sys
+import csv
+import re
 
-def remove_duplicates(input_file, output_file=None, subset=None):
+def clean_csv(input_file, output_file, columns_to_clean=None):
     """
-    Remove duplicate rows from a CSV file.
+    Clean a CSV file by removing extra whitespace and optionally cleaning specific columns.
     
     Args:
-        input_file (str): Path to input CSV file
-        output_file (str, optional): Path to output CSV file. 
-                                     If None, overwrites input file.
-        subset (list, optional): Columns to consider for duplicates.
+        input_file (str): Path to the input CSV file.
+        output_file (str): Path to the output cleaned CSV file.
+        columns_to_clean (list, optional): List of column names to apply cleaning to.
+                                          If None, all columns are cleaned.
     """
-    try:
-        df = pd.read_csv(input_file)
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
         
-        if subset:
-            df_clean = df.drop_duplicates(subset=subset, keep='first')
-        else:
-            df_clean = df.drop_duplicates(keep='first')
+        with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+            writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+            writer.writeheader()
+            
+            for row in reader:
+                cleaned_row = {}
+                for field in fieldnames:
+                    value = row[field]
+                    if value is not None and (columns_to_clean is None or field in columns_to_clean):
+                        # Remove extra whitespace
+                        value = re.sub(r'\s+', ' ', str(value)).strip()
+                    cleaned_row[field] = value
+                writer.writerow(cleaned_row)
+
+def validate_email(email):
+    """
+    Validate an email address format.
+    
+    Args:
+        email (str): Email address to validate.
+    
+    Returns:
+        bool: True if email format is valid, False otherwise.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def remove_duplicates(input_file, output_file, key_column):
+    """
+    Remove duplicate rows from a CSV file based on a key column.
+    
+    Args:
+        input_file (str): Path to the input CSV file.
+        output_file (str): Path to the output CSV file without duplicates.
+        key_column (str): Column name to use for identifying duplicates.
+    """
+    seen = set()
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
         
-        if output_file is None:
-            output_file = input_file
-        
-        df_clean.to_csv(output_file, index=False)
-        print(f"Removed {len(df) - len(df_clean)} duplicate rows.")
-        print(f"Cleaned data saved to: {output_file}")
-        
-        return df_clean
-        
-    except FileNotFoundError:
-        print(f"Error: File '{input_file}' not found.")
-        sys.exit(1)
-    except pd.errors.EmptyDataError:
-        print(f"Error: File '{input_file}' is empty.")
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error processing file: {e}")
-        sys.exit(1)
+        with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+            writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+            writer.writeheader()
+            
+            for row in reader:
+                key = row[key_column]
+                if key not in seen:
+                    seen.add(key)
+                    writer.writerow(row)
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python data_cleaner.py <input_file> [output_file]")
-        print("Example: python data_cleaner.py data.csv cleaned_data.csv")
-        sys.exit(1)
+    # Example usage
+    clean_csv('input.csv', 'cleaned.csv', columns_to_clean=['name', 'email'])
+    remove_duplicates('cleaned.csv', 'final.csv', key_column='id')
     
-    input_file = sys.argv[1]
-    output_file = sys.argv[2] if len(sys.argv) > 2 else None
-    
-    remove_duplicates(input_file, output_file)
+    # Test email validation
+    test_emails = ['test@example.com', 'invalid-email', 'another.test@domain.co.uk']
+    for email in test_emails:
+        print(f"{email}: {validate_email(email)}")
