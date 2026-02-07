@@ -245,3 +245,32 @@ if __name__ == "__main__":
     
     if cleaned_file:
         print(f"\nCleaned data saved to: {cleaned_file}")
+import pandas as pd
+
+def clean_dataframe(df, column_name):
+    """
+    Clean a specified column in a DataFrame by removing duplicates,
+    stripping whitespace, and converting to lowercase.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+
+    df[column_name] = df[column_name].astype(str).str.strip().str.lower()
+    df = df.drop_duplicates(subset=[column_name], keep='first')
+    df = df.reset_index(drop=True)
+    return df
+
+def process_csv(input_path, output_path, column_name):
+    """
+    Read a CSV file, clean a specified column, and save the result.
+    """
+    df = pd.read_csv(input_path)
+    cleaned_df = clean_dataframe(df, column_name)
+    cleaned_df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+
+if __name__ == "__main__":
+    input_file = "input_data.csv"
+    output_file = "cleaned_data.csv"
+    target_column = "product_name"
+    process_csv(input_file, output_file, target_column)
