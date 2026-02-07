@@ -677,3 +677,11 @@ if __name__ == "__main__":
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("\nCleaned summary statistics for 'value':")
     print(calculate_summary_stats(cleaned_df, 'value'))
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
