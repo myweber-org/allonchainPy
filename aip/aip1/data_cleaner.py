@@ -1,77 +1,74 @@
-import csv
-import re
 
-def clean_csv(input_file, output_file, columns_to_clean=None):
-    """
-    Clean a CSV file by removing extra whitespace and optionally cleaning specific columns.
-    
-    Args:
-        input_file (str): Path to the input CSV file.
-        output_file (str): Path to the output cleaned CSV file.
-        columns_to_clean (list, optional): List of column names to apply cleaning to.
-                                          If None, all columns are cleaned.
-    """
-    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
-        reader = csv.DictReader(infile)
-        fieldnames = reader.fieldnames
-        
-        with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
-            writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-            writer.writeheader()
-            
-            for row in reader:
-                cleaned_row = {}
-                for field in fieldnames:
-                    value = row[field]
-                    if value is not None and (columns_to_clean is None or field in columns_to_clean):
-                        # Remove extra whitespace
-                        value = re.sub(r'\s+', ' ', str(value)).strip()
-                    cleaned_row[field] = value
-                writer.writerow(cleaned_row)
+import numpy as np
+import pandas as pd
 
-def validate_email(email):
+def remove_outliers_iqr(df, column):
     """
-    Validate an email address format.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
-    Args:
-        email (str): Email address to validate.
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
     
     Returns:
-        bool: True if email format is valid, False otherwise.
+    pd.DataFrame: DataFrame with outliers removed
     """
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return re.match(pattern, email) is not None
-
-def remove_duplicates(input_file, output_file, key_column):
-    """
-    Remove duplicate rows from a CSV file based on a key column.
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    Args:
-        input_file (str): Path to the input CSV file.
-        output_file (str): Path to the output CSV file without duplicates.
-        key_column (str): Column name to use for identifying duplicates.
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def calculate_statistics(df, column):
     """
-    seen = set()
-    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
-        reader = csv.DictReader(infile)
-        fieldnames = reader.fieldnames
-        
-        with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
-            writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-            writer.writeheader()
-            
-            for row in reader:
-                key = row[key_column]
-                if key not in seen:
-                    seen.add(key)
-                    writer.writerow(row)
+    Calculate basic statistics for a DataFrame column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing statistics
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
+    
+    return stats
+
+def main():
+    # Example usage
+    np.random.seed(42)
+    data = {
+        'values': np.random.normal(100, 15, 1000).tolist() + [500, -200]  # Add some outliers
+    }
+    df = pd.DataFrame(data)
+    
+    print("Original DataFrame shape:", df.shape)
+    print("Original statistics:", calculate_statistics(df, 'values'))
+    
+    cleaned_df = remove_outliers_iqr(df, 'values')
+    
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("Cleaned statistics:", calculate_statistics(cleaned_df, 'values'))
+    
+    return cleaned_df
 
 if __name__ == "__main__":
-    # Example usage
-    clean_csv('input.csv', 'cleaned.csv', columns_to_clean=['name', 'email'])
-    remove_duplicates('cleaned.csv', 'final.csv', key_column='id')
-    
-    # Test email validation
-    test_emails = ['test@example.com', 'invalid-email', 'another.test@domain.co.uk']
-    for email in test_emails:
-        print(f"{email}: {validate_email(email)}")
+    cleaned_data = main()
