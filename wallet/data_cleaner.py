@@ -286,3 +286,55 @@ def get_data_summary(data):
         summary['numeric_statistics'] = numeric_stats
     
     return summary
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_dataset(filepath):
+    return pd.read_csv(filepath)
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_column(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def handle_missing_values(df, strategy='mean'):
+    for col in df.select_dtypes(include=[np.number]).columns:
+        if df[col].isnull().any():
+            if strategy == 'mean':
+                df[col].fillna(df[col].mean(), inplace=True)
+            elif strategy == 'median':
+                df[col].fillna(df[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df[col].fillna(df[col].mode()[0], inplace=True)
+    return df
+
+def clean_dataframe(df, numeric_columns):
+    df_clean = df.copy()
+    df_clean = handle_missing_values(df_clean)
+    
+    for col in numeric_columns:
+        if col in df_clean.columns:
+            df_clean = remove_outliers_iqr(df_clean, col)
+            df_clean = normalize_column(df_clean, col)
+    
+    return df_clean
+
+def save_cleaned_data(df, output_path):
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+
+if __name__ == "__main__":
+    raw_data = load_dataset('raw_dataset.csv')
+    numeric_cols = ['age', 'income', 'score']
+    cleaned_data = clean_dataframe(raw_data, numeric_cols)
+    save_cleaned_data(cleaned_data, 'cleaned_dataset.csv')
