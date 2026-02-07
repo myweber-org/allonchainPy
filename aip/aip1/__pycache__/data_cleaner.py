@@ -91,3 +91,88 @@ def validate_data(df, required_columns):
     if df.empty:
         raise ValueError("DataFrame is empty")
     return True
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, deduplicate=True, fill_na=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling null values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        deduplicate (bool): Whether to remove duplicate rows
+        fill_na (bool): Whether to fill null values
+        fill_value: Value to use for filling nulls (default: 0)
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if deduplicate:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_na:
+        null_count = cleaned_df.isnull().sum().sum()
+        if null_count > 0:
+            cleaned_df = cleaned_df.fillna(fill_value)
+            print(f"Filled {null_count} null values with {fill_value}")
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+    
+    Returns:
+        dict: Validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f"Missing columns: {missing_columns}")
+    
+    if df.empty:
+        validation_results['warnings'].append("DataFrame is empty")
+    
+    null_percentage = (df.isnull().sum().sum() / (df.shape[0] * df.shape[1])) * 100
+    if null_percentage > 20:
+        validation_results['warnings'].append(f"High null percentage: {null_percentage:.2f}%")
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4],
+        'value': [10, 20, 20, None, 40],
+        'category': ['A', 'B', 'B', 'C', None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned = clean_dataset(df)
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print("\n" + "="*50 + "\n")
+    
+    validation = validate_data(cleaned, required_columns=['id', 'value'])
+    print("Validation Results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
