@@ -152,4 +152,101 @@ def clean_dataset(file_path, numeric_columns):
 if __name__ == "__main__":
     cleaned_data = clean_dataset('sample_data.csv', ['age', 'income', 'score'])
     cleaned_data.to_csv('cleaned_data.csv', index=False)
-    print(f"Data cleaning complete. Original shape: {pd.read_csv('sample_data.csv').shape}, Cleaned shape: {cleaned_data.shape}")
+    print(f"Data cleaning complete. Original shape: {pd.read_csv('sample_data.csv').shape}, Cleaned shape: {cleaned_data.shape}")import csv
+import os
+from typing import List, Dict, Any, Optional
+
+def read_csv_file(file_path: str) -> List[Dict[str, Any]]:
+    """
+    Read a CSV file and return its contents as a list of dictionaries.
+    """
+    data = []
+    if not os.path.exists(file_path):
+        print(f"Error: File '{file_path}' not found.")
+        return data
+    
+    try:
+        with open(file_path, 'r', newline='', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                data.append(row)
+    except Exception as e:
+        print(f"Error reading CSV file: {e}")
+    
+    return data
+
+def clean_numeric_column(data: List[Dict[str, Any]], column_name: str) -> List[Dict[str, Any]]:
+    """
+    Clean a numeric column by removing non-numeric characters and converting to float.
+    """
+    cleaned_data = []
+    for row in data:
+        cleaned_row = row.copy()
+        if column_name in cleaned_row:
+            value = cleaned_row[column_name]
+            if isinstance(value, str):
+                # Remove non-numeric characters except decimal point and minus sign
+                cleaned_value = ''.join(ch for ch in value if ch.isdigit() or ch in '.-')
+                try:
+                    cleaned_row[column_name] = float(cleaned_value) if cleaned_value else 0.0
+                except ValueError:
+                    cleaned_row[column_name] = 0.0
+        cleaned_data.append(cleaned_row)
+    return cleaned_data
+
+def remove_empty_rows(data: List[Dict[str, Any]], key_columns: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    """
+    Remove rows where all specified key columns are empty.
+    If key_columns is None, check all columns.
+    """
+    if not data:
+        return []
+    
+    if key_columns is None:
+        key_columns = list(data[0].keys())
+    
+    filtered_data = []
+    for row in data:
+        # Check if all key columns are empty
+        if not all(not row.get(col) for col in key_columns):
+            filtered_data.append(row)
+    
+    return filtered_data
+
+def write_csv_file(data: List[Dict[str, Any]], file_path: str) -> bool:
+    """
+    Write data to a CSV file.
+    """
+    if not data:
+        print("Error: No data to write.")
+        return False
+    
+    try:
+        with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+            fieldnames = list(data[0].keys())
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+        return True
+    except Exception as e:
+        print(f"Error writing CSV file: {e}")
+        return False
+
+def get_column_stats(data: List[Dict[str, Any]], column_name: str) -> Dict[str, Any]:
+    """
+    Calculate basic statistics for a numeric column.
+    """
+    values = []
+    for row in data:
+        if column_name in row and isinstance(row[column_name], (int, float)):
+            values.append(row[column_name])
+    
+    if not values:
+        return {"count": 0, "min": None, "max": None, "avg": None}
+    
+    return {
+        "count": len(values),
+        "min": min(values),
+        "max": max(values),
+        "avg": sum(values) / len(values)
+    }
