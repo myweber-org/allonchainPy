@@ -684,4 +684,100 @@ def remove_duplicates_preserve_order(input_list):
         if item not in seen:
             seen.add(item)
             result.append(item)
-    return result
+    return resultimport csv
+import re
+from typing import List, Dict, Any, Optional
+
+def clean_numeric_string(value: str) -> Optional[str]:
+    """Remove non-numeric characters from a string except decimal point and minus sign."""
+    if not isinstance(value, str):
+        return value
+    cleaned = re.sub(r'[^\d.-]', '', value)
+    return cleaned if cleaned else None
+
+def normalize_column_names(headers: List[str]) -> List[str]:
+    """Convert column names to lowercase with underscores."""
+    normalized = []
+    for header in headers:
+        if not isinstance(header, str):
+            header = str(header)
+        header = header.strip().lower()
+        header = re.sub(r'\s+', '_', header)
+        normalized.append(header)
+    return normalized
+
+def remove_empty_rows(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Remove rows where all values are empty or None."""
+    filtered_data = []
+    for row in data:
+        if any(value not in (None, '') for value in row.values()):
+            filtered_data.append(row)
+    return filtered_data
+
+def read_and_clean_csv(filepath: str, delimiter: str = ',') -> List[Dict[str, Any]]:
+    """Read a CSV file and apply cleaning operations."""
+    cleaned_data = []
+    try:
+        with open(filepath, 'r', newline='', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile, delimiter=delimiter)
+            original_headers = reader.fieldnames
+            if not original_headers:
+                return cleaned_data
+            
+            normalized_headers = normalize_column_names(original_headers)
+            
+            for row in reader:
+                cleaned_row = {}
+                for orig_header, norm_header in zip(original_headers, normalized_headers):
+                    value = row.get(orig_header, '')
+                    if isinstance(value, str):
+                        value = value.strip()
+                    cleaned_row[norm_header] = value
+                cleaned_data.append(cleaned_row)
+        
+        cleaned_data = remove_empty_rows(cleaned_data)
+        
+        for row in cleaned_data:
+            for key, value in row.items():
+                if isinstance(value, str) and re.search(r'\d', value):
+                    row[key] = clean_numeric_string(value)
+        
+        return cleaned_data
+    
+    except FileNotFoundError:
+        print(f"Error: File '{filepath}' not found.")
+        return []
+    except Exception as e:
+        print(f"Error processing file: {e}")
+        return []
+
+def write_cleaned_csv(data: List[Dict[str, Any]], output_path: str, delimiter: str = ',') -> bool:
+    """Write cleaned data to a new CSV file."""
+    if not data:
+        return False
+    
+    try:
+        with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
+            fieldnames = data[0].keys()
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter=delimiter)
+            writer.writeheader()
+            writer.writerows(data)
+        return True
+    except Exception as e:
+        print(f"Error writing file: {e}")
+        return False
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned = read_and_clean_csv(input_file)
+    
+    if cleaned:
+        success = write_cleaned_csv(cleaned, output_file)
+        if success:
+            print(f"Successfully cleaned {len(cleaned)} rows. Output saved to '{output_file}'.")
+        else:
+            print("Failed to write output file.")
+    else:
+        print("No data to process.")
