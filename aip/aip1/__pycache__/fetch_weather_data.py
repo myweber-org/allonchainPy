@@ -1,4 +1,3 @@
-
 import requests
 import json
 import sys
@@ -41,17 +40,12 @@ def display_weather(data):
     print(f"  Humidity: {humidity}%")
     print(f"  Wind Speed: {wind_speed} m/s")
 
-def main():
+if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("Usage: python fetch_weather_data.py <API_KEY> <CITY_NAME>")
-        print("Example: python fetch_weather_data.py abc123 London")
+        print("Usage: python fetch_weather_data.py <api_key> <city>")
         sys.exit(1)
 
     api_key = sys.argv[1]
     city = ' '.join(sys.argv[2:])
-
     weather_data = get_weather(api_key, city)
     display_weather(weather_data)
-
-if __name__ == "__main__":
-    main()
