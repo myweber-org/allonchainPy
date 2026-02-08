@@ -128,3 +128,53 @@ if __name__ == "__main__":
     if cleaned is not None:
         is_valid = validate_dataframe(cleaned, ['A', 'B', 'C'])
         print(f"Data validation result: {is_valid}")
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def clean_dataset(file_path):
+    df = pd.read_csv(file_path)
+    
+    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_columns:
+        df = remove_outliers_iqr(df, col)
+    
+    for col in numeric_columns:
+        df = normalize_minmax(df, col)
+    
+    df = df.dropna()
+    
+    return df
+
+def save_cleaned_data(df, output_path):
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    try:
+        cleaned_df = clean_dataset(input_file)
+        save_cleaned_data(cleaned_df, output_file)
+        print(f"Original shape: {pd.read_csv(input_file).shape}")
+        print(f"Cleaned shape: {cleaned_df.shape}")
+    except FileNotFoundError:
+        print(f"Error: File {input_file} not found")
+    except Exception as e:
+        print(f"Error during processing: {str(e)}")
