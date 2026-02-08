@@ -732,3 +732,67 @@ if __name__ == "__main__":
     # Validate the cleaned data
     is_valid, message = validate_data(cleaned, required_columns=['id', 'name', 'age', 'score'])
     print(f"\nValidation: {is_valid} - {message}")
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def remove_outliers_iqr(df, columns):
+    df_clean = df.copy()
+    for col in columns:
+        Q1 = df_clean[col].quantile(0.25)
+        Q3 = df_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean
+
+def normalize_data(df, columns, method='minmax'):
+    df_norm = df.copy()
+    for col in columns:
+        if method == 'minmax':
+            df_norm[col] = (df_norm[col] - df_norm[col].min()) / (df_norm[col].max() - df_norm[col].min())
+        elif method == 'zscore':
+            df_norm[col] = (df_norm[col] - df_norm[col].mean()) / df_norm[col].std()
+        elif method == 'robust':
+            df_norm[col] = (df_norm[col] - df_norm[col].median()) / stats.iqr(df_norm[col])
+    return df_norm
+
+def handle_missing_values(df, columns, strategy='mean'):
+    df_filled = df.copy()
+    for col in columns:
+        if strategy == 'mean':
+            fill_value = df_filled[col].mean()
+        elif strategy == 'median':
+            fill_value = df_filled[col].median()
+        elif strategy == 'mode':
+            fill_value = df_filled[col].mode()[0]
+        elif strategy == 'constant':
+            fill_value = 0
+        df_filled[col].fillna(fill_value, inplace=True)
+    return df_filled
+
+def clean_dataset(df, numeric_columns):
+    df_processed = df.copy()
+    df_processed = handle_missing_values(df_processed, numeric_columns, strategy='median')
+    df_processed = remove_outliers_iqr(df_processed, numeric_columns)
+    df_processed = normalize_data(df_processed, numeric_columns, method='zscore')
+    return df_processed
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature1': np.random.normal(100, 15, 1000),
+        'feature2': np.random.exponential(50, 1000),
+        'feature3': np.random.uniform(0, 200, 1000)
+    })
+    
+    sample_data.iloc[10:20, 0] = np.nan
+    sample_data.iloc[50:55, 1] = 1000
+    
+    numeric_cols = ['feature1', 'feature2', 'feature3']
+    cleaned_data = clean_dataset(sample_data, numeric_cols)
+    
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned_data.shape}")
+    print(f"Original stats:\n{sample_data[numeric_cols].describe()}")
+    print(f"Cleaned stats:\n{cleaned_data[numeric_cols].describe()}")
