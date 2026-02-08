@@ -66,4 +66,88 @@ def main():
     print(f"\nValidation: {message}")
 
 if __name__ == "__main__":
-    main()
+    main()import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(df, numeric_columns=None, outlier_factor=1.5):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col, outlier_factor)
+    
+    return cleaned_df
+
+def get_summary_statistics(df):
+    """
+    Generate summary statistics for numeric columns
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    summary = pd.DataFrame({
+        'mean': df[numeric_cols].mean(),
+        'median': df[numeric_cols].median(),
+        'std': df[numeric_cols].std(),
+        'min': df[numeric_cols].min(),
+        'max': df[numeric_cols].max(),
+        'skewness': df[numeric_cols].apply(lambda x: stats.skew(x.dropna())),
+        'kurtosis': df[numeric_cols].apply(lambda x: stats.kurtosis(x.dropna()))
+    })
+    
+    return summary
