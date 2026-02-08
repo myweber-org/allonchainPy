@@ -437,3 +437,56 @@ def clean_csv_file(input_path: str,
         
     except Exception as e:
         raise Exception(f"Error cleaning CSV file: {str(e)}")
+import pandas as pd
+import re
+
+def clean_dataset(df, column_names):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing string columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        column_names (list): List of column names to normalize.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Remove duplicate rows
+    cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Normalize specified string columns
+    for col in column_names:
+        if col in cleaned_df.columns and cleaned_df[col].dtype == 'object':
+            cleaned_df[col] = cleaned_df[col].apply(
+                lambda x: re.sub(r'\s+', ' ', str(x).strip().lower()) if pd.notnull(x) else x
+            )
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_email_column(df, email_column):
+    """
+    Validate email addresses in a specified column.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        email_column (str): Name of the column containing email addresses.
+    
+    Returns:
+        pd.DataFrame: DataFrame with valid emails and a validation flag.
+    """
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+    
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    
+    df_validated = df.copy()
+    df_validated['is_valid_email'] = df_validated[email_column].apply(
+        lambda x: bool(re.match(email_pattern, str(x))) if pd.notnull(x) else False
+    )
+    
+    return df_validated
