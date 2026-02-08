@@ -95,3 +95,86 @@ def load_and_clean_csv(filepath: str, **kwargs) -> pd.DataFrame:
         cleaner.remove_outliers_iqr(columns=columns, multiplier=multiplier)
         
     return cleaner.get_cleaned_data()
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_names):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and normalizing
+    specified string columns (strip whitespace, lowercase).
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates().reset_index(drop=True)
+    
+    # Normalize specified string columns
+    for col in column_names:
+        if col in df_cleaned.columns:
+            # Convert to string, strip whitespace, convert to lowercase
+            df_cleaned[col] = df_cleaned[col].astype(str).str.strip().str.lower()
+    
+    return df_cleaned
+
+def validate_email_column(df, email_column):
+    """
+    Validate email addresses in a specified column using regex.
+    Returns a DataFrame with an additional validation column.
+    """
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+    
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    df['email_valid'] = df[email_column].apply(
+        lambda x: bool(re.match(email_pattern, str(x)))
+    )
+    
+    return df
+
+def remove_special_characters(df, column_names, keep_chars=''):
+    """
+    Remove special characters from specified columns, keeping only alphanumeric
+    characters and specified additional characters.
+    """
+    df_cleaned = df.copy()
+    
+    for col in column_names:
+        if col in df_cleaned.columns:
+            # Create regex pattern to keep alphanumeric and specified characters
+            pattern = f'[^a-zA-Z0-9{re.escape(keep_chars)}]'
+            df_cleaned[col] = df_cleaned[col].astype(str).apply(
+                lambda x: re.sub(pattern, '', x)
+            )
+    
+    return df_cleaned
+
+def main():
+    # Example usage
+    sample_data = {
+        'name': ['  John Doe  ', 'Jane Smith', 'John Doe', 'Bob@Example'],
+        'email': ['john@example.com', 'invalid-email', 'JOHN@EXAMPLE.COM', 'bob@test.org'],
+        'phone': ['123-456-7890', '(987) 654-3210', '123-456-7890', '555-1234']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned_df = clean_dataframe(df, ['name', 'email'])
+    print("After cleaning:")
+    print(cleaned_df)
+    print("\n" + "="*50 + "\n")
+    
+    # Validate emails
+    validated_df = validate_email_column(cleaned_df, 'email')
+    print("After email validation:")
+    print(validated_df)
+    print("\n" + "="*50 + "\n")
+    
+    # Remove special characters from phone numbers
+    final_df = remove_special_characters(validated_df, ['phone'], keep_chars='-')
+    print("After removing special characters from phone:")
+    print(final_df)
+
+if __name__ == "__main__":
+    main()
