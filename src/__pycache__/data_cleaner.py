@@ -966,3 +966,45 @@ if __name__ == "__main__":
     print(cleaned)
     print("\nValidation after cleaning:")
     print(validate_dataset(cleaned))
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def clean_dataset(df, numeric_columns):
+    original_shape = df.shape
+    for col in numeric_columns:
+        if col in df.columns:
+            df = remove_outliers_iqr(df, col)
+    cleaned_shape = df.shape
+    print(f"Original shape: {original_shape}")
+    print(f"Cleaned shape: {cleaned_shape}")
+    print(f"Rows removed: {original_shape[0] - cleaned_shape[0]}")
+    return df
+
+def main():
+    data = {
+        'id': range(100),
+        'value': np.random.normal(100, 15, 100)
+    }
+    df = pd.DataFrame(data)
+    df.loc[10, 'value'] = 500
+    df.loc[20, 'value'] = -200
+    
+    print("Before cleaning:")
+    print(df.describe())
+    
+    cleaned_df = clean_dataset(df, ['value'])
+    
+    print("\nAfter cleaning:")
+    print(cleaned_df.describe())
+
+if __name__ == "__main__":
+    main()
