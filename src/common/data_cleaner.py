@@ -58,4 +58,51 @@ def get_summary_statistics(df):
     summary = df[numeric_cols].describe()
     summary.loc['skewness'] = df[numeric_cols].skew()
     summary.loc['kurtosis'] = df[numeric_cols].kurtosis()
-    return summary
+    return summaryimport re
+import pandas as pd
+
+def normalize_string(text):
+    if not isinstance(text, str):
+        return text
+    text = text.strip().lower()
+    text = re.sub(r'\s+', ' ', text)
+    return text
+
+def clean_numeric(value):
+    if pd.isna(value):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        cleaned = re.sub(r'[^\d.-]', '', value)
+        try:
+            return float(cleaned)
+        except ValueError:
+            return None
+    return None
+
+def remove_duplicates(df, subset=None):
+    if subset is None:
+        subset = df.columns.tolist()
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def validate_email(email):
+    if not isinstance(email, str):
+        return False
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def process_dataframe(df, string_columns=None, numeric_columns=None):
+    df_clean = df.copy()
+    
+    if string_columns:
+        for col in string_columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].apply(normalize_string)
+    
+    if numeric_columns:
+        for col in numeric_columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].apply(clean_numeric)
+    
+    return df_clean
