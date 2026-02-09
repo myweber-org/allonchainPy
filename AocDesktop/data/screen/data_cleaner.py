@@ -145,3 +145,76 @@ if __name__ == "__main__":
     print("\nSummary Statistics:")
     for key, value in stats.items():
         print(f"{key}: {value:.2f}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, handle_nulls='drop'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling null values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        drop_duplicates (bool): Whether to remove duplicate rows
+        handle_nulls (str): How to handle null values - 'drop', 'fill_mean', 'fill_median', or 'fill_zero'
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if handle_nulls == 'drop':
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.dropna()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} rows with null values")
+    elif handle_nulls in ['fill_mean', 'fill_median', 'fill_zero']:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols:
+            if handle_nulls == 'fill_mean':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+            elif handle_nulls == 'fill_median':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+            elif handle_nulls == 'fill_zero':
+                cleaned_df[col] = cleaned_df[col].fillna(0)
+        
+        print(f"Filled null values in {len(numeric_cols)} numeric columns using {handle_nulls}")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate a DataFrame for basic integrity checks.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of column names that must be present
+    
+    Returns:
+        dict: Dictionary with validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'null_counts': df.isnull().sum().to_dict(),
+        'duplicate_rows': df.duplicated().sum(),
+        'missing_columns': []
+    }
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        validation_results['missing_columns'] = missing
+        if missing:
+            validation_results['is_valid'] = False
+    
+    if df.empty:
+        validation_results['is_valid'] = False
+    
+    return validation_results
