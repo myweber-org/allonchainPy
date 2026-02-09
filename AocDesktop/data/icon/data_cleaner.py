@@ -71,3 +71,64 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B'])
     print(f"\nData validation passed: {is_valid}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing numeric values with column median
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].median())
+    
+    # Fill missing categorical values with mode
+    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if df_cleaned[col].isnull().any():
+            mode_value = df_cleaned[col].mode()[0]
+            df_cleaned[col] = df_cleaned[col].fillna(mode_value)
+    
+    return df_cleaned
+
+def validate_data(df, required_columns):
+    """
+    Validate that DataFrame contains all required columns.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    return True
+
+def main():
+    # Example usage
+    data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', None, 'Eve', 'Frank'],
+        'age': [25, 30, 30, 35, None, 40],
+        'score': [85.5, 92.0, 92.0, 78.5, 88.0, 95.5]
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    # Clean the data
+    df_cleaned = clean_dataset(df)
+    print("Cleaned DataFrame:")
+    print(df_cleaned)
+    
+    # Validate required columns
+    required_cols = ['id', 'name', 'age']
+    try:
+        validate_data(df_cleaned, required_cols)
+        print("Data validation passed.")
+    except ValueError as e:
+        print(f"Data validation failed: {e}")
+
+if __name__ == "__main__":
+    main()
