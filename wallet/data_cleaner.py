@@ -250,4 +250,37 @@ def process_data_file(file_path, output_path=None):
     if output_path:
         cleaned_df.to_csv(output_path, index=False)
     
-    return cleaned_df
+    return cleaned_dfdef remove_duplicates(input_list):
+    """
+    Remove duplicate elements from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_data(data):
+    """
+    Main cleaning function that processes the input data.
+    Handles None values and ensures proper data types.
+    """
+    if data is None:
+        return []
+    
+    if not isinstance(data, list):
+        try:
+            data = list(data)
+        except TypeError:
+            return []
+    
+    return remove_duplicates(data)
+
+if __name__ == "__main__":
+    sample_data = [1, 2, 2, 3, 4, 4, 5, 1, 6]
+    cleaned = clean_data(sample_data)
+    print(f"Original: {sample_data}")
+    print(f"Cleaned: {cleaned}")
