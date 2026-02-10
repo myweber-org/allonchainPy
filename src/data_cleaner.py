@@ -1,82 +1,102 @@
 
 import pandas as pd
+import numpy as np
 
-def clean_dataset(df, drop_duplicates=True, normalize_cols=True):
+def remove_outliers_iqr(df, column):
     """
-    Clean a pandas DataFrame by removing duplicates and normalizing column names.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
     Args:
-        df (pd.DataFrame): Input DataFrame to clean.
-        drop_duplicates (bool): Whether to drop duplicate rows.
-        normalize_cols (bool): Whether to normalize column names to lowercase with underscores.
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to clean
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame.
+        pd.DataFrame: DataFrame with outliers removed
     """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def clean_numeric_data(df, columns=None):
+    """
+    Clean numeric columns by removing outliers from specified columns or all numeric columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list, optional): List of column names to clean. If None, cleans all numeric columns.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        columns = numeric_cols
+    
     cleaned_df = df.copy()
     
-    if drop_duplicates:
-        initial_rows = len(cleaned_df)
-        cleaned_df = cleaned_df.drop_duplicates()
-        removed = initial_rows - len(cleaned_df)
-        print(f"Removed {removed} duplicate rows.")
-    
-    if normalize_cols:
-        original_cols = cleaned_df.columns.tolist()
-        cleaned_df.columns = [
-            col.lower().replace(' ', '_').replace('-', '_')
-            for col in cleaned_df.columns
-        ]
-        print(f"Normalized column names: {dict(zip(original_cols, cleaned_df.columns))}")
+    for col in columns:
+        if col in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[col]):
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            removed_count = original_count - len(cleaned_df)
+            print(f"Removed {removed_count} outliers from column '{col}'")
     
     return cleaned_df
 
-def validate_dataframe(df, required_cols=None):
+def validate_dataframe(df, required_columns=None):
     """
     Validate DataFrame structure and content.
     
     Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_cols (list): List of required column names.
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list, optional): List of required column names
     
     Returns:
-        dict: Validation results with keys 'is_valid' and 'messages'.
+        bool: True if validation passes, False otherwise
     """
-    results = {
-        'is_valid': True,
-        'messages': []
-    }
+    if not isinstance(df, pd.DataFrame):
+        print("Error: Input is not a pandas DataFrame")
+        return False
     
     if df.empty:
-        results['is_valid'] = False
-        results['messages'].append('DataFrame is empty.')
+        print("Warning: DataFrame is empty")
+        return True
     
-    if required_cols:
-        missing_cols = [col for col in required_cols if col not in df.columns]
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
         if missing_cols:
-            results['is_valid'] = False
-            results['messages'].append(f'Missing required columns: {missing_cols}')
+            print(f"Error: Missing required columns: {missing_cols}")
+            return False
     
-    if df.isnull().all().any():
-        results['messages'].append('Warning: Some columns contain only null values.')
-    
-    return results
+    return True
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sample_data = {
-        'Product Name': ['A', 'B', 'A', 'C', 'B'],
-        'Unit-Price': [10, 20, 10, 30, 20],
-        'Quantity ': [1, 2, 1, 3, 2]
+        'id': range(1, 101),
+        'value': np.random.randn(100) * 10 + 50,
+        'category': np.random.choice(['A', 'B', 'C'], 100)
     }
     
     df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\nCleaning DataFrame...")
+    df.loc[10, 'value'] = 200
+    df.loc[20, 'value'] = -100
     
-    cleaned = clean_dataset(df)
-    print("\nCleaned DataFrame:")
-    print(cleaned)
+    print("Original DataFrame shape:", df.shape)
+    print("Original statistics:")
+    print(df['value'].describe())
     
-    validation = validate_dataframe(cleaned, required_cols=['product_name', 'unit_price'])
-    print(f"\nValidation: {validation}")
+    cleaned_df = clean_numeric_data(df, columns=['value'])
+    
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("Cleaned statistics:")
+    print(cleaned_df['value'].describe())
