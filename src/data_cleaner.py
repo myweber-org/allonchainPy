@@ -1,98 +1,82 @@
 
-import numpy as np
 import pandas as pd
 
-def remove_outliers_iqr(df, column):
+def clean_dataset(df, drop_duplicates=True, normalize_cols=True):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Clean a pandas DataFrame by removing duplicates and normalizing column names.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows.
+        normalize_cols (bool): Whether to normalize column names to lowercase with underscores.
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+        pd.DataFrame: Cleaned DataFrame.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    cleaned_df = df.copy()
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows.")
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    if normalize_cols:
+        original_cols = cleaned_df.columns.tolist()
+        cleaned_df.columns = [
+            col.lower().replace(' ', '_').replace('-', '_')
+            for col in cleaned_df.columns
+        ]
+        print(f"Normalized column names: {dict(zip(original_cols, cleaned_df.columns))}")
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    return cleaned_df
 
-def calculate_summary_statistics(df, column):
+def validate_dataframe(df, required_cols=None):
     """
-    Calculate summary statistics for a column after outlier removal.
+    Validate DataFrame structure and content.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_cols (list): List of required column names.
     
     Returns:
-    dict: Dictionary containing summary statistics
+        dict: Validation results with keys 'is_valid' and 'messages'.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
+    results = {
+        'is_valid': True,
+        'messages': []
     }
     
-    return stats
+    if df.empty:
+        results['is_valid'] = False
+        results['messages'].append('DataFrame is empty.')
+    
+    if required_cols:
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            results['is_valid'] = False
+            results['messages'].append(f'Missing required columns: {missing_cols}')
+    
+    if df.isnull().all().any():
+        results['messages'].append('Warning: Some columns contain only null values.')
+    
+    return results
 
-def process_dataset(file_path, column_name):
-    """
-    Complete pipeline to load, clean, and analyze a dataset.
+if __name__ == '__main__':
+    sample_data = {
+        'Product Name': ['A', 'B', 'A', 'C', 'B'],
+        'Unit-Price': [10, 20, 10, 30, 20],
+        'Quantity ': [1, 2, 1, 3, 2]
+    }
     
-    Parameters:
-    file_path (str): Path to CSV file
-    column_name (str): Column to process
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaning DataFrame...")
     
-    Returns:
-    tuple: (cleaned_df, original_stats, cleaned_stats)
-    """
-    try:
-        df = pd.read_csv(file_path)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {file_path}")
+    cleaned = clean_dataset(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
     
-    original_stats = calculate_summary_statistics(df, column_name)
-    cleaned_df = remove_outliers_iqr(df, column_name)
-    cleaned_stats = calculate_summary_statistics(cleaned_df, column_name)
-    
-    print(f"Original data shape: {df.shape}")
-    print(f"Cleaned data shape: {cleaned_df.shape}")
-    print(f"Outliers removed: {len(df) - len(cleaned_df)}")
-    
-    return cleaned_df, original_stats, cleaned_stats
-
-if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'values': np.concatenate([
-            np.random.normal(100, 15, 95),
-            np.random.normal(300, 50, 5)
-        ])
-    })
-    
-    print("Sample data processing:")
-    cleaned, original, cleaned_stats = process_dataset(sample_data, 'values')
-    
-    print("\nOriginal statistics:")
-    for key, value in original.items():
-        print(f"{key}: {value:.2f}")
-    
-    print("\nCleaned statistics:")
-    for key, value in cleaned_stats.items():
-        print(f"{key}: {value:.2f}")
+    validation = validate_dataframe(cleaned, required_cols=['product_name', 'unit_price'])
+    print(f"\nValidation: {validation}")
