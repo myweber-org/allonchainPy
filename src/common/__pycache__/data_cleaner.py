@@ -228,4 +228,54 @@ def filter_by_column(df, column_name, threshold):
         raise ValueError(f"Column '{column_name}' not found in DataFrame")
     
     filtered_df = df[df[column_name] > threshold]
-    return filtered_df
+    return filtered_dfimport pandas as pd
+import re
+
+def clean_dataframe(df, text_column='text'):
+    """
+    Clean a DataFrame by removing duplicates and normalizing text.
+    """
+    # Remove duplicate rows
+    df_clean = df.drop_duplicates().reset_index(drop=True)
+    
+    # Normalize text: lowercase, remove extra whitespace
+    if text_column in df_clean.columns:
+        df_clean[text_column] = df_clean[text_column].apply(
+            lambda x: re.sub(r'\s+', ' ', str(x).strip().lower())
+        )
+    
+    return df_clean
+
+def filter_by_length(df, text_column='text', min_length=10):
+    """
+    Filter rows based on minimum text length.
+    """
+    if text_column in df.columns:
+        mask = df[text_column].str.len() >= min_length
+        return df[mask].reset_index(drop=True)
+    return df
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 3, 4, 5],
+        'text': [
+            'Hello World  ',
+            'hello world',
+            'Python is great',
+            '  PYTHON IS GREAT  ',
+            'Short'
+        ]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataframe(df, text_column='text')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    filtered_df = filter_by_length(cleaned_df, text_column='text', min_length=5)
+    print("\nFiltered DataFrame (min length 5):")
+    print(filtered_df)
