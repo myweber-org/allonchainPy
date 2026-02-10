@@ -375,3 +375,21 @@ def remove_duplicates(seq):
             seen.add(item)
             result.append(item)
     return result
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def test_remove_duplicates():
+    sample_list = [1, 2, 3, 2, 4, 3, 5]
+    cleaned = remove_duplicates_preserve_order(sample_list)
+    print(f"Original list: {sample_list}")
+    print(f"Cleaned list: {cleaned}")
+    assert cleaned == [1, 2, 3, 4, 5]
+
+if __name__ == "__main__":
+    test_remove_duplicates()
