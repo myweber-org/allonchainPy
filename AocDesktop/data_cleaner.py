@@ -217,3 +217,120 @@ def clean_dataframe(df: pd.DataFrame,
                 cleaned_df = normalize_column(cleaned_df, col)
     
     return cleaned_df
+import pandas as pd
+import numpy as np
+from typing import Optional, List
+
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        subset: List of column names to consider for identifying duplicates
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def fill_missing_values(df: pd.DataFrame, strategy: str = 'mean', columns: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Fill missing values in specified columns using a given strategy.
+    
+    Args:
+        df: Input DataFrame
+        strategy: Method to fill missing values ('mean', 'median', 'mode', 'zero')
+        columns: List of column names to fill (None means all columns)
+    
+    Returns:
+        DataFrame with missing values filled
+    """
+    df_filled = df.copy()
+    
+    if columns is None:
+        columns = df.columns
+    
+    for col in columns:
+        if col in df.columns and df[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0] if not df[col].mode().empty else np.nan
+            elif strategy == 'zero':
+                fill_value = 0
+            else:
+                raise ValueError(f"Unsupported strategy: {strategy}")
+            
+            df_filled[col] = df[col].fillna(fill_value)
+    
+    return df_filled
+
+def validate_numeric_range(df: pd.DataFrame, column: str, min_val: float, max_val: float) -> pd.DataFrame:
+    """
+    Filter DataFrame to keep only rows where a numeric column is within specified range.
+    
+    Args:
+        df: Input DataFrame
+        column: Name of the column to validate
+        min_val: Minimum allowed value
+        max_val: Maximum allowed value
+    
+    Returns:
+        Filtered DataFrame
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mask = df[column].between(min_val, max_val)
+    return df[mask].copy()
+
+def normalize_column(df: pd.DataFrame, column: str, method: str = 'minmax') -> pd.DataFrame:
+    """
+    Normalize values in a column using specified method.
+    
+    Args:
+        df: Input DataFrame
+        column: Name of the column to normalize
+        method: Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_normalized = df.copy()
+    
+    if method == 'minmax':
+        min_val = df[column].min()
+        max_val = df[column].max()
+        if max_val > min_val:
+            df_normalized[column] = (df[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = df[column].mean()
+        std_val = df[column].std()
+        if std_val > 0:
+            df_normalized[column] = (df[column] - mean_val) / std_val
+    
+    else:
+        raise ValueError(f"Unsupported normalization method: {method}")
+    
+    return df_normalized
+
+def clean_column_names(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Clean column names by converting to lowercase and replacing spaces with underscores.
+    
+    Args:
+        df: Input DataFrame
+    
+    Returns:
+        DataFrame with cleaned column names
+    """
+    df_clean = df.copy()
+    df_clean.columns = [col.lower().replace(' ', '_') for col in df.columns]
+    return df_clean
