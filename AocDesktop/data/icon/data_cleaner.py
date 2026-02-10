@@ -253,3 +253,32 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned, required_columns=['id', 'value'])
     print(f"\nData validation result: {is_valid}")
+import pandas as pd
+
+def clean_data(df):
+    """
+    Clean the input DataFrame by removing duplicate rows and
+    filling missing numeric values with the column median.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+
+    # Fill missing numeric values with column median
+    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].median())
+
+    return df_cleaned
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, 2, None, 5],
+        'B': [10, None, 10, 40, 50],
+        'C': ['x', 'y', 'x', 'z', 'z']
+    }
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    cleaned_df = clean_data(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
