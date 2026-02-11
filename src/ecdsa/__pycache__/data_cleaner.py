@@ -136,4 +136,61 @@ def clean_dataset(dataframe, outlier_columns=None, normalize=True, standardize=F
     if standardize:
         cleaned_df = standardize_zscore(cleaned_df)
     
-    return cleaned_df
+    return cleaned_dfimport pandas as pd
+import numpy as np
+import argparse
+import os
+
+def clean_csv(input_file, output_file=None):
+    """
+    Clean a CSV file by handling missing values and duplicates.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original shape: {df.shape}")
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        print(f"After removing duplicates: {df.shape}")
+        
+        # Fill missing numeric values with median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df[col].isnull().sum() > 0:
+                df[col] = df[col].fillna(df[col].median())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if df[col].isnull().sum() > 0:
+                df[col] = df[col].fillna(df[col].mode()[0])
+        
+        # Remove columns with too many missing values (threshold > 50%)
+        missing_percentage = df.isnull().sum() / len(df)
+        columns_to_drop = missing_percentage[missing_percentage > 0.5].index
+        df = df.drop(columns=columns_to_drop)
+        
+        if output_file is None:
+            base_name = os.path.splitext(input_file)[0]
+            output_file = f"{base_name}_cleaned.csv"
+        
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to: {output_file}")
+        print(f"Final shape: {df.shape}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Clean CSV files')
+    parser.add_argument('input_file', help='Path to input CSV file')
+    parser.add_argument('-o', '--output', help='Path to output CSV file (optional)')
+    
+    args = parser.parse_args()
+    clean_csv(args.input_file, args.output)
