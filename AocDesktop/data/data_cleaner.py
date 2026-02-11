@@ -355,4 +355,65 @@ def get_summary_statistics(df, numeric_columns):
     summary = df[numeric_columns].describe()
     summary.loc['skewness'] = df[numeric_columns].skew()
     summary.loc['kurtosis'] = df[numeric_columns].kurtosis()
-    return summary
+    return summaryimport pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_data(filepath):
+    """Load data from a CSV file."""
+    return pd.read_csv(filepath)
+
+def remove_outliers_iqr(df, column):
+    """Remove outliers from a column using the IQR method."""
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def remove_outliers_zscore(df, column, threshold=3):
+    """Remove outliers from a column using Z-score method."""
+    z_scores = np.abs(stats.zscore(df[column]))
+    return df[z_scores < threshold]
+
+def normalize_minmax(df, column):
+    """Normalize a column using Min-Max scaling."""
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def normalize_zscore(df, column):
+    """Normalize a column using Z-score normalization."""
+    mean_val = df[column].mean()
+    std_val = df[column].std()
+    df[column + '_standardized'] = (df[column] - mean_val) / std_val
+    return df
+
+def clean_dataset(filepath, column_to_clean, method='iqr', normalize=False, norm_method='minmax'):
+    """Main function to clean and optionally normalize a dataset."""
+    df = load_data(filepath)
+    
+    if method == 'iqr':
+        df_clean = remove_outliers_iqr(df, column_to_clean)
+    elif method == 'zscore':
+        df_clean = remove_outliers_zscore(df, column_to_clean)
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+    
+    if normalize:
+        if norm_method == 'minmax':
+            df_clean = normalize_minmax(df_clean, column_to_clean)
+        elif norm_method == 'zscore':
+            df_clean = normalize_zscore(df_clean, column_to_clean)
+        else:
+            raise ValueError("Normalization method must be 'minmax' or 'zscore'")
+    
+    return df_clean
+
+if __name__ == "__main__":
+    cleaned_data = clean_dataset('sample_data.csv', 'value', method='iqr', normalize=True, norm_method='minmax')
+    print(f"Original rows: {pd.read_csv('sample_data.csv').shape[0]}")
+    print(f"Cleaned rows: {cleaned_data.shape[0]}")
+    print(cleaned_data.head())
