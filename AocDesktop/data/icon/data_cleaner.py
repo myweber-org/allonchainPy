@@ -281,4 +281,47 @@ if __name__ == "__main__":
     print(df)
     cleaned_df = clean_data(df)
     print("\nCleaned DataFrame:")
-    print(cleaned_df)
+    print(cleaned_df)import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_file, output_file):
+    """
+    Clean a CSV file by removing duplicates, handling missing values,
+    and converting data types.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        print(f"Original shape: {df.shape}")
+        
+        df = df.drop_duplicates()
+        print(f"After removing duplicates: {df.shape}")
+        
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
+        df[numeric_columns] = df[numeric_columns].fillna(df[numeric_columns].mean())
+        
+        categorical_columns = df.select_dtypes(include=['object']).columns
+        df[categorical_columns] = df[categorical_columns].fillna('Unknown')
+        
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to: {output_file}")
+        
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        return False
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+        return False
+
+if __name__ == "__main__":
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    success = clean_csv_data(input_csv, output_csv)
+    
+    if success:
+        print("Data cleaning completed successfully.")
+    else:
+        print("Data cleaning failed.")
