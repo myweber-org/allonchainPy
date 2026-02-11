@@ -1,52 +1,37 @@
-
 import requests
 
-def get_github_user(username):
+def fetch_github_user(username):
+    """Fetch public information for a given GitHub username."""
     url = f"https://api.github.com/users/{username}"
-    response = requests.get(url)
-    
-    if response.status_code == 200:
-        return response.json()
-    else:
-        return None
-
-def display_user_info(user_data):
-    if user_data:
-        print(f"Username: {user_data.get('login')}")
-        print(f"Name: {user_data.get('name')}")
-        print(f"Followers: {user_data.get('followers')}")
-        print(f"Public Repos: {user_data.get('public_repos')}")
-        print(f"Location: {user_data.get('location')}")
-        print(f"Bio: {user_data.get('bio')}")
-    else:
-        print("User not found or error occurred.")
-
-if __name__ == "__main__":
-    username = input("Enter GitHub username: ")
-    user_info = get_github_user(username)
-    display_user_info(user_info)
-import requests
-import sys
-
-def get_github_user(username):
-    url = f"https://api.github.com/users/{username}"
-    response = requests.get(url)
-    
-    if response.status_code == 200:
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
         user_data = response.json()
-        print(f"Username: {user_data['login']}")
-        print(f"Name: {user_data.get('name', 'N/A')}")
-        print(f"Public Repos: {user_data['public_repos']}")
-        print(f"Followers: {user_data['followers']}")
-        print(f"Following: {user_data['following']}")
-        print(f"Profile URL: {user_data['html_url']}")
-    else:
-        print(f"Error: User '{username}' not found or API request failed.")
+        return {
+            'login': user_data.get('login'),
+            'name': user_data.get('name'),
+            'public_repos': user_data.get('public_repos'),
+            'followers': user_data.get('followers'),
+            'following': user_data.get('following'),
+            'html_url': user_data.get('html_url')
+        }
+    except requests.exceptions.HTTPError as e:
+        if response.status_code == 404:
+            return f"Error: User '{username}' not found."
+        else:
+            return f"HTTP Error occurred: {e}"
+    except requests.exceptions.RequestException as e:
+        return f"Request failed: {e}"
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python fetch_github_user.py <username>")
-        sys.exit(1)
-    
-    username = sys.argv[1]
-    get_github_user(username)
+    username = input("Enter a GitHub username: ").strip()
+    result = fetch_github_user(username)
+    if isinstance(result, dict):
+        print(f"\nGitHub User: {result['login']}")
+        print(f"Name: {result['name']}")
+        print(f"Public Repositories: {result['public_repos']}")
+        print(f"Followers: {result['followers']}")
+        print(f"Following: {result['following']}")
+        print(f"Profile URL: {result['html_url']}")
+    else:
+        print(result)
