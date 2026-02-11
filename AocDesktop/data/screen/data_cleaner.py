@@ -4,17 +4,17 @@ import numpy as np
 
 def remove_outliers_iqr(df, column):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Remove outliers from a specified column in a DataFrame using the IQR method.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to process.
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    pd.DataFrame: DataFrame with outliers removed from the specified column.
     """
     if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+        raise ValueError(f"Column '{column}' not found in DataFrame.")
     
     Q1 = df[column].quantile(0.25)
     Q3 = df[column].quantile(0.75)
@@ -25,28 +25,26 @@ def remove_outliers_iqr(df, column):
     
     filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
-    return filtered_df
+    return filtered_df.reset_index(drop=True)
 
-def clean_numeric_data(df, columns=None):
+def clean_dataset(df, numeric_columns=None):
     """
-    Clean numeric data by removing outliers from specified columns.
-    If no columns specified, clean all numeric columns.
+    Clean a dataset by removing outliers from all numeric columns.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    columns (list): List of column names to clean
+    df (pd.DataFrame): The input DataFrame.
+    numeric_columns (list): List of numeric column names. If None, uses all numeric columns.
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame
+    pd.DataFrame: Cleaned DataFrame with outliers removed.
     """
-    if columns is None:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        columns = numeric_cols
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
     
     cleaned_df = df.copy()
     
-    for col in columns:
-        if col in cleaned_df.columns:
+    for col in numeric_columns:
+        if col in df.columns:
             original_len = len(cleaned_df)
             cleaned_df = remove_outliers_iqr(cleaned_df, col)
             removed_count = original_len - len(cleaned_df)
@@ -54,35 +52,18 @@ def clean_numeric_data(df, columns=None):
     
     return cleaned_df
 
-def save_cleaned_data(df, input_path, suffix='_cleaned'):
-    """
-    Save cleaned DataFrame to a new CSV file.
-    
-    Parameters:
-    df (pd.DataFrame): Cleaned DataFrame
-    input_path (str): Original file path
-    suffix (str): Suffix to add to filename
-    
-    Returns:
-    str: Path to saved file
-    """
-    if input_path.endswith('.csv'):
-        output_path = input_path.replace('.csv', f'{suffix}.csv')
-    else:
-        output_path = f"{input_path}{suffix}.csv"
-    
-    df.to_csv(output_path, index=False)
-    print(f"Cleaned data saved to: {output_path}")
-    
-    return output_path
-
 if __name__ == "__main__":
-    sample_data = pd.DataFrame({
+    sample_data = {
         'A': np.random.normal(100, 15, 1000),
         'B': np.random.exponential(50, 1000),
         'C': np.random.uniform(0, 200, 1000)
-    })
+    }
     
-    print("Original data shape:", sample_data.shape)
-    cleaned_data = clean_numeric_data(sample_data)
-    print("Cleaned data shape:", cleaned_data.shape)
+    sample_data['A'][:50] = np.random.uniform(300, 500, 50)
+    
+    df = pd.DataFrame(sample_data)
+    print(f"Original dataset shape: {df.shape}")
+    
+    cleaned_df = clean_dataset(df)
+    print(f"Cleaned dataset shape: {cleaned_df.shape}")
+    print(f"Removed {len(df) - len(cleaned_df)} total outliers")
