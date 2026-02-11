@@ -129,4 +129,92 @@ class DataCleaner:
         return self.df
         
     def get_removed_count(self):
-        return self.original_shape[0] - self.df.shape[0]
+        return self.original_shape[0] - self.df.shape[0]import csv
+import re
+
+def clean_csv(input_file, output_file):
+    """
+    Clean a CSV file by removing rows with missing values
+    and standardizing text fields.
+    """
+    cleaned_rows = []
+    
+    with open(input_file, 'r', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
+        
+        for row in reader:
+            # Skip rows with any empty values
+            if any(value.strip() == '' for value in row.values()):
+                continue
+            
+            # Clean text fields
+            cleaned_row = {}
+            for key, value in row.items():
+                if key.endswith('_name') or key.endswith('_text'):
+                    # Remove extra whitespace and standardize case
+                    cleaned_value = re.sub(r'\s+', ' ', value.strip())
+                    cleaned_value = cleaned_value.title()
+                    cleaned_row[key] = cleaned_value
+                else:
+                    cleaned_row[key] = value.strip()
+            
+            cleaned_rows.append(cleaned_row)
+    
+    # Write cleaned data to output file
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(cleaned_rows)
+    
+    return len(cleaned_rows)
+
+def validate_email(email):
+    """
+    Validate email format using regex pattern.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def remove_duplicates(input_file, output_file, key_field):
+    """
+    Remove duplicate rows based on a specified key field.
+    """
+    seen = set()
+    unique_rows = []
+    
+    with open(input_file, 'r', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
+        
+        for row in reader:
+            key = row.get(key_field)
+            if key not in seen:
+                seen.add(key)
+                unique_rows.append(row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(unique_rows)
+    
+    return len(unique_rows)
+
+if __name__ == "__main__":
+    # Example usage
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    try:
+        rows_processed = clean_csv(input_csv, output_csv)
+        print(f"Processed {rows_processed} rows successfully.")
+        
+        # Remove duplicates based on 'id' field
+        deduplicated_csv = "deduplicated_data.csv"
+        unique_count = remove_duplicates(output_csv, deduplicated_csv, 'id')
+        print(f"Found {unique_count} unique records.")
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_csv}' not found.")
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
