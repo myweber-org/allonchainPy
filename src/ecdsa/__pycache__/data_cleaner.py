@@ -222,3 +222,57 @@ def save_cleaned_data(df, output_path, format='csv'):
         raise ValueError(f"Unsupported format: {format}")
     
     print(f"Data saved to {output_path}")
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and
+    handling missing values in numeric columns.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing values in numeric columns with column median
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(
+        df_cleaned[numeric_cols].median()
+    )
+    
+    # For non-numeric columns, fill with 'Unknown'
+    non_numeric_cols = df_cleaned.select_dtypes(exclude=[np.number]).columns
+    df_cleaned[non_numeric_cols] = df_cleaned[non_numeric_cols].fillna('Unknown')
+    
+    return df_cleaned
+
+def validate_dataframe(df):
+    """
+    Validate that DataFrame has no null values after cleaning.
+    """
+    null_counts = df.isnull().sum()
+    if null_counts.sum() == 0:
+        return True, "Data validation passed: No null values found."
+    else:
+        error_cols = null_counts[null_counts > 0].index.tolist()
+        return False, f"Data validation failed: Null values in columns {error_cols}"
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4],
+        'name': ['Alice', 'Bob', 'Bob', None, 'Eve'],
+        'age': [25, 30, 30, None, 35],
+        'score': [85.5, 92.0, 92.0, 78.5, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataframe(df)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    
+    is_valid, message = validate_dataframe(cleaned_df)
+    print(f"\nValidation Result: {message}")
