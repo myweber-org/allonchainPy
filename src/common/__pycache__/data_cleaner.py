@@ -48,3 +48,23 @@ if __name__ == "__main__":
     cleaned_df = standardize_data(df, text_columns=['name', 'email'])
     print("\nCleaned DataFrame:")
     print(cleaned_df)
+def filter_valid_entries(data, required_keys):
+    """
+    Filters a list of dictionaries, returning only those that contain all specified keys
+    and where none of the required key values are None or empty strings.
+    """
+    if not isinstance(data, list):
+        raise TypeError("Input data must be a list")
+    if not isinstance(required_keys, list):
+        raise TypeError("Required keys must be a list")
+
+    valid_entries = []
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        try:
+            if all(key in entry and entry[key] is not None and entry[key] != "" for key in required_keys):
+                valid_entries.append(entry)
+        except (TypeError, KeyError):
+            continue
+    return valid_entries
