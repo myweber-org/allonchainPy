@@ -59,4 +59,48 @@ if __name__ == "__main__":
     city = ' '.join(sys.argv[2:])
     
     weather_data = get_weather(api_key, city)
+    display_weather(weather_data)import requests
+import json
+import sys
+
+def get_weather(api_key, city):
+    base_url = "http://api.openweathermap.org/data/2.5/weather"
+    params = {
+        'q': city,
+        'appid': api_key,
+        'units': 'metric'
+    }
+    try:
+        response = requests.get(base_url, params=params)
+        response.raise_for_status()
+        data = response.json()
+        return data
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching weather data: {e}")
+        return None
+    except json.JSONDecodeError:
+        print("Error decoding JSON response.")
+        return None
+
+def display_weather(data):
+    if data and data.get('cod') == 200:
+        main = data['main']
+        weather = data['weather'][0]
+        print(f"City: {data['name']}")
+        print(f"Temperature: {main['temp']}°C")
+        print(f"Humidity: {main['humidity']}%")
+        print(f"Weather: {weather['description']}")
+        print(f"Wind Speed: {data['wind']['speed']} m/s")
+    else:
+        error_msg = data.get('message', 'Unknown error') if data else 'No data received'
+        print(f"Failed to get weather data: {error_msg}")
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: python fetch_weather_data.py <API_KEY> <CITY_NAME>")
+        sys.exit(1)
+
+    api_key = sys.argv[1]
+    city = sys.argv[2]
+    weather_data = get_weather(api_key, city)
     display_weather(weather_data)
