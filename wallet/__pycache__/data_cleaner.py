@@ -381,3 +381,53 @@ class DataCleaner:
             'numeric_columns': list(self.df.select_dtypes(include=[np.number]).columns)
         }
         return summary
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_file, output_file):
+    """
+    Load a CSV file, clean missing values, and save cleaned data.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        print(f"Original data shape: {df.shape}")
+        print(f"Missing values per column:\n{df.isnull().sum()}")
+        
+        df_cleaned = df.copy()
+        
+        numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+        categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+        
+        for col in numeric_cols:
+            if df_cleaned[col].isnull().any():
+                df_cleaned[col].fillna(df_cleaned[col].median(), inplace=True)
+        
+        for col in categorical_cols:
+            if df_cleaned[col].isnull().any():
+                df_cleaned[col].fillna(df_cleaned[col].mode()[0], inplace=True)
+        
+        df_cleaned.to_csv(output_file, index=False)
+        
+        print(f"Cleaned data shape: {df_cleaned.shape}")
+        print(f"Missing values after cleaning:\n{df_cleaned.isnull().sum().sum()}")
+        print(f"Cleaned data saved to: {output_file}")
+        
+        return df_cleaned
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_csv, output_csv)
+    
+    if cleaned_df is not None:
+        print("Data cleaning completed successfully.")
+        print(f"Sample of cleaned data:\n{cleaned_df.head()}")
