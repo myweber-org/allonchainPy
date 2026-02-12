@@ -270,3 +270,205 @@ if __name__ == "__main__":
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {cleaned_data.shape}")
     print(cleaned_data.head())
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers using IQR method.
+    
+    Parameters:
+    data: pandas DataFrame
+    column: column name to process
+    multiplier: IQR multiplier (default 1.5)
+    
+    Returns:
+    DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method.
+    
+    Parameters:
+    data: pandas DataFrame
+    column: column name to process
+    threshold: Z-score threshold (default 3)
+    
+    Returns:
+    DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = np.abs(stats.zscore(data[column].dropna()))
+    filtered_data = data[z_scores < threshold]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Parameters:
+    data: pandas DataFrame
+    column: column name to normalize
+    
+    Returns:
+    Series with normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def normalize_zscore(data, column):
+    """
+    Normalize data using Z-score standardization.
+    
+    Parameters:
+    data: pandas DataFrame
+    column: column name to normalize
+    
+    Returns:
+    Series with standardized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(df, numeric_columns=None, outlier_method='iqr', normalize_method='minmax'):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Parameters:
+    df: pandas DataFrame
+    numeric_columns: list of numeric columns to process (default: all numeric)
+    outlier_method: 'iqr' or 'zscore' (default: 'iqr')
+    normalize_method: 'minmax' or 'zscore' (default: 'minmax')
+    
+    Returns:
+    Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    
+    for column in numeric_columns:
+        if column not in cleaned_df.columns:
+            continue
+            
+        if outlier_method == 'iqr':
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+        elif outlier_method == 'zscore':
+            cleaned_df = remove_outliers_zscore(cleaned_df, column)
+        else:
+            raise ValueError(f"Unknown outlier method: {outlier_method}")
+    
+    for column in numeric_columns:
+        if column not in cleaned_df.columns:
+            continue
+            
+        if normalize_method == 'minmax':
+            cleaned_df[column] = normalize_minmax(cleaned_df, column)
+        elif normalize_method == 'zscore':
+            cleaned_df[column] = normalize_zscore(cleaned_df, column)
+        else:
+            raise ValueError(f"Unknown normalize method: {normalize_method}")
+    
+    return cleaned_df
+
+def get_data_summary(df):
+    """
+    Generate summary statistics for DataFrame.
+    
+    Parameters:
+    df: pandas DataFrame
+    
+    Returns:
+    Dictionary with summary statistics
+    """
+    summary = {
+        'shape': df.shape,
+        'columns': df.columns.tolist(),
+        'dtypes': df.dtypes.to_dict(),
+        'missing_values': df.isnull().sum().to_dict(),
+        'numeric_summary': {}
+    }
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        summary['numeric_summary'][col] = {
+            'mean': df[col].mean(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            '25%': df[col].quantile(0.25),
+            '50%': df[col].quantile(0.5),
+            '75%': df[col].quantile(0.75),
+            'max': df[col].max()
+        }
+    
+    return summary
+
+def validate_data(df, required_columns=None, numeric_columns=None):
+    """
+    Validate data quality.
+    
+    Parameters:
+    df: pandas DataFrame
+    required_columns: list of required columns
+    numeric_columns: list of columns that should be numeric
+    
+    Returns:
+    Dictionary with validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f"Missing required columns: {missing_columns}")
+    
+    if numeric_columns:
+        non_numeric = [col for col in numeric_columns if col in df.columns and not np.issubdtype(df[col].dtype, np.number)]
+        if non_numeric:
+            validation_results['warnings'].append(f"Columns expected to be numeric but aren't: {non_numeric}")
+    
+    if df.empty:
+        validation_results['is_valid'] = False
+        validation_results['errors'].append("DataFrame is empty")
+    
+    return validation_results
