@@ -117,3 +117,101 @@ if __name__ == "__main__":
         print(f"Error: File '{input_file}' not found")
     except Exception as e:
         print(f"Error during data cleaning: {str(e)}")
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_names=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing string columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        column_names (list, optional): Specific columns to clean. If None, all object columns are cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    # Remove duplicate rows
+    df_clean = df_clean.drop_duplicates()
+    
+    # Identify columns to clean
+    if column_names is None:
+        # Clean all object (string) columns
+        string_columns = df_clean.select_dtypes(include=['object']).columns
+    else:
+        # Clean only specified columns
+        string_columns = [col for col in column_names if col in df_clean.columns]
+    
+    # Normalize string columns
+    for col in string_columns:
+        if df_clean[col].dtype == 'object':
+            df_clean[col] = df_clean[col].apply(
+                lambda x: re.sub(r'\s+', ' ', str(x).strip().lower()) if pd.notnull(x) else x
+            )
+    
+    # Reset index after cleaning
+    df_clean = df_clean.reset_index(drop=True)
+    
+    return df_clean
+
+def validate_email_column(df, email_column):
+    """
+    Validate email addresses in a specified column.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        email_column (str): Name of the column containing email addresses.
+    
+    Returns:
+        pd.DataFrame: DataFrame with additional validation columns.
+    """
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+    
+    df_valid = df.copy()
+    
+    # Basic email validation regex
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    
+    df_valid['email_valid'] = df_valid[email_column].apply(
+        lambda x: bool(re.match(email_pattern, str(x))) if pd.notnull(x) else False
+    )
+    
+    df_valid['email_domain'] = df_valid[email_column].apply(
+        lambda x: str(x).split('@')[-1] if pd.notnull(x) and '@' in str(x) else None
+    )
+    
+    return df_valid
+
+# Example usage function
+def demonstrate_cleaning():
+    """Demonstrate the data cleaning functions."""
+    # Create sample data
+    sample_data = {
+        'name': ['John Doe', 'Jane Smith', 'john doe', 'Bob Johnson', 'Jane Smith'],
+        'email': ['john@example.com', 'jane@test.org', 'invalid-email', 'bob@company.net', 'jane@test.org'],
+        'age': [25, 30, 25, 35, 30]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    # Clean the data
+    df_clean = clean_dataframe(df)
+    print("Cleaned DataFrame:")
+    print(df_clean)
+    print("\n")
+    
+    # Validate emails
+    df_validated = validate_email_column(df_clean, 'email')
+    print("DataFrame with email validation:")
+    print(df_validated)
+    
+    return df_validated
+
+if __name__ == "__main__":
+    demonstrate_cleaning()
