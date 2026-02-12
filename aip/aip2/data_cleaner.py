@@ -177,3 +177,68 @@ if __name__ == "__main__":
     print("\nBasic statistics:")
     for key, value in stats.items():
         print(f"{key}: {value}")
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        for column in cleaned_df.columns:
+            if cleaned_df[column].dtype in ['int64', 'float64']:
+                cleaned_df[column] = cleaned_df[column].fillna(cleaned_df[column].median())
+            elif cleaned_df[column].dtype == 'object':
+                cleaned_df[column] = cleaned_df[column].fillna(cleaned_df[column].mode()[0] if not cleaned_df[column].mode().empty else 'Unknown')
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    return True
+
+def process_data_file(file_path, output_path=None):
+    """
+    Process a CSV file through cleaning pipeline.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        cleaned_df = clean_dataframe(df)
+        
+        if validate_dataframe(cleaned_df):
+            if output_path:
+                cleaned_df.to_csv(output_path, index=False)
+                print(f"Cleaned data saved to: {output_path}")
+            return cleaned_df
+    except Exception as e:
+        print(f"Error processing file: {e}")
+        return None
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'id': [1, 2, 2, 3, 4],
+        'value': [10.5, None, 15.2, 20.1, None],
+        'category': ['A', 'B', 'B', None, 'C']
+    })
+    
+    print("Original DataFrame:")
+    print(sample_data)
+    
+    cleaned = clean_dataframe(sample_data)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
