@@ -337,3 +337,161 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataset(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation: {is_valid}, Message: {message}")
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+def remove_duplicates(
+    data: pd.DataFrame,
+    subset: Optional[List[str]] = None,
+    keep: str = 'first',
+    reset_index: bool = True
+) -> pd.DataFrame:
+    """
+    Remove duplicate rows from a DataFrame with configurable options.
+    
+    Parameters:
+    -----------
+    data : pd.DataFrame
+        Input DataFrame containing potential duplicates
+    subset : list, optional
+        Column names to consider for identifying duplicates
+    keep : {'first', 'last', False}
+        Which duplicates to keep
+    reset_index : bool
+        Whether to reset the DataFrame index after removal
+        
+    Returns:
+    --------
+    pd.DataFrame
+        DataFrame with duplicates removed
+    """
+    if data.empty:
+        return data
+    
+    cleaned_data = data.drop_duplicates(subset=subset, keep=keep)
+    
+    if reset_index:
+        cleaned_data = cleaned_data.reset_index(drop=True)
+    
+    return cleaned_data
+
+def find_duplicate_indices(
+    data: pd.DataFrame,
+    subset: Optional[List[str]] = None
+) -> pd.Index:
+    """
+    Find indices of duplicate rows in a DataFrame.
+    
+    Parameters:
+    -----------
+    data : pd.DataFrame
+        Input DataFrame to check for duplicates
+    subset : list, optional
+        Column names to consider for identifying duplicates
+        
+    Returns:
+    --------
+    pd.Index
+        Indices of duplicate rows
+    """
+    if data.empty:
+        return pd.Index([])
+    
+    duplicates = data.duplicated(subset=subset, keep=False)
+    return data.index[duplicates]
+
+def clean_numeric_outliers(
+    data: pd.DataFrame,
+    column: str,
+    method: str = 'iqr',
+    threshold: float = 1.5
+) -> pd.DataFrame:
+    """
+    Remove outliers from a numeric column using specified method.
+    
+    Parameters:
+    -----------
+    data : pd.DataFrame
+        Input DataFrame
+    column : str
+        Column name to clean
+    method : {'iqr', 'zscore'}
+        Method for outlier detection
+    threshold : float
+        Threshold for outlier detection
+        
+    Returns:
+    --------
+    pd.DataFrame
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if method == 'iqr':
+        Q1 = data[column].quantile(0.25)
+        Q3 = data[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        mask = (data[column] >= lower_bound) & (data[column] <= upper_bound)
+    
+    elif method == 'zscore':
+        mean = data[column].mean()
+        std = data[column].std()
+        z_scores = np.abs((data[column] - mean) / std)
+        mask = z_scores <= threshold
+    
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+    
+    return data[mask].copy()
+
+def validate_dataframe(
+    data: pd.DataFrame,
+    required_columns: List[str]
+) -> bool:
+    """
+    Validate that DataFrame contains all required columns.
+    
+    Parameters:
+    -----------
+    data : pd.DataFrame
+        DataFrame to validate
+    required_columns : list
+        List of column names that must be present
+        
+    Returns:
+    --------
+    bool
+        True if all required columns are present
+    """
+    missing_columns = [col for col in required_columns if col not in data.columns]
+    
+    if missing_columns:
+        print(f"Missing columns: {missing_columns}")
+        return False
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = pd.DataFrame({
+        'id': [1, 2, 3, 2, 4, 1],
+        'name': ['Alice', 'Bob', 'Charlie', 'Bob', 'David', 'Alice'],
+        'value': [10, 20, 30, 20, 40, 10],
+        'score': [100, 200, 300, 250, 400, 150]
+    })
+    
+    print("Original data:")
+    print(sample_data)
+    print("\nAfter removing duplicates:")
+    cleaned = remove_duplicates(sample_data, subset=['id', 'name'])
+    print(cleaned)
+    
+    print("\nDuplicate indices:")
+    print(find_duplicate_indices(sample_data, subset=['id']))
+    
+    print("\nData validation:")
+    print(validate_dataframe(sample_data, ['id', 'name', 'value']))
