@@ -182,4 +182,80 @@ def validate_dataframe(df, required_columns=None):
     if null_counts.sum() > 0:
         print(f"Warning: DataFrame contains {null_counts.sum()} null values")
     
+    return Trueimport pandas as pd
+
+def clean_dataset(df, remove_duplicates=True, fill_missing=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    remove_duplicates (bool): If True, remove duplicate rows
+    fill_missing (str or dict): Method to fill missing values:
+        - 'mean': Fill with column mean (numeric only)
+        - 'median': Fill with column median (numeric only)
+        - 'mode': Fill with most frequent value
+        - dict: Column-specific fill values
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if remove_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_missing is not None:
+        if cleaned_df.isnull().sum().sum() > 0:
+            if fill_missing == 'mean':
+                cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+            elif fill_missing == 'median':
+                cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+            elif fill_missing == 'mode':
+                cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
+            elif isinstance(fill_missing, dict):
+                cleaned_df = cleaned_df.fillna(fill_missing)
+            else:
+                raise ValueError("Invalid fill_missing method")
+            print("Missing values filled")
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None, min_rows=1):
+    """
+    Validate dataset structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    bool: True if validation passes
+    """
+    if len(df) < min_rows:
+        raise ValueError(f"Dataset must have at least {min_rows} rows")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
     return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, None, 5],
+        'B': [10, 20, 20, 40, None],
+        'C': ['x', 'y', 'y', 'z', 'x']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original dataset:")
+    print(df)
+    print("\nCleaned dataset (remove duplicates, fill with mean):")
+    cleaned = clean_dataset(df, remove_duplicates=True, fill_missing='mean')
+    print(cleaned)
