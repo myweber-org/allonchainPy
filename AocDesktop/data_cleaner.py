@@ -174,3 +174,82 @@ if __name__ == "__main__":
     print(f"\nCleaned shape: {cleaned_df.shape}")
     print("\nCleaned DataFrame:")
     print(cleaned_df)
+import pandas as pd
+import re
+
+def clean_dataframe(df, text_columns=None, drop_duplicates=True, lowercase=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and standardizing text columns.
+    
+    Args:
+        df: pandas DataFrame to clean
+        text_columns: list of column names to apply text standardization
+        drop_duplicates: whether to remove duplicate rows
+        lowercase: whether to convert text to lowercase
+        
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    df_clean = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(df_clean)
+        df_clean = df_clean.drop_duplicates()
+        removed = initial_rows - len(df_clean)
+        print(f"Removed {removed} duplicate rows")
+    
+    if text_columns:
+        for col in text_columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].astype(str)
+                
+                if lowercase:
+                    df_clean[col] = df_clean[col].str.lower()
+                
+                df_clean[col] = df_clean[col].apply(
+                    lambda x: re.sub(r'\s+', ' ', x.strip())
+                )
+    
+    return df_clean
+
+def validate_email(email):
+    """
+    Validate email format using regex pattern.
+    
+    Args:
+        email: string to validate as email
+        
+    Returns:
+        Boolean indicating if email is valid
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email)))
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers from a DataFrame column using IQR method.
+    
+    Args:
+        df: pandas DataFrame
+        column: column name to process
+        multiplier: IQR multiplier for outlier detection
+        
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = df[column].quantile(0.25)
+    q3 = df[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    removed = len(df) - len(filtered_df)
+    print(f"Removed {removed} outliers from column '{column}'")
+    
+    return filtered_df
