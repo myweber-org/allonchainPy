@@ -204,4 +204,58 @@ def validate_data(data, required_columns=None, check_missing=True, check_duplica
         if duplicate_count > 0:
             validation_report['duplicate_rows'] = duplicate_count
     
-    return validation_report
+    return validation_reportimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns):
+    """
+    Remove outliers from specified columns using IQR method.
+    """
+    df_clean = df.copy()
+    for col in columns:
+        Q1 = df_clean[col].quantile(0.25)
+        Q3 = df_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean
+
+def normalize_minmax(df, columns):
+    """
+    Normalize specified columns using min-max scaling.
+    """
+    df_norm = df.copy()
+    for col in columns:
+        min_val = df_norm[col].min()
+        max_val = df_norm[col].max()
+        df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+    return df_norm
+
+def standardize_zscore(df, columns):
+    """
+    Standardize specified columns using z-score method.
+    """
+    df_std = df.copy()
+    for col in columns:
+        df_std[col] = stats.zscore(df_std[col])
+    return df_std
+
+def handle_missing_mean(df, columns):
+    """
+    Fill missing values in specified columns with column mean.
+    """
+    df_filled = df.copy()
+    for col in columns:
+        mean_val = df_filled[col].mean()
+        df_filled[col].fillna(mean_val, inplace=True)
+    return df_filled
+
+def clean_dataset(df, numeric_columns):
+    """
+    Apply a complete cleaning pipeline: remove outliers and normalize.
+    """
+    df_clean = remove_outliers_iqr(df, numeric_columns)
+    df_clean = normalize_minmax(df_clean, numeric_columns)
+    return df_clean
