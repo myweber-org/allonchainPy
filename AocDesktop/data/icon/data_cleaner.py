@@ -268,3 +268,21 @@ def get_summary_statistics(df):
             'missing': df[col].isnull().sum()
         }
     return pd.DataFrame(summary).T
+import re
+
+def clean_string(text):
+    if not isinstance(text, str):
+        return ""
+    
+    cleaned = text.strip()
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+    cleaned = cleaned.lower()
+    
+    return cleaned
+
+def normalize_whitespace(text):
+    return re.sub(r'\s+', ' ', text.strip())
+
+def remove_special_chars(text, keep_chars=""):
+    pattern = f"[^a-zA-Z0-9\\s{re.escape(keep_chars)}]"
+    return re.sub(pattern, '', text)
