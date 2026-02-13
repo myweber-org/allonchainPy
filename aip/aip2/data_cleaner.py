@@ -281,3 +281,56 @@ if __name__ == "__main__":
     input_path = "raw_data.csv"
     output_path = "cleaned_data.csv"
     clean_dataset(input_path, output_path)
+import pandas as pd
+import re
+
+def clean_text_column(series):
+    """Normalize text: lowercase, strip whitespace, remove extra spaces."""
+    return series.str.lower().str.strip().replace(r'\s+', ' ', regex=True)
+
+def remove_duplicates(df, subset=None):
+    """Remove duplicate rows from DataFrame."""
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def clean_dataframe(df, text_columns=None, deduplicate_subset=None):
+    """Main cleaning function."""
+    df_clean = df.copy()
+    
+    if text_columns:
+        for col in text_columns:
+            if col in df_clean.columns:
+                df_clean[col] = clean_text_column(df_clean[col])
+    
+    if deduplicate_subset:
+        df_clean = remove_duplicates(df_clean, subset=deduplicate_subset)
+    
+    return df_clean
+
+def save_cleaned_data(df, input_path, suffix='_cleaned'):
+    """Save cleaned DataFrame with modified filename."""
+    from pathlib import Path
+    path = Path(input_path)
+    output_path = path.parent / f"{path.stem}{suffix}{path.suffix}"
+    df.to_csv(output_path, index=False)
+    return output_path
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) != 2:
+        print("Usage: python data_cleaner.py <input_csv>")
+        sys.exit(1)
+    
+    input_file = sys.argv[1]
+    try:
+        df = pd.read_csv(input_file)
+        df_clean = clean_dataframe(
+            df, 
+            text_columns=['name', 'description'], 
+            deduplicate_subset=['id', 'email']
+        )
+        output_file = save_cleaned_data(df_clean, input_file)
+        print(f"Cleaned data saved to: {output_file}")
+        print(f"Original rows: {len(df)}, Cleaned rows: {len(df_clean)}")
+    except Exception as e:
+        print(f"Error processing file: {e}")
+        sys.exit(1)
