@@ -1,15 +1,25 @@
 
-def remove_duplicates_preserve_order(iterable):
-    seen = set()
-    result = []
-    for item in iterable:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def clean_dataset(input_file, output_file):
+    df = pd.read_csv(input_file)
+    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_columns:
+        df = remove_outliers_iqr(df, col)
+    
+    df.to_csv(output_file, index=False)
+    print(f"Cleaned data saved to {output_file}")
+    print(f"Original rows: {len(pd.read_csv(input_file))}, Cleaned rows: {len(df)}")
 
 if __name__ == "__main__":
-    sample_list = [1, 2, 2, 3, 4, 4, 5, 1, 6]
-    cleaned_list = remove_duplicates_preserve_order(sample_list)
-    print(f"Original list: {sample_list}")
-    print(f"Cleaned list: {cleaned_list}")
+    clean_dataset("raw_data.csv", "cleaned_data.csv")
