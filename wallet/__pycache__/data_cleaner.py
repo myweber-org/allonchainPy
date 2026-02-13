@@ -89,4 +89,86 @@ if __name__ == "__main__":
     stats = calculate_summary_statistics(cleaned_df, 'values')
     print("\nSummary statistics:")
     for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+        print(f"{key}: {value:.2f}")import pandas as pd
+
+def clean_dataset(df, columns_to_check=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    # Create a copy to avoid modifying the original DataFrame
+    df_clean = df.copy()
+    
+    # Remove duplicate rows
+    initial_rows = df_clean.shape[0]
+    df_clean.drop_duplicates(inplace=True)
+    removed_duplicates = initial_rows - df_clean.shape[0]
+    
+    # Handle missing values
+    # If columns_to_check is not provided, use all columns
+    if columns_to_check is None:
+        columns_to_check = df_clean.columns
+    
+    missing_summary = {}
+    for column in columns_to_check:
+        if column in df_clean.columns:
+            missing_count = df_clean[column].isnull().sum()
+            if missing_count > 0:
+                # For numeric columns, fill with median
+                if pd.api.types.is_numeric_dtype(df_clean[column]):
+                    median_val = df_clean[column].median()
+                    df_clean[column].fillna(median_val, inplace=True)
+                    missing_summary[column] = f'filled with median: {median_val}'
+                # For categorical columns, fill with mode
+                else:
+                    mode_val = df_clean[column].mode()[0] if not df_clean[column].mode().empty else 'Unknown'
+                    df_clean[column].fillna(mode_val, inplace=True)
+                    missing_summary[column] = f'filled with mode: {mode_val}'
+    
+    # Print cleaning summary
+    print(f"Data cleaning completed:")
+    print(f"  - Removed {removed_duplicates} duplicate rows")
+    print(f"  - Initial shape: {df.shape}")
+    print(f"  - Cleaned shape: {df_clean.shape}")
+    
+    if missing_summary:
+        print("  - Missing values handled:")
+        for col, action in missing_summary.items():
+            print(f"    * {col}: {action}")
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate that the DataFrame meets basic requirements.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     # Create sample data
+#     data = {
+#         'id': [1, 2, 2, 3, 4, 5],
+#         'name': ['Alice', 'Bob', 'Bob', None, 'Eve', None],
+#         'age': [25, 30, 30, None, 35, 40],
+#         'score': [85.5, 90.0, 90.0, 78.5, None, 92.0]
+#     }
+#     
+#     df = pd.DataFrame(data)
+#     print("Original DataFrame:")
+#     print(df)
+#     print("\n" + "="*50 + "\n")
+#     
+#     cleaned_df = clean_dataset(df)
+#     print("\nCleaned DataFrame:")
+#     print(cleaned_df)
