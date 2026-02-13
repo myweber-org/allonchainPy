@@ -465,4 +465,65 @@ def validate_dataframe(data, required_columns=None, min_rows=1):
         if missing_cols:
             raise ValueError(f"Missing required columns: {missing_cols}")
     
-    return True
+    return Trueimport pandas as pd
+import numpy as np
+import argparse
+import sys
+
+def clean_csv(input_file, output_file):
+    try:
+        df = pd.read_csv(input_file)
+        
+        print(f"Original shape: {df.shape}")
+        
+        df = df.drop_duplicates()
+        
+        df = df.replace(['', 'NA', 'N/A', 'null', 'NULL'], np.nan)
+        
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_columns:
+            if df[col].isnull().sum() > 0:
+                df[col] = df[col].fillna(df[col].median())
+        
+        categorical_columns = df.select_dtypes(include=['object']).columns
+        for col in categorical_columns:
+            if df[col].isnull().sum() > 0:
+                df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+        
+        df = df.dropna(thresh=len(df.columns) * 0.7)
+        
+        print(f"Cleaned shape: {df.shape}")
+        
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to: {output_file}")
+        
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return False
+    except pd.errors.EmptyDataError:
+        print("Error: Input file is empty.")
+        return False
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+        return False
+
+def main():
+    parser = argparse.ArgumentParser(description='Clean CSV data file')
+    parser.add_argument('input', help='Input CSV file path')
+    parser.add_argument('output', help='Output CSV file path')
+    
+    args = parser.parse_args()
+    
+    success = clean_csv(args.input, args.output)
+    
+    if success:
+        print("Data cleaning completed successfully.")
+        sys.exit(0)
+    else:
+        print("Data cleaning failed.")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
