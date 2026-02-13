@@ -962,3 +962,110 @@ def save_cleaned_data(df, output_path, format='csv'):
         df.to_excel(output_path, index=False)
     elif format == 'json':
         df.to_json(output_path, orient='records')
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+class DataCleaner:
+    def __init__(self, file_path):
+        self.file_path = Path(file_path)
+        self.df = None
+        
+    def load_data(self):
+        if self.file_path.exists():
+            self.df = pd.read_csv(self.file_path)
+            return True
+        return False
+    
+    def check_missing_values(self):
+        if self.df is not None:
+            missing = self.df.isnull().sum()
+            return missing[missing > 0]
+        return pd.Series()
+    
+    def fill_missing_numeric(self, strategy='mean'):
+        if self.df is not None:
+            numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+            for col in numeric_cols:
+                if self.df[col].isnull().any():
+                    if strategy == 'mean':
+                        fill_value = self.df[col].mean()
+                    elif strategy == 'median':
+                        fill_value = self.df[col].median()
+                    else:
+                        fill_value = 0
+                    self.df[col].fillna(fill_value, inplace=True)
+    
+    def fill_missing_categorical(self, strategy='mode'):
+        if self.df is not None:
+            cat_cols = self.df.select_dtypes(include=['object']).columns
+            for col in cat_cols:
+                if self.df[col].isnull().any():
+                    if strategy == 'mode':
+                        fill_value = self.df[col].mode()[0] if not self.df[col].mode().empty else 'Unknown'
+                    else:
+                        fill_value = 'Unknown'
+                    self.df[col].fillna(fill_value, inplace=True)
+    
+    def drop_duplicates(self):
+        if self.df is not None:
+            initial_rows = len(self.df)
+            self.df.drop_duplicates(inplace=True)
+            return initial_rows - len(self.df)
+        return 0
+    
+    def save_cleaned_data(self, output_path):
+        if self.df is not None:
+            output_path = Path(output_path)
+            self.df.to_csv(output_path, index=False)
+            return True
+        return False
+    
+    def get_summary(self):
+        if self.df is not None:
+            summary = {
+                'total_rows': len(self.df),
+                'total_columns': len(self.df.columns),
+                'numeric_columns': list(self.df.select_dtypes(include=[np.number]).columns),
+                'categorical_columns': list(self.df.select_dtypes(include=['object']).columns),
+                'missing_values': self.check_missing_values().to_dict()
+            }
+            return summary
+        return {}
+
+def process_csv_file(input_file, output_file):
+    cleaner = DataCleaner(input_file)
+    
+    if not cleaner.load_data():
+        print(f"Error: File {input_file} not found")
+        return False
+    
+    print("Initial data summary:")
+    print(cleaner.get_summary())
+    
+    cleaner.fill_missing_numeric('mean')
+    cleaner.fill_missing_categorical('mode')
+    
+    duplicates_removed = cleaner.drop_duplicates()
+    print(f"Removed {duplicates_removed} duplicate rows")
+    
+    if cleaner.save_cleaned_data(output_file):
+        print(f"Cleaned data saved to {output_file}")
+        print("Final data summary:")
+        print(cleaner.get_summary())
+        return True
+    
+    return False
+
+if __name__ == "__main__":
+    import sys
+    
+    if len(sys.argv) != 3:
+        print("Usage: python data_cleaner.py <input_file> <output_file>")
+        sys.exit(1)
+    
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    
+    success = process_csv_file(input_file, output_file)
+    sys.exit(0 if success else 1)
