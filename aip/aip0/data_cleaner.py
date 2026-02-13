@@ -112,4 +112,64 @@ if __name__ == "__main__":
     
     cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='median')
     print("\nCleaned DataFrame:")
-    print(cleaned)
+    print(cleaned)import pandas as pd
+
+def clean_dataset(df, drop_na=True, rename_columns=True):
+    """
+    Clean a pandas DataFrame by removing null values and standardizing column names.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    drop_na (bool): Whether to drop rows with null values
+    rename_columns (bool): Whether to rename columns to lowercase with underscores
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_na:
+        cleaned_df = cleaned_df.dropna()
+    
+    if rename_columns:
+        cleaned_df.columns = [col.lower().replace(' ', '_') for col in cleaned_df.columns]
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate that a DataFrame meets basic requirements.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of column names that must be present
+    
+    Returns:
+    bool: True if validation passes, False otherwise
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    
+    if df.empty:
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False
+    
+    return True
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    subset (list): Columns to consider for identifying duplicates
+    keep (str): Which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+    pd.DataFrame: DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
