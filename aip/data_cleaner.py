@@ -864,3 +864,11 @@ if __name__ == "__main__":
     cleaned_data = clean_dataset(sample_data, ['feature1', 'feature2'])
     print("Cleaned dataset shape:", cleaned_data.shape)
     print("Cleaned dataset columns:", cleaned_data.columns.tolist())
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
