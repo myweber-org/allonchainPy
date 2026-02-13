@@ -745,4 +745,118 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B', 'C'], min_rows=3)
-    print(f"\nData validation passed: {is_valid}")
+    print(f"\nData validation passed: {is_valid}")import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, output_path=None, missing_strategy='mean'):
+    """
+    Clean CSV data by handling missing values and removing duplicates.
+    
+    Args:
+        file_path: Path to input CSV file
+        output_path: Path for cleaned output CSV (optional)
+        missing_strategy: Strategy for handling missing values ('mean', 'median', 'drop', 'zero')
+    
+    Returns:
+        pandas.DataFrame: Cleaned dataframe
+    """
+    
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Loaded data with shape: {df.shape}")
+        
+        # Remove duplicate rows
+        initial_rows = len(df)
+        df = df.drop_duplicates()
+        removed_duplicates = initial_rows - len(df)
+        print(f"Removed {removed_duplicates} duplicate rows")
+        
+        # Handle missing values
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        
+        if missing_strategy == 'mean':
+            for col in numeric_cols:
+                if df[col].isnull().any():
+                    df[col].fillna(df[col].mean(), inplace=True)
+        elif missing_strategy == 'median':
+            for col in numeric_cols:
+                if df[col].isnull().any():
+                    df[col].fillna(df[col].median(), inplace=True)
+        elif missing_strategy == 'zero':
+            df.fillna(0, inplace=True)
+        elif missing_strategy == 'drop':
+            df.dropna(inplace=True)
+        
+        # Remove outliers using IQR method for numeric columns
+        for col in numeric_cols:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            # Cap outliers instead of removing them
+            df[col] = df[col].clip(lower=lower_bound, upper=upper_bound)
+        
+        # Standardize column names
+        df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+        
+        print(f"Final data shape: {df.shape}")
+        print(f"Missing values after cleaning: {df.isnull().sum().sum()}")
+        
+        if output_path:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    
+    Args:
+        df: pandas.DataFrame to validate
+        required_columns: List of required column names
+    
+    Returns:
+        bool: True if validation passes
+    """
+    if df is None or df.empty:
+        print("Error: Dataframe is empty or None")
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Error: Missing required columns: {missing_cols}")
+            return False
+    
+    # Check for infinite values
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    inf_count = np.isinf(df[numeric_cols]).sum().sum()
+    if inf_count > 0:
+        print(f"Warning: Found {inf_count} infinite values")
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    cleaned_data = clean_csv_data(
+        file_path='raw_data.csv',
+        output_path='cleaned_data.csv',
+        missing_strategy='mean'
+    )
+    
+    if cleaned_data is not None:
+        is_valid = validate_dataframe(cleaned_data)
+        if is_valid:
+            print("Data cleaning completed successfully")
+        else:
+            print("Data validation failed")
