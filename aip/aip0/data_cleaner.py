@@ -618,3 +618,54 @@ def normalize_column(df, column):
         normalized_df[column] = (normalized_df[column] - min_val) / (max_val - min_val)
     
     return normalized_df
+import pandas as pd
+import numpy as np
+
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    elif method == 'zscore':
+        from scipy import stats
+        z_scores = np.abs(stats.zscore(df[column]))
+        return df[z_scores < threshold]
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+
+def normalize_column(df, column, method='minmax'):
+    if method == 'minmax':
+        min_val = df[column].min()
+        max_val = df[column].max()
+        df[column] = (df[column] - min_val) / (max_val - min_val)
+    elif method == 'standard':
+        mean_val = df[column].mean()
+        std_val = df[column].std()
+        df[column] = (df[column] - mean_val) / std_val
+    else:
+        raise ValueError("Method must be 'minmax' or 'standard'")
+    return df
+
+def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize_method='minmax'):
+    cleaned_df = df.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers(cleaned_df, col, method=outlier_method)
+            cleaned_df = normalize_column(cleaned_df, col, method=normalize_method)
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature1': np.random.normal(100, 15, 1000),
+        'feature2': np.random.exponential(50, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    })
+    
+    numeric_cols = ['feature1', 'feature2']
+    cleaned_data = clean_dataset(sample_data, numeric_cols)
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned_data.shape}")
+    print(f"Removed {len(sample_data) - len(cleaned_data)} outliers")
