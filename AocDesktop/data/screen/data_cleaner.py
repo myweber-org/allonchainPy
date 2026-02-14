@@ -673,3 +673,78 @@ def validate_cleaning(dataframe, original_dataframe, numeric_columns):
                 'removed_percentage': (len(original_dataframe) - len(dataframe)) / len(original_dataframe) * 100
             }
     return pd.DataFrame.from_dict(report, orient='index')
+import pandas as pd
+
+def clean_dataset(df, column_mapping=None, drop_duplicates=True):
+    """
+    Clean a pandas DataFrame by standardizing column names and removing duplicates.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        column_mapping (dict): Optional dictionary mapping old column names to new ones.
+        drop_duplicates (bool): Whether to remove duplicate rows.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Standardize column names
+    if column_mapping:
+        cleaned_df.rename(columns=column_mapping, inplace=True)
+    
+    # Convert column names to lowercase and replace spaces with underscores
+    cleaned_df.columns = cleaned_df.columns.str.lower().str.replace(' ', '_')
+    
+    # Remove duplicate rows if specified
+    if drop_duplicates:
+        cleaned_df.drop_duplicates(inplace=True)
+    
+    # Reset index after cleaning
+    cleaned_df.reset_index(drop=True, inplace=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate that a DataFrame meets basic requirements.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'Product Name': ['A', 'B', 'A', 'C', 'B'],
+        'Price': [100, 200, 100, 300, 200],
+        'Quantity': [5, 3, 5, 2, 3]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nShape:", df.shape)
+    
+    # Clean the DataFrame
+    cleaned = clean_dataset(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    print("\nShape after cleaning:", cleaned.shape)
+    
+    # Validate the cleaned DataFrame
+    is_valid, message = validate_dataframe(cleaned, ['product_name', 'price'])
+    print(f"\nValidation: {is_valid} - {message}")
