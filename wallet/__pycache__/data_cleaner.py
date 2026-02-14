@@ -174,3 +174,200 @@ if __name__ == "__main__":
     cleaned = clean_dataset(df)
     print(cleaned)
     print(f"\nData validation: {validate_data(cleaned)}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers from a DataFrame column using IQR method.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: column name to process
+        threshold: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df
+
+def zscore_normalize(dataframe, columns=None):
+    """
+    Normalize specified columns using z-score normalization.
+    
+    Args:
+        dataframe: pandas DataFrame
+        columns: list of column names to normalize (default: all numeric columns)
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    normalized_df = dataframe.copy()
+    
+    for col in columns:
+        if col in normalized_df.columns and pd.api.types.is_numeric_dtype(normalized_df[col]):
+            mean_val = normalized_df[col].mean()
+            std_val = normalized_df[col].std()
+            
+            if std_val > 0:
+                normalized_df[col] = (normalized_df[col] - mean_val) / std_val
+            else:
+                normalized_df[col] = 0
+    
+    return normalized_df
+
+def minmax_normalize(dataframe, columns=None, feature_range=(0, 1)):
+    """
+    Normalize specified columns using min-max normalization.
+    
+    Args:
+        dataframe: pandas DataFrame
+        columns: list of column names to normalize
+        feature_range: tuple of (min, max) for output range
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    normalized_df = dataframe.copy()
+    min_val, max_val = feature_range
+    
+    for col in columns:
+        if col in normalized_df.columns and pd.api.types.is_numeric_dtype(normalized_df[col]):
+            col_min = normalized_df[col].min()
+            col_max = normalized_df[col].max()
+            col_range = col_max - col_min
+            
+            if col_range > 0:
+                normalized_df[col] = ((normalized_df[col] - col_min) / col_range) * (max_val - min_val) + min_val
+            else:
+                normalized_df[col] = min_val
+    
+    return normalized_df
+
+def detect_skewed_columns(dataframe, threshold=0.5):
+    """
+    Detect columns with significant skewness.
+    
+    Args:
+        dataframe: pandas DataFrame
+        threshold: absolute skewness threshold (default 0.5)
+    
+    Returns:
+        Dictionary of column names and their skewness values
+    """
+    skewed_cols = {}
+    
+    for col in dataframe.select_dtypes(include=[np.number]).columns:
+        skewness = dataframe[col].skew()
+        if abs(skewness) > threshold:
+            skewed_cols[col] = skewness
+    
+    return skewed_cols
+
+def log_transform(dataframe, columns):
+    """
+    Apply log transformation to specified columns.
+    
+    Args:
+        dataframe: pandas DataFrame
+        columns: list of column names to transform
+    
+    Returns:
+        DataFrame with transformed columns
+    """
+    transformed_df = dataframe.copy()
+    
+    for col in columns:
+        if col in transformed_df.columns and pd.api.types.is_numeric_dtype(transformed_df[col]):
+            # Add small constant to handle zero values
+            min_val = transformed_df[col].min()
+            if min_val <= 0:
+                constant = abs(min_val) + 1
+                transformed_df[col] = np.log(transformed_df[col] + constant)
+            else:
+                transformed_df[col] = np.log(transformed_df[col])
+    
+    return transformed_df
+
+def clean_dataset(dataframe, outlier_columns=None, normalize_method='zscore', 
+                  normalize_columns=None, handle_skewness=True):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        dataframe: pandas DataFrame
+        outlier_columns: columns to remove outliers from
+        normalize_method: 'zscore', 'minmax', or None
+        normalize_columns: columns to normalize
+        handle_skewness: whether to apply log transform to skewed columns
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = dataframe.copy()
+    
+    # Remove outliers
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in cleaned_df.columns:
+                cleaned_df = remove_outliers_iqr(cleaned_df, col)
+    
+    # Handle skewness
+    if handle_skewness:
+        skewed_cols = detect_skewed_columns(cleaned_df)
+        if skewed_cols:
+            skewed_cols_list = list(skewed_cols.keys())
+            cleaned_df = log_transform(cleaned_df, skewed_cols_list)
+    
+    # Normalize
+    if normalize_method == 'zscore':
+        cleaned_df = zscore_normalize(cleaned_df, normalize_columns)
+    elif normalize_method == 'minmax':
+        cleaned_df = minmax_normalize(cleaned_df, normalize_columns)
+    
+    return cleaned_df
+
+def validate_dataframe(dataframe, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        dataframe: pandas DataFrame to validate
+        required_columns: list of required column names
+        min_rows: minimum number of rows required
+    
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if len(dataframe) < min_rows:
+        return False, f"DataFrame must have at least {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in dataframe.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
