@@ -560,4 +560,53 @@ if __name__ == "__main__":
         is_valid = validate_dataframe(cleaned, required_columns=['id', 'value'])
         print(f"Data validation result: {is_valid}")
         print("\nCleaned data preview:")
-        print(cleaned.head())
+        print(cleaned.head())import re
+from typing import Optional
+
+def normalize_whitespace(text: str) -> str:
+    """
+    Replace multiple whitespace characters with a single space.
+    """
+    return re.sub(r'\s+', ' ', text).strip()
+
+def remove_special_characters(text: str, keep_chars: Optional[str] = None) -> str:
+    """
+    Remove special characters from text.
+    If keep_chars is provided, only those characters will be preserved.
+    """
+    if keep_chars:
+        pattern = f'[^{re.escape(keep_chars)}a-zA-Z0-9\s]'
+    else:
+        pattern = r'[^a-zA-Z0-9\s]'
+    return re.sub(pattern, '', text)
+
+def clean_text(text: str, 
+               normalize: bool = True, 
+               remove_special: bool = True,
+               keep_chars: Optional[str] = None) -> str:
+    """
+    Main function to clean text with multiple options.
+    """
+    cleaned = text
+    
+    if remove_special:
+        cleaned = remove_special_characters(cleaned, keep_chars)
+    
+    if normalize:
+        cleaned = normalize_whitespace(cleaned)
+    
+    return cleaned
+
+def truncate_text(text: str, max_length: int, suffix: str = "...") -> str:
+    """
+    Truncate text to maximum length, adding suffix if truncated.
+    """
+    if len(text) <= max_length:
+        return text
+    return text[:max_length - len(suffix)] + suffix
+
+if __name__ == "__main__":
+    sample_text = "  Hello   World!  This  is  a  test...  "
+    print(f"Original: '{sample_text}'")
+    print(f"Cleaned: '{clean_text(sample_text)}'")
+    print(f"Truncated: '{truncate_text(clean_text(sample_text), 15)}'")
