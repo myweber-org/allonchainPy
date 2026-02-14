@@ -108,3 +108,69 @@ if __name__ == "__main__":
     
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation: {is_valid}, Message: {message}")
+import pandas as pd
+
+def clean_dataset(df, drop_na=True, rename_columns=True):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing column names.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_na (bool): If True, drop rows with any null values.
+    rename_columns (bool): If True, rename columns to lowercase with underscores.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_na:
+        cleaned_df = cleaned_df.dropna()
+    
+    if rename_columns:
+        cleaned_df.columns = (
+            cleaned_df.columns
+            .str.lower()
+            .str.replace(' ', '_')
+            .str.replace(r'[^\w_]', '', regex=True)
+        )
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate the DataFrame for required columns and data types.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    bool: True if validation passes, False otherwise.
+    """
+    if required_columns:
+        missing_columns = set(required_columns) - set(df.columns)
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    if df.empty:
+        print("DataFrame is empty")
+        return False
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'Product Name': ['Widget A', 'Widget B', None, 'Widget C'],
+        'Price ($)': [10.99, 15.49, 12.99, None],
+        'Quantity': [100, 150, 200, 250]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned = clean_dataset(df)
+    print(cleaned)
+    print(f"\nData validation: {validate_data(cleaned)}")
