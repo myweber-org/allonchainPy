@@ -175,3 +175,11 @@ if __name__ == "__main__":
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("\nCleaned statistics for column 'A':")
     print(stats['A'])
+def deduplicate_list(original_list):
+    seen = set()
+    result = []
+    for item in original_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
