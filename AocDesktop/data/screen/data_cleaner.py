@@ -610,3 +610,66 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
     print(f"\nValidation: {is_valid} - {message}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column):
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
+
+def remove_outliers_zscore(dataframe, column, threshold=3):
+    z_scores = np.abs(stats.zscore(dataframe[column]))
+    return dataframe[z_scores < threshold]
+
+def normalize_minmax(dataframe, column):
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    if max_val == min_val:
+        return dataframe[column].apply(lambda x: 0.5)
+    return (dataframe[column] - min_val) / (max_val - min_val)
+
+def normalize_zscore(dataframe, column):
+    mean_val = dataframe[column].mean()
+    std_val = dataframe[column].std()
+    if std_val == 0:
+        return dataframe[column].apply(lambda x: 0)
+    return (dataframe[column] - mean_val) / std_val
+
+def clean_dataset(dataframe, numeric_columns, outlier_method='iqr', normalize_method='minmax'):
+    cleaned_df = dataframe.copy()
+    
+    for col in numeric_columns:
+        if col not in cleaned_df.columns:
+            continue
+            
+        if outlier_method == 'iqr':
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+        elif outlier_method == 'zscore':
+            cleaned_df = remove_outliers_zscore(cleaned_df, col)
+        
+        if normalize_method == 'minmax':
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+        elif normalize_method == 'zscore':
+            cleaned_df[col] = normalize_zscore(cleaned_df, col)
+    
+    return cleaned_df.reset_index(drop=True)
+
+def validate_cleaning(dataframe, original_dataframe, numeric_columns):
+    report = {}
+    for col in numeric_columns:
+        if col in dataframe.columns and col in original_dataframe.columns:
+            report[col] = {
+                'original_mean': original_dataframe[col].mean(),
+                'cleaned_mean': dataframe[col].mean(),
+                'original_std': original_dataframe[col].std(),
+                'cleaned_std': dataframe[col].std(),
+                'original_count': len(original_dataframe),
+                'cleaned_count': len(dataframe),
+                'removed_percentage': (len(original_dataframe) - len(dataframe)) / len(original_dataframe) * 100
+            }
+    return pd.DataFrame.from_dict(report, orient='index')
