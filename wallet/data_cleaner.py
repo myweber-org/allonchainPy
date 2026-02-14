@@ -108,3 +108,77 @@ if __name__ == "__main__":
     print("Basic statistics for cleaned data:")
     for key, value in stats.items():
         print(f"{key}: {value:.2f}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def detect_outliers_iqr(self, column):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        outliers = self.df[(self.df[column] < lower_bound) | (self.df[column] > upper_bound)]
+        return outliers
+    
+    def remove_outliers_zscore(self, column, threshold=3):
+        z_scores = np.abs(stats.zscore(self.df[column].dropna()))
+        self.df = self.df[(z_scores < threshold) | (self.df[column].isna())]
+        return self
+    
+    def normalize_column(self, column, method='minmax'):
+        if method == 'minmax':
+            min_val = self.df[column].min()
+            max_val = self.df[column].max()
+            self.df[column] = (self.df[column] - min_val) / (max_val - min_val)
+        elif method == 'zscore':
+            mean_val = self.df[column].mean()
+            std_val = self.df[column].std()
+            self.df[column] = (self.df[column] - mean_val) / std_val
+        return self
+    
+    def fill_missing(self, column, strategy='mean'):
+        if strategy == 'mean':
+            fill_value = self.df[column].mean()
+        elif strategy == 'median':
+            fill_value = self.df[column].median()
+        elif strategy == 'mode':
+            fill_value = self.df[column].mode()[0]
+        else:
+            fill_value = strategy
+            
+        self.df[column].fillna(fill_value, inplace=True)
+        return self
+    
+    def get_cleaned_data(self):
+        print(f"Original shape: {self.original_shape}")
+        print(f"Cleaned shape: {self.df.shape}")
+        print(f"Rows removed: {self.original_shape[0] - self.df.shape[0]}")
+        return self.df
+    
+    def summary(self):
+        summary_stats = self.df.describe()
+        missing_values = self.df.isnull().sum()
+        return {
+            'summary': summary_stats,
+            'missing_values': missing_values
+        }
+
+def clean_dataset(df, config):
+    cleaner = DataCleaner(df)
+    
+    for column in config.get('outlier_columns', []):
+        cleaner.remove_outliers_zscore(column, threshold=config.get('zscore_threshold', 3))
+    
+    for column, method in config.get('normalize_columns', {}).items():
+        cleaner.normalize_column(column, method=method)
+    
+    for column, strategy in config.get('fill_missing', {}).items():
+        cleaner.fill_missing(column, strategy=strategy)
+    
+    return cleaner.get_cleaned_data()
