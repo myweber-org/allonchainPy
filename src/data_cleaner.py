@@ -48,3 +48,47 @@ if __name__ == "__main__":
         print(cleaned)
     except ValueError as e:
         print(f"Validation error: {e}")
+import pandas as pd
+import numpy as np
+import sys
+
+def clean_csv_data(input_file, output_file):
+    """
+    Clean CSV data by handling missing values and removing duplicates.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        # Remove duplicate rows
+        df_cleaned = df.drop_duplicates()
+        
+        # Fill missing numeric values with column median
+        numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].median())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown')
+        
+        # Save cleaned data
+        df_cleaned.to_csv(output_file, index=False)
+        print(f"Data cleaning completed. Cleaned data saved to {output_file}")
+        print(f"Original rows: {len(df)}, Cleaned rows: {len(df_cleaned)}")
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: python data_cleaner.py <input_file.csv> <output_file.csv>")
+        sys.exit(1)
+    
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    clean_csv_data(input_file, output_file)
