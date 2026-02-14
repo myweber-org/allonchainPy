@@ -451,4 +451,119 @@ def validate_email_column(df, email_column):
     valid_count = df_validated['email_valid'].sum()
     print(f"Found {valid_count} valid email addresses out of {len(df_validated)} rows.")
     
-    return df_validated
+    return df_validatedimport pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows.
+        fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop').
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+            elif fill_missing == 'median':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    elif fill_missing == 'mode':
+        for col in cleaned_df.columns:
+            mode_value = cleaned_df[col].mode()
+            if not mode_value.empty:
+                cleaned_df[col] = cleaned_df[col].fillna(mode_value[0])
+    
+    return cleaned_df
+
+def validate_dataset(df, check_missing=True, check_types=True):
+    """
+    Validate a DataFrame for common data quality issues.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        check_missing (bool): Check for missing values.
+        check_types (bool): Check for consistent data types.
+    
+    Returns:
+        dict: Dictionary containing validation results.
+    """
+    validation_results = {}
+    
+    if check_missing:
+        missing_counts = df.isnull().sum()
+        validation_results['missing_values'] = missing_counts[missing_counts > 0].to_dict()
+        validation_results['total_missing'] = missing_counts.sum()
+    
+    if check_types:
+        type_counts = df.dtypes.value_counts().to_dict()
+        validation_results['data_types'] = type_counts
+    
+    validation_results['shape'] = df.shape
+    validation_results['columns'] = list(df.columns)
+    
+    return validation_results
+
+def normalize_numeric_columns(df, columns=None, method='minmax'):
+    """
+    Normalize numeric columns in a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        columns (list): List of columns to normalize. If None, normalize all numeric columns.
+        method (str): Normalization method ('minmax' or 'zscore').
+    
+    Returns:
+        pd.DataFrame: DataFrame with normalized columns.
+    """
+    normalized_df = df.copy()
+    
+    if columns is None:
+        columns = normalized_df.select_dtypes(include=['number']).columns
+    
+    for col in columns:
+        if col in normalized_df.columns and pd.api.types.is_numeric_dtype(normalized_df[col]):
+            if method == 'minmax':
+                col_min = normalized_df[col].min()
+                col_max = normalized_df[col].max()
+                if col_max != col_min:
+                    normalized_df[col] = (normalized_df[col] - col_min) / (col_max - col_min)
+            elif method == 'zscore':
+                col_mean = normalized_df[col].mean()
+                col_std = normalized_df[col].std()
+                if col_std != 0:
+                    normalized_df[col] = (normalized_df[col] - col_mean) / col_std
+    
+    return normalized_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, None, 6],
+        'B': [10, 20, 20, 40, 50, None],
+        'C': ['x', 'y', 'y', 'z', 'x', 'z']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nValidation Results:")
+    print(validate_dataset(df))
+    
+    cleaned = clean_dataset(df, fill_missing='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    normalized = normalize_numeric_columns(cleaned, method='minmax')
+    print("\nNormalized DataFrame:")
+    print(normalized)
