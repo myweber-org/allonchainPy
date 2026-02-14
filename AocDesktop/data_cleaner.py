@@ -194,3 +194,58 @@ if __name__ == "__main__":
     validation = validate_dataframe(cleaned, required_columns=['id', 'value'])
     print("\nValidation Results:")
     print(validation)
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_dataset(filepath):
+    """Load dataset from CSV file."""
+    return pd.read_csv(filepath)
+
+def remove_outliers_iqr(df, columns):
+    """Remove outliers using IQR method."""
+    df_clean = df.copy()
+    for col in columns:
+        Q1 = df_clean[col].quantile(0.25)
+        Q3 = df_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean
+
+def normalize_data(df, columns, method='minmax'):
+    """Normalize specified columns using min-max or z-score normalization."""
+    df_norm = df.copy()
+    for col in columns:
+        if method == 'minmax':
+            df_norm[col] = (df_norm[col] - df_norm[col].min()) / (df_norm[col].max() - df_norm[col].min())
+        elif method == 'zscore':
+            df_norm[col] = (df_norm[col] - df_norm[col].mean()) / df_norm[col].std()
+    return df_norm
+
+def handle_missing_values(df, strategy='mean'):
+    """Handle missing values using specified strategy."""
+    df_filled = df.copy()
+    for col in df_filled.columns:
+        if df_filled[col].isnull().any():
+            if strategy == 'mean':
+                df_filled[col].fillna(df_filled[col].mean(), inplace=True)
+            elif strategy == 'median':
+                df_filled[col].fillna(df_filled[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df_filled[col].fillna(df_filled[col].mode()[0], inplace=True)
+    return df_filled
+
+def clean_dataset(filepath, numeric_columns, normalization_method='minmax'):
+    """Complete data cleaning pipeline."""
+    df = load_dataset(filepath)
+    df = handle_missing_values(df)
+    df = remove_outliers_iqr(df, numeric_columns)
+    df = normalize_data(df, numeric_columns, method=normalization_method)
+    return df
+
+if __name__ == "__main__":
+    cleaned_data = clean_dataset('raw_data.csv', ['age', 'income', 'score'])
+    cleaned_data.to_csv('cleaned_data.csv', index=False)
+    print("Data cleaning completed. Cleaned data saved to 'cleaned_data.csv'")
