@@ -323,3 +323,99 @@ def clean_dataset(data, config):
                     cleaned_data[column] = normalize_zscore(cleaned_data, column)
     
     return cleaned_data
+import pandas as pd
+
+def remove_duplicates(dataframe, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        dataframe: pandas DataFrame
+        subset: column label or sequence of labels to consider for duplicates
+        keep: determines which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+        Cleaned DataFrame with duplicates removed
+    """
+    if dataframe.empty:
+        return dataframe
+    
+    cleaned_df = dataframe.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(dataframe) - len(cleaned_df)
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate rows")
+    
+    return cleaned_df
+
+def clean_numeric_columns(dataframe, columns):
+    """
+    Clean numeric columns by converting to appropriate types and handling errors.
+    
+    Args:
+        dataframe: pandas DataFrame
+        columns: list of column names to clean
+    
+    Returns:
+        DataFrame with cleaned numeric columns
+    """
+    for col in columns:
+        if col in dataframe.columns:
+            dataframe[col] = pd.to_numeric(dataframe[col], errors='coerce')
+    
+    return dataframe
+
+def validate_dataframe(dataframe, required_columns):
+    """
+    Validate that DataFrame contains required columns.
+    
+    Args:
+        dataframe: pandas DataFrame
+        required_columns: list of required column names
+    
+    Returns:
+        Boolean indicating if validation passed
+    """
+    missing_columns = [col for col in required_columns if col not in dataframe.columns]
+    
+    if missing_columns:
+        print(f"Missing required columns: {missing_columns}")
+        return False
+    
+    return True
+
+def clean_dataset(file_path, output_path=None):
+    """
+    Main function to clean a dataset from file.
+    
+    Args:
+        file_path: path to input data file
+        output_path: path to save cleaned data (optional)
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return None
+    
+    original_shape = df.shape
+    
+    df = remove_duplicates(df)
+    df = clean_numeric_columns(df, df.select_dtypes(include=['object']).columns)
+    
+    df = df.dropna()
+    
+    final_shape = df.shape
+    print(f"Data cleaned: {original_shape} -> {final_shape}")
+    
+    if output_path:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+    
+    return df
