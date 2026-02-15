@@ -667,4 +667,55 @@ def validate_dataframe(data, required_columns=None, numeric_columns=None):
                 if not np.issubdtype(data[col].dtype, np.number):
                     raise TypeError(f"Column '{col}' must be numeric")
     
+    return Trueimport pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing is not None:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        if fill_missing == 'mean':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+        elif fill_missing == 'median':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].median())
+        elif fill_missing == 'zero':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(0)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate that a DataFrame meets basic requirements.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
     return True
+
+def get_data_summary(df):
+    """
+    Generate a summary of the DataFrame including shape, dtypes, and missing values.
+    """
+    summary = {
+        'shape': df.shape,
+        'columns': list(df.columns),
+        'dtypes': df.dtypes.to_dict(),
+        'missing_values': df.isnull().sum().to_dict(),
+        'unique_counts': {col: df[col].nunique() for col in df.columns}
+    }
+    return summary
