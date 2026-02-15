@@ -757,3 +757,85 @@ def clean_dataset(df, subset=None, fill_method='mean'):
                 cleaned_df[column].fillna(fill_method, inplace=True)
 
     return cleaned_df
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_path, output_path, missing_strategy='mean'):
+    """
+    Load a CSV file, handle missing values, and save cleaned data.
+    
+    Parameters:
+    input_path (str): Path to input CSV file.
+    output_path (str): Path to save cleaned CSV file.
+    missing_strategy (str): Strategy for handling missing values.
+                            Options: 'mean', 'median', 'drop', 'zero'.
+    """
+    try:
+        df = pd.read_csv(input_path)
+        print(f"Original data shape: {df.shape}")
+        
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        
+        if missing_strategy == 'mean':
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+        elif missing_strategy == 'median':
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+        elif missing_strategy == 'zero':
+            df[numeric_cols] = df[numeric_cols].fillna(0)
+        elif missing_strategy == 'drop':
+            df = df.dropna(subset=numeric_cols)
+        else:
+            raise ValueError(f"Unknown strategy: {missing_strategy}")
+        
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+        print(f"Cleaned data shape: {df.shape}")
+        
+        missing_count = df.isnull().sum().sum()
+        if missing_count > 0:
+            print(f"Warning: {missing_count} missing values remain in non-numeric columns")
+            
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: Input file not found at {input_path}")
+    except pd.errors.EmptyDataError:
+        print("Error: Input file is empty")
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+
+def validate_data(df, required_columns=None):
+    """
+    Validate data quality after cleaning.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    dict: Validation results.
+    """
+    validation_results = {}
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        validation_results['missing_columns'] = missing_cols
+    
+    validation_results['total_rows'] = len(df)
+    validation_results['total_columns'] = len(df.columns)
+    validation_results['missing_values'] = int(df.isnull().sum().sum())
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) > 0:
+        validation_results['numeric_stats'] = df[numeric_cols].describe().to_dict()
+    
+    return validation_results
+
+if __name__ == "__main__":
+    cleaned_df = clean_csv_data('input_data.csv', 'cleaned_data.csv', 'mean')
+    
+    if cleaned_df is not None:
+        validation = validate_data(cleaned_df)
+        print("Validation results:")
+        for key, value in validation.items():
+            print(f"{key}: {value}")
