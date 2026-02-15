@@ -706,3 +706,73 @@ def example_usage():
 if __name__ == "__main__":
     result_df = example_usage()
     print(f"\nRemoved {100 - len(result_df)} outliers")
+def remove_duplicates(input_list):
+    """
+    Remove duplicate items from a list while preserving order.
+    
+    Args:
+        input_list: A list that may contain duplicate elements.
+    
+    Returns:
+        A new list with duplicates removed.
+    """
+    seen = set()
+    result = []
+    
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    
+    return result
+
+def clean_numeric_data(values, remove_none=True):
+    """
+    Clean a list of numeric values by removing None values and converting strings to floats.
+    
+    Args:
+        values: List of values that may include numbers, strings, or None.
+        remove_none: Boolean indicating whether to remove None values.
+    
+    Returns:
+        A cleaned list of numeric values.
+    """
+    cleaned = []
+    
+    for value in values:
+        if value is None:
+            if not remove_none:
+                cleaned.append(None)
+            continue
+        
+        try:
+            if isinstance(value, str):
+                cleaned.append(float(value))
+            else:
+                cleaned.append(float(value))
+        except (ValueError, TypeError):
+            continue
+    
+    return cleaned
+
+def validate_data_structure(data, required_keys):
+    """
+    Validate that a dictionary contains all required keys.
+    
+    Args:
+        data: Dictionary to validate.
+        required_keys: List of keys that must be present in the dictionary.
+    
+    Returns:
+        Tuple of (is_valid, missing_keys) where is_valid is a boolean and
+        missing_keys is a list of keys that are missing.
+    """
+    if not isinstance(data, dict):
+        return False, ["data must be a dictionary"]
+    
+    missing = [key for key in required_keys if key not in data]
+    
+    if missing:
+        return False, missing
+    
+    return True, []
