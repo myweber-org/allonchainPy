@@ -153,3 +153,106 @@ def clean_numeric_columns(dataframe, columns):
             dataframe[column] = pd.to_numeric(dataframe[column], errors='coerce')
     
     return dataframe
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, missing_strategy='mean', outlier_method='iqr', threshold=1.5):
+    """
+    Clean dataset by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    missing_strategy (str): Strategy for missing values ('mean', 'median', 'mode', 'drop')
+    outlier_method (str): Method for outlier detection ('iqr', 'zscore')
+    threshold (float): Threshold for outlier detection
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if missing_strategy == 'mean':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+    elif missing_strategy == 'median':
+        cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+    elif missing_strategy == 'mode':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
+    elif missing_strategy == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    
+    # Handle outliers for numeric columns
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        if outlier_method == 'iqr':
+            Q1 = cleaned_df[col].quantile(0.25)
+            Q3 = cleaned_df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            
+            # Cap outliers
+            cleaned_df[col] = cleaned_df[col].clip(lower=lower_bound, upper=upper_bound)
+            
+        elif outlier_method == 'zscore':
+            mean_val = cleaned_df[col].mean()
+            std_val = cleaned_df[col].std()
+            z_scores = np.abs((cleaned_df[col] - mean_val) / std_val)
+            
+            # Replace outliers with mean
+            cleaned_df.loc[z_scores > threshold, col] = mean_val
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): Dataframe to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if len(df) < min_rows:
+        return False, f"Dataframe has less than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Dataframe is valid"
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 100],
+        'B': [5, 6, 7, np.nan, 8],
+        'C': [10, 20, 30, 40, 50]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    # Clean the data
+    cleaned = clean_dataset(df, missing_strategy='mean', outlier_method='iqr')
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print("\n")
+    
+    # Validate the cleaned data
+    is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
+    print(f"Validation: {is_valid}")
+    print(f"Message: {message}")
