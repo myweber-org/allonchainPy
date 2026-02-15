@@ -719,3 +719,41 @@ def get_data_summary(df):
         'unique_counts': {col: df[col].nunique() for col in df.columns}
     }
     return summary
+import pandas as pd
+
+def clean_dataset(df, subset=None, fill_method='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame to clean.
+        subset (list, optional): Column labels to consider for identifying duplicates.
+                                 If None, all columns are used.
+        fill_method (str, optional): Method to fill missing values.
+                                     Options: 'mean', 'median', 'mode', or a constant value.
+                                     Defaults to 'mean'.
+
+    Returns:
+        pd.DataFrame: The cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+
+    # Remove duplicate rows
+    cleaned_df = cleaned_df.drop_duplicates(subset=subset)
+
+    # Handle missing values
+    for column in cleaned_df.columns:
+        if cleaned_df[column].isnull().any():
+            if fill_method == 'mean':
+                if pd.api.types.is_numeric_dtype(cleaned_df[column]):
+                    cleaned_df[column].fillna(cleaned_df[column].mean(), inplace=True)
+            elif fill_method == 'median':
+                if pd.api.types.is_numeric_dtype(cleaned_df[column]):
+                    cleaned_df[column].fillna(cleaned_df[column].median(), inplace=True)
+            elif fill_method == 'mode':
+                cleaned_df[column].fillna(cleaned_df[column].mode()[0], inplace=True)
+            else:
+                # Assume fill_method is a constant value
+                cleaned_df[column].fillna(fill_method, inplace=True)
+
+    return cleaned_df
