@@ -776,3 +776,100 @@ def validate_data_structure(data, required_keys):
         return False, missing
     
     return True, []
+import pandas as pd
+
+def clean_dataset(df, remove_duplicates=True, fill_method=None):
+    """
+    Clean a pandas DataFrame by handling missing values and duplicates.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        remove_duplicates (bool): Whether to remove duplicate rows.
+        fill_method (str or None): Method to fill missing values.
+            Options: 'mean', 'median', 'mode', or None to drop rows.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if fill_method is None:
+        cleaned_df = cleaned_df.dropna()
+    elif fill_method == 'mean':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+    elif fill_method == 'median':
+        cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+    elif fill_method == 'mode':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
+    
+    # Remove duplicates if requested
+    if remove_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None):
+    """
+    Validate dataset structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        dict: Validation results with status and messages.
+    """
+    validation_result = {
+        'is_valid': True,
+        'messages': [],
+        'missing_columns': [],
+        'null_counts': {}
+    }
+    
+    # Check required columns
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            validation_result['is_valid'] = False
+            validation_result['missing_columns'] = missing_cols
+            validation_result['messages'].append(f"Missing required columns: {missing_cols}")
+    
+    # Count null values per column
+    null_counts = df.isnull().sum()
+    columns_with_nulls = null_counts[null_counts > 0]
+    
+    if not columns_with_nulls.empty:
+        validation_result['null_counts'] = columns_with_nulls.to_dict()
+        validation_result['messages'].append(f"Found null values in columns: {list(columns_with_nulls.index)}")
+    
+    return validation_result
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data with issues
+    sample_data = {
+        'id': [1, 2, 3, 4, 5, 5],
+        'name': ['Alice', 'Bob', None, 'David', 'Eve', 'Eve'],
+        'age': [25, 30, 35, None, 40, 40],
+        'score': [85.5, 92.0, 78.5, 88.0, 95.5, 95.5]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Validate the dataset
+    validation = validate_dataset(df, required_columns=['id', 'name', 'age'])
+    print("Validation Results:")
+    print(validation)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the dataset
+    cleaned = clean_dataset(df, remove_duplicates=True, fill_method='mean')
+    print("Cleaned DataFrame:")
+    print(cleaned)
