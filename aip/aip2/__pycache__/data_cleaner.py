@@ -1021,4 +1021,48 @@ if __name__ == "__main__":
     print(cleaned_df)
     
     is_valid, message = validate_dataframe(cleaned_df, required_columns=['id', 'value'])
-    print(f"\nValidation: {message}")
+    print(f"\nValidation: {message}")import pandas as pd
+
+def clean_dataframe(df):
+    """
+    Remove duplicate rows and fill missing numeric values with column median.
+    """
+    # Remove duplicates
+    df_clean = df.drop_duplicates()
+    
+    # Fill missing numeric values
+    numeric_cols = df_clean.select_dtypes(include=['number']).columns
+    for col in numeric_cols:
+        median_val = df_clean[col].median()
+        df_clean[col] = df_clean[col].fillna(median_val)
+    
+    return df_clean
+
+def validate_data(df):
+    """
+    Validate that dataframe has no duplicates and no missing numeric values.
+    """
+    duplicates_exist = df.duplicated().any()
+    numeric_cols = df.select_dtypes(include=['number']).columns
+    missing_numeric = df[numeric_cols].isnull().any().any()
+    
+    return not duplicates_exist and not missing_numeric
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4],
+        'value': [10.5, None, 15.0, 20.0, None],
+        'category': ['A', 'B', 'B', 'C', 'A']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    is_valid = validate_data(cleaned_df)
+    print(f"\nData validation passed: {is_valid}")
