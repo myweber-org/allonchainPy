@@ -234,4 +234,64 @@ if __name__ == "__main__":
     print("\nCleaned DataFrame:")
     cleaned = clean_dataset(df, normalize_cols=['value'])
     print(cleaned)
-    print(f"\nDataFrame valid: {validate_dataframe(cleaned)}")
+    print(f"\nDataFrame valid: {validate_dataframe(cleaned)}")import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(dataframe, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    Returns a cleaned DataFrame.
+    """
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    cleaned_df = dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
+    return cleaned_df
+
+def normalize_column_minmax(dataframe, column):
+    """
+    Normalize a DataFrame column using Min-Max scaling.
+    Returns a new Series with normalized values.
+    """
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    if max_val == min_val:
+        return pd.Series([0.5] * len(dataframe), index=dataframe.index)
+    normalized = (dataframe[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def calculate_statistics(dataframe, column):
+    """
+    Calculate basic statistics for a DataFrame column.
+    Returns a dictionary with mean, median, and standard deviation.
+    """
+    stats = {
+        'mean': dataframe[column].mean(),
+        'median': dataframe[column].median(),
+        'std': dataframe[column].std()
+    }
+    return stats
+
+def process_dataframe(dataframe, target_column):
+    """
+    Main function to process a DataFrame: remove outliers and normalize target column.
+    Returns a tuple (cleaned_df, normalized_series, stats_dict).
+    """
+    cleaned_df = remove_outliers_iqr(dataframe, target_column)
+    normalized_series = normalize_column_minmax(cleaned_df, target_column)
+    stats = calculate_statistics(cleaned_df, target_column)
+    return cleaned_df, normalized_series, stats
+
+if __name__ == "__main__":
+    sample_data = {'values': [10, 12, 12, 13, 12, 11, 10, 100, 12, 9, 10, 11]}
+    df = pd.DataFrame(sample_data)
+    cleaned, normalized, statistics = process_dataframe(df, 'values')
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print("\nNormalized Series:")
+    print(normalized)
+    print("\nStatistics:")
+    for key, value in statistics.items():
+        print(f"{key}: {value:.4f}")
