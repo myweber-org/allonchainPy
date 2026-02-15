@@ -76,3 +76,55 @@ def organize_files(directory):
 if __name__ == "__main__":
     target_directory = input("Enter directory path to organize: ").strip()
     organize_files(target_directory)
+import os
+import shutil
+from pathlib import Path
+
+def organize_files_by_extension(directory_path):
+    """
+    Organize files in the specified directory into subfolders based on their extensions.
+    """
+    if not os.path.exists(directory_path):
+        print(f"Directory '{directory_path}' does not exist.")
+        return
+
+    path = Path(directory_path)
+    
+    # Define categories and their associated extensions
+    categories = {
+        'Images': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg'],
+        'Documents': ['.pdf', '.docx', '.txt', '.xlsx', '.pptx', '.md'],
+        'Archives': ['.zip', '.tar', '.gz', '.rar', '.7z'],
+        'Code': ['.py', '.js', '.html', '.css', '.java', '.cpp'],
+        'Audio': ['.mp3', '.wav', '.flac', '.aac'],
+        'Video': ['.mp4', '.avi', '.mov', '.mkv', '.flv']
+    }
+    
+    # Create a mapping from extension to category
+    extension_to_category = {}
+    for category, extensions in categories.items():
+        for ext in extensions:
+            extension_to_category[ext] = category
+    
+    # Process each file in the directory
+    for item in path.iterdir():
+        if item.is_file():
+            file_extension = item.suffix.lower()
+            category = extension_to_category.get(file_extension, 'Other')
+            
+            # Create category folder if it doesn't exist
+            category_folder = path / category
+            category_folder.mkdir(exist_ok=True)
+            
+            # Move file to category folder
+            try:
+                shutil.move(str(item), str(category_folder / item.name))
+                print(f"Moved '{item.name}' to '{category}' folder.")
+            except Exception as e:
+                print(f"Error moving '{item.name}': {e}")
+    
+    print("File organization completed.")
+
+if __name__ == "__main__":
+    target_directory = input("Enter the directory path to organize: ").strip()
+    organize_files_by_extension(target_directory)
