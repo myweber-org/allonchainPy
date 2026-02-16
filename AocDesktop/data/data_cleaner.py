@@ -856,3 +856,82 @@ if __name__ == "__main__":
     
     stats = calculate_basic_stats(cleaned_data, 'values')
     print(f"\nStatistics after cleaning: {stats}")
+import pandas as pd
+
+def clean_dataset(df, columns_to_check=None):
+    """
+    Clean a pandas DataFrame by removing null values and duplicate rows.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        columns_to_check (list, optional): Specific columns to check for duplicates.
+            If None, checks all columns. Defaults to None.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    # Create a copy to avoid modifying the original DataFrame
+    cleaned_df = df.copy()
+    
+    # Remove rows with any null values
+    cleaned_df = cleaned_df.dropna()
+    
+    # Remove duplicate rows
+    if columns_to_check:
+        cleaned_df = cleaned_df.drop_duplicates(subset=columns_to_check)
+    else:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None):
+    """
+    Validate a DataFrame by checking for required columns and data types.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list, optional): List of required column names.
+    
+    Returns:
+        bool: True if validation passes, False otherwise.
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    # Check if DataFrame is empty after cleaning
+    if df.empty:
+        print("DataFrame is empty after cleaning")
+        return False
+    
+    return True
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data with nulls and duplicates
+    sample_data = {
+        'id': [1, 2, 3, 3, 4, None],
+        'name': ['Alice', 'Bob', 'Charlie', 'Charlie', 'David', 'Eve'],
+        'age': [25, 30, None, 35, 40, 45],
+        'score': [85.5, 90.0, 78.5, 78.5, 92.0, 88.0]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print(f"Original shape: {df.shape}")
+    
+    # Clean the dataset
+    cleaned_df = clean_dataset(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    print(f"Cleaned shape: {cleaned_df.shape}")
+    
+    # Validate the cleaned dataset
+    is_valid = validate_dataset(cleaned_df, required_columns=['id', 'name', 'age', 'score'])
+    print(f"\nDataset validation: {'Passed' if is_valid else 'Failed'}")
