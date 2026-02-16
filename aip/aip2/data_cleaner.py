@@ -162,4 +162,63 @@ if __name__ == "__main__":
     cleaned_data = clean_dataset(sample_data, ['feature_a', 'feature_b'])
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {cleaned_data.shape}")
-    print(f"Cleaned columns: {list(cleaned_data.columns)}")
+    print(f"Cleaned columns: {list(cleaned_data.columns)}")import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_file, output_file):
+    """
+    Load a CSV file, clean missing values, and save cleaned data.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original data shape: {df.shape}")
+        
+        # Handle missing values
+        df_cleaned = df.copy()
+        
+        # For numeric columns, fill missing with median
+        numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df_cleaned[col].isnull().sum() > 0:
+                median_val = df_cleaned[col].median()
+                df_cleaned[col].fillna(median_val, inplace=True)
+                print(f"Filled missing values in {col} with median: {median_val}")
+        
+        # For categorical columns, fill missing with mode
+        categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if df_cleaned[col].isnull().sum() > 0:
+                mode_val = df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown'
+                df_cleaned[col].fillna(mode_val, inplace=True)
+                print(f"Filled missing values in {col} with mode: {mode_val}")
+        
+        # Remove duplicates
+        initial_rows = len(df_cleaned)
+        df_cleaned.drop_duplicates(inplace=True)
+        duplicates_removed = initial_rows - len(df_cleaned)
+        print(f"Removed {duplicates_removed} duplicate rows")
+        
+        # Save cleaned data
+        df_cleaned.to_csv(output_file, index=False)
+        print(f"Cleaned data shape: {df_cleaned.shape}")
+        print(f"Cleaned data saved to: {output_file}")
+        
+        return df_cleaned
+        
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {e}")
+        return None
+
+if __name__ == "__main__":
+    # Example usage
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_csv, output_csv)
+    
+    if cleaned_df is not None:
+        print("Data cleaning completed successfully.")
+        print(cleaned_df.head())
