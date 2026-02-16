@@ -1,81 +1,60 @@
 
 import pandas as pd
+import numpy as np
+from scipy import stats
 
-def clean_dataset(df, remove_duplicates=True, fill_method=None):
-    """
-    Clean a pandas DataFrame by handling missing values and duplicates.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean
-        remove_duplicates (bool): Whether to remove duplicate rows
-        fill_method (str or None): Method to fill missing values: 
-                                   'mean', 'median', 'mode', or None to drop
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame
-    """
+def remove_outliers_iqr(df, columns):
     cleaned_df = df.copy()
-    
-    # Handle missing values
-    if fill_method:
-        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
-        
-        if fill_method == 'mean':
-            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(
-                cleaned_df[numeric_cols].mean()
-            )
-        elif fill_method == 'median':
-            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(
-                cleaned_df[numeric_cols].median()
-            )
-        elif fill_method == 'mode':
-            for col in cleaned_df.columns:
-                if cleaned_df[col].dtype == 'object':
-                    cleaned_df[col] = cleaned_df[col].fillna(
-                        cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else ''
-                    )
-    else:
-        cleaned_df = cleaned_df.dropna()
-    
-    # Remove duplicates
-    if remove_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-    
-    # Reset index
-    cleaned_df = cleaned_df.reset_index(drop=True)
-    
+    for col in columns:
+        Q1 = cleaned_df[col].quantile(0.25)
+        Q3 = cleaned_df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
     return cleaned_df
 
-def validate_dataset(df, required_columns=None):
-    """
-    Validate dataset structure and content.
+def normalize_data(df, columns, method='minmax'):
+    normalized_df = df.copy()
+    for col in columns:
+        if method == 'minmax':
+            min_val = normalized_df[col].min()
+            max_val = normalized_df[col].max()
+            if max_val != min_val:
+                normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+        elif method == 'zscore':
+            mean_val = normalized_df[col].mean()
+            std_val = normalized_df[col].std()
+            if std_val > 0:
+                normalized_df[col] = (normalized_df[col] - mean_val) / std_val
+    return normalized_df
+
+def clean_dataset(file_path, numeric_columns):
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Original dataset shape: {df.shape}")
+        
+        df_cleaned = remove_outliers_iqr(df, numeric_columns)
+        print(f"After outlier removal: {df_cleaned.shape}")
+        
+        df_normalized = normalize_data(df_cleaned, numeric_columns, method='zscore')
+        print("Data cleaning and normalization completed.")
+        
+        return df_normalized
+    except Exception as e:
+        print(f"Error processing dataset: {e}")
+        return None
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature1': np.random.normal(100, 15, 200),
+        'feature2': np.random.exponential(50, 200),
+        'feature3': np.random.uniform(0, 100, 200)
+    })
     
-    Args:
-        df (pd.DataFrame): DataFrame to validate
-        required_columns (list): List of required column names
+    sample_data.to_csv('sample_dataset.csv', index=False)
     
-    Returns:
-        dict: Validation results
-    """
-    validation_results = {
-        'row_count': len(df),
-        'column_count': len(df.columns),
-        'missing_values': df.isnull().sum().sum(),
-        'duplicate_rows': df.duplicated().sum(),
-        'column_types': df.dtypes.to_dict()
-    }
+    cleaned_data = clean_dataset('sample_dataset.csv', ['feature1', 'feature2', 'feature3'])
     
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        validation_results['missing_required_columns'] = missing_columns
-        validation_results['all_required_columns_present'] = len(missing_columns) == 0
-    
-    return validation_results
-def remove_duplicates_preserve_order(iterable):
-    seen = set()
-    result = []
-    for item in iterable:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
+    if cleaned_data is not None:
+        print(cleaned_data.describe())
