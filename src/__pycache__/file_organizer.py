@@ -105,3 +105,63 @@ def organize_files(directory):
 if __name__ == "__main__":
     target_directory = input("Enter the directory path to organize: ").strip()
     organize_files(target_directory)
+import os
+import shutil
+
+def organize_files(directory):
+    """
+    Organize files in the specified directory into subfolders based on their extensions.
+    """
+    # Define file type categories and their associated extensions
+    categories = {
+        'Images': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg'],
+        'Documents': ['.pdf', '.docx', '.txt', '.xlsx', '.pptx', '.md'],
+        'Audio': ['.mp3', '.wav', '.aac', '.flac'],
+        'Video': ['.mp4', '.avi', '.mov', '.mkv'],
+        'Archives': ['.zip', '.tar', '.gz', '.rar'],
+        'Code': ['.py', '.js', '.html', '.css', '.java', '.cpp'],
+    }
+
+    # Create category folders if they don't exist
+    for category in categories:
+        category_path = os.path.join(directory, category)
+        if not os.path.exists(category_path):
+            os.makedirs(category_path)
+
+    # Iterate over all files in the directory
+    for filename in os.listdir(directory):
+        file_path = os.path.join(directory, filename)
+
+        # Skip directories
+        if os.path.isdir(file_path):
+            continue
+
+        # Get the file extension
+        _, extension = os.path.splitext(filename)
+        extension = extension.lower()
+
+        # Determine the category for the file
+        moved = False
+        for category, extensions in categories.items():
+            if extension in extensions:
+                dest_folder = os.path.join(directory, category)
+                shutil.move(file_path, os.path.join(dest_folder, filename))
+                print(f"Moved '{filename}' to '{category}' folder.")
+                moved = True
+                break
+
+        # If no category matched, move to 'Other' folder
+        if not moved:
+            other_folder = os.path.join(directory, 'Other')
+            if not os.path.exists(other_folder):
+                os.makedirs(other_folder)
+            shutil.move(file_path, os.path.join(other_folder, filename))
+            print(f"Moved '{filename}' to 'Other' folder.")
+
+if __name__ == "__main__":
+    target_directory = input("Enter the directory path to organize: ").strip()
+    if os.path.isdir(target_directory):
+        organize_files(target_directory)
+        print("File organization completed.")
+    else:
+        print("Invalid directory path.")
