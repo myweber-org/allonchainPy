@@ -319,4 +319,44 @@ if __name__ == "__main__":
     
     # Validate
     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
-    print(f"\nValidation: {is_valid} - {message}")
+    print(f"\nValidation: {is_valid} - {message}")import pandas as pd
+
+def clean_dataframe(df):
+    """
+    Remove duplicate rows and fill missing numeric values with column mean.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing numeric values with column mean
+    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+    
+    return df_cleaned
+
+def load_and_clean_csv(filepath):
+    """
+    Load CSV file and apply cleaning operations.
+    """
+    try:
+        df = pd.read_csv(filepath)
+        cleaned_df = clean_dataframe(df)
+        return cleaned_df
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+    except pd.errors.EmptyDataError:
+        print("Error: The file is empty")
+        return None
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    result = load_and_clean_csv(input_file)
+    if result is not None:
+        result.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to {output_file}")
+        print(f"Original shape: {pd.read_csv(input_file).shape}")
+        print(f"Cleaned shape: {result.shape}")
