@@ -71,3 +71,11 @@ def validate_dataset(df, required_columns=None):
         validation_results['all_required_columns_present'] = len(missing_columns) == 0
     
     return validation_results
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
