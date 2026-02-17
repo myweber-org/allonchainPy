@@ -434,3 +434,64 @@ def clean_dataset(df: pd.DataFrame,
             cleaner.remove_outliers(col)
             
     return cleaner.get_cleaned_data()
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Args:
+        data (np.ndarray): Input data array.
+        column (int): Index of the column to process.
+    
+    Returns:
+        np.ndarray: Data with outliers removed from specified column.
+    """
+    if data.size == 0:
+        return data
+    
+    col_data = data[:, column]
+    q1 = np.percentile(col_data, 25)
+    q3 = np.percentile(col_data, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    mask = (col_data >= lower_bound) & (col_data <= upper_bound)
+    return data[mask]
+
+def clean_dataset(data, columns_to_clean=None):
+    """
+    Clean dataset by removing outliers from specified columns.
+    
+    Args:
+        data (np.ndarray): Input dataset.
+        columns_to_clean (list): List of column indices to clean. If None, clean all columns.
+    
+    Returns:
+        np.ndarray: Cleaned dataset.
+    """
+    if data.size == 0:
+        return data
+    
+    if columns_to_clean is None:
+        columns_to_clean = list(range(data.shape[1]))
+    
+    cleaned_data = data.copy()
+    for col in columns_to_clean:
+        if col < data.shape[1]:
+            cleaned_data = remove_outliers_iqr(cleaned_data, col)
+    
+    return cleaned_data
+
+if __name__ == "__main__":
+    # Example usage
+    np.random.seed(42)
+    sample_data = np.random.randn(100, 3) * 10
+    sample_data[0, 0] = 100  # Add an outlier
+    
+    print(f"Original data shape: {sample_data.shape}")
+    cleaned = clean_dataset(sample_data, columns_to_clean=[0])
+    print(f"Cleaned data shape: {cleaned.shape}")
+    print(f"Removed {sample_data.shape[0] - cleaned.shape[0]} outliers")
