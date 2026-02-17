@@ -266,4 +266,40 @@ def clean_numeric_data(df, columns=None):
             if removed_count > 0:
                 print(f"Removed {removed_count} outliers from column '{col}'")
     
-    return cleaned_df
+    return cleaned_dfimport pandas as pd
+import numpy as np
+from scipy import stats
+
+def detect_outliers_iqr(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
+
+def impute_missing_with_median(data, column):
+    median_value = data[column].median()
+    data[column].fillna(median_value, inplace=True)
+    return data
+
+def remove_duplicates(data):
+    return data.drop_duplicates()
+
+def standardize_column(data, column):
+    mean = data[column].mean()
+    std = data[column].std()
+    data[column] = (data[column] - mean) / std
+    return data
+
+def clean_dataset(data, numeric_columns):
+    cleaned_data = data.copy()
+    cleaned_data = remove_duplicates(cleaned_data)
+    
+    for col in numeric_columns:
+        if col in cleaned_data.columns:
+            cleaned_data = impute_missing_with_median(cleaned_data, col)
+            cleaned_data = standardize_column(cleaned_data, col)
+    
+    return cleaned_data
