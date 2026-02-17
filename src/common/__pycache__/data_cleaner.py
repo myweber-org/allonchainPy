@@ -114,4 +114,104 @@ def clean_dataframe(df, numeric_columns=None, outlier_columns=None,
             if col in numeric_columns:
                 cleaned_df = normalize_column(cleaned_df, col)
     
+    return cleaned_dfimport pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        subset: column label or sequence of labels to consider for duplicates
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def convert_column_types(df, column_types):
+    """
+    Convert specified columns to given data types.
+    
+    Args:
+        df: pandas DataFrame
+        column_types: dict mapping column names to target types
+    
+    Returns:
+        DataFrame with converted column types
+    """
+    df_converted = df.copy()
+    for column, dtype in column_types.items():
+        if column in df_converted.columns:
+            df_converted[column] = df_converted[column].astype(dtype)
+    return df_converted
+
+def handle_missing_values(df, strategy='drop', fill_value=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        strategy: 'drop' to remove rows, 'fill' to fill values
+        fill_value: value to use when strategy is 'fill'
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill':
+        return df.fillna(fill_value)
+    else:
+        raise ValueError("Strategy must be 'drop' or 'fill'")
+
+def clean_dataframe(df, cleaning_steps):
+    """
+    Apply multiple cleaning steps to DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        cleaning_steps: list of tuples (function_name, kwargs)
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    cleaning_functions = {
+        'remove_duplicates': remove_duplicates,
+        'convert_types': convert_column_types,
+        'handle_missing': handle_missing_values
+    }
+    
+    for step_name, kwargs in cleaning_steps:
+        if step_name in cleaning_functions:
+            cleaned_df = cleaning_functions[step_name](cleaned_df, **kwargs)
+    
     return cleaned_df
+
+def validate_dataframe(df, validation_rules):
+    """
+    Validate DataFrame against specified rules.
+    
+    Args:
+        df: pandas DataFrame
+        validation_rules: dict with validation criteria
+    
+    Returns:
+        dict with validation results
+    """
+    results = {}
+    
+    if 'required_columns' in validation_rules:
+        required = set(validation_rules['required_columns'])
+        present = set(df.columns)
+        results['missing_columns'] = list(required - present)
+        results['extra_columns'] = list(present - required)
+    
+    if 'non_null_columns' in validation_rules:
+        null_counts = df[validation_rules['non_null_columns']].isnull().sum()
+        results['null_counts'] = null_counts[null_counts > 0].to_dict()
+    
+    return results
