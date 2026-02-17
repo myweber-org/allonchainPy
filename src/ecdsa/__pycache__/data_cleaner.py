@@ -1007,3 +1007,105 @@ if __name__ == "__main__":
     
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation: {is_valid} - {message}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers from specified column using IQR method
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df.copy()
+
+def normalize_column(dataframe, column, method='minmax'):
+    """
+    Normalize specified column using different methods
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    data = dataframe[column].values.astype(float)
+    
+    if method == 'minmax':
+        min_val = np.min(data)
+        max_val = np.max(data)
+        if max_val - min_val == 0:
+            normalized = np.zeros_like(data)
+        else:
+            normalized = (data - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = np.mean(data)
+        std_val = np.std(data)
+        if std_val == 0:
+            normalized = np.zeros_like(data)
+        else:
+            normalized = (data - mean_val) / std_val
+    
+    elif method == 'robust':
+        median_val = np.median(data)
+        iqr_val = stats.iqr(data)
+        if iqr_val == 0:
+            normalized = np.zeros_like(data)
+        else:
+            normalized = (data - median_val) / iqr_val
+    
+    else:
+        raise ValueError(f"Unknown normalization method: {method}")
+    
+    result_df = dataframe.copy()
+    result_df[f"{column}_{method}_normalized"] = normalized
+    
+    return result_df
+
+def clean_dataset(dataframe, numeric_columns=None, outlier_threshold=1.5, 
+                  normalization_method='minmax'):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    if numeric_columns is None:
+        numeric_columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = dataframe.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, column, outlier_threshold)
+            cleaned_df = normalize_column(cleaned_df, column, normalization_method)
+    
+    return cleaned_df
+
+def validate_dataframe(dataframe, required_columns=None, allow_nan=False):
+    """
+    Validate DataFrame structure and content
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if dataframe.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in dataframe.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    if not allow_nan:
+        nan_count = dataframe.isna().sum().sum()
+        if nan_count > 0:
+            print(f"Warning: DataFrame contains {nan_count} NaN values")
+    
+    return True
