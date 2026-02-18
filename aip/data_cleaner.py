@@ -642,3 +642,11 @@ if __name__ == "__main__":
     cleaned_data = cleaner.get_cleaned_data()
     print(f"\nCleaned data shape: {cleaned_data.shape}")
     print(cleaned_data.head())
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
