@@ -296,3 +296,42 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_cols}"
     
     return True, "DataFrame is valid"
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def clean_dataset(file_path, numeric_columns):
+    df = pd.read_csv(file_path)
+    
+    for column in numeric_columns:
+        if column in df.columns:
+            df = remove_outliers_iqr(df, column)
+            df = normalize_minmax(df, column)
+    
+    df.to_csv('cleaned_data.csv', index=False)
+    return df
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'age': [25, 30, 35, 200, 40, 45, 50, 55, 60, 65],
+        'salary': [50000, 55000, 60000, 1000000, 65000, 70000, 75000, 80000, 85000, 90000]
+    })
+    sample_data.to_csv('sample_data.csv', index=False)
+    
+    cleaned_df = clean_dataset('sample_data.csv', ['age', 'salary'])
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned_df.shape}")
+    print("Cleaning completed successfully")
