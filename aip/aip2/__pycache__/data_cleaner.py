@@ -385,3 +385,83 @@ def remove_duplicates_preserve_order(iterable):
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+
+def clean_dataset(df, drop_na=True, column_case='lower'):
+    """
+    Clean a pandas DataFrame by handling null values and standardizing column names.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_na (bool): If True, drop rows with any null values. If False, fill nulls with column mean (numeric) or mode (categorical).
+        column_case (str): Desired case for column names. Options: 'lower', 'upper', 'title'.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    # Handle null values
+    if drop_na:
+        df_clean = df_clean.dropna()
+    else:
+        for col in df_clean.columns:
+            if pd.api.types.is_numeric_dtype(df_clean[col]):
+                df_clean[col].fillna(df_clean[col].mean(), inplace=True)
+            else:
+                df_clean[col].fillna(df_clean[col].mode()[0] if not df_clean[col].mode().empty else '', inplace=True)
+    
+    # Standardize column names
+    if column_case == 'lower':
+        df_clean.columns = df_clean.columns.str.lower()
+    elif column_case == 'upper':
+        df_clean.columns = df_clean.columns.str.upper()
+    elif column_case == 'title':
+        df_clean.columns = df_clean.columns.str.title()
+    
+    # Remove leading/trailing whitespace from column names
+    df_clean.columns = df_clean.columns.str.strip()
+    
+    # Replace spaces with underscores in column names
+    df_clean.columns = df_clean.columns.str.replace(' ', '_')
+    
+    return df_clean
+
+def validate_dataset(df, required_columns=None):
+    """
+    Validate a DataFrame for basic integrity checks.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+    
+    Returns:
+        dict: Dictionary with validation results.
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'null_count': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum()
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        validation_results['missing_columns'] = missing_columns
+        validation_results['all_required_present'] = len(missing_columns) == 0
+    
+    return validation_results
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     sample_data = {
+#         'Name': ['Alice', 'Bob', None, 'David'],
+#         'Age': [25, None, 35, 40],
+#         'City': ['NYC', 'LA', 'Chicago', None]
+#     }
+#     df = pd.DataFrame(sample_data)
+#     cleaned_df = clean_dataset(df, drop_na=False, column_case='lower')
+#     print("Cleaned DataFrame:")
+#     print(cleaned_df)
+#     print("\nValidation Results:")
+#     print(validate_dataset(cleaned_df, required_columns=['name', 'age']))
