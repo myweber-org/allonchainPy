@@ -413,3 +413,135 @@ def clean_dataset(df, remove_outliers=True, normalize=True):
         cleaner.normalize_numeric(method='minmax')
     
     return cleaner.get_cleaned_data(), cleaner.get_summary()
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def clean_csv_data(input_path, output_path=None, missing_strategy='mean'):
+    """
+    Load a CSV file, clean missing values, and save the cleaned data.
+    
+    Parameters:
+    input_path (str): Path to the input CSV file.
+    output_path (str, optional): Path to save the cleaned CSV. 
+                                 If None, appends '_cleaned' to input filename.
+    missing_strategy (str): Strategy for handling missing values.
+                            Options: 'mean', 'median', 'mode', 'drop'.
+    
+    Returns:
+    pandas.DataFrame: The cleaned DataFrame.
+    """
+    
+    if not Path(input_path).exists():
+        raise FileNotFoundError(f"Input file not found: {input_path}")
+    
+    df = pd.read_csv(input_path)
+    
+    original_rows = len(df)
+    original_cols = len(df.columns)
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    categorical_cols = df.select_dtypes(exclude=[np.number]).columns
+    
+    if missing_strategy == 'drop':
+        df_cleaned = df.dropna()
+    elif missing_strategy == 'mean':
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].mean())
+        for col in categorical_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+        df_cleaned = df
+    elif missing_strategy == 'median':
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].median())
+        for col in categorical_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+        df_cleaned = df
+    elif missing_strategy == 'mode':
+        for col in df.columns:
+            if col in numeric_cols:
+                mode_val = df[col].mode()
+                df[col] = df[col].fillna(mode_val[0] if not mode_val.empty else df[col].median())
+            else:
+                mode_val = df[col].mode()
+                df[col] = df[col].fillna(mode_val[0] if not mode_val.empty else 'Unknown')
+        df_cleaned = df
+    else:
+        raise ValueError(f"Unsupported missing strategy: {missing_strategy}")
+    
+    if output_path is None:
+        input_path_obj = Path(input_path)
+        output_path = input_path_obj.parent / f"{input_path_obj.stem}_cleaned.csv"
+    
+    df_cleaned.to_csv(output_path, index=False)
+    
+    cleaned_rows = len(df_cleaned)
+    cleaned_cols = len(df_cleaned.columns)
+    
+    print(f"Data cleaning completed:")
+    print(f"  Original shape: ({original_rows}, {original_cols})")
+    print(f"  Cleaned shape: ({cleaned_rows}, {cleaned_cols})")
+    print(f"  Missing strategy: {missing_strategy}")
+    print(f"  Output saved to: {output_path}")
+    
+    return df_cleaned
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate a DataFrame for common data quality issues.
+    
+    Parameters:
+    df (pandas.DataFrame): DataFrame to validate.
+    required_columns (list, optional): List of columns that must be present.
+    
+    Returns:
+    dict: Dictionary containing validation results.
+    """
+    
+    validation_results = {
+        'has_data': not df.empty,
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'data_types': df.dtypes.to_dict()
+    }
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        validation_results['missing_required_columns'] = missing_cols
+        validation_results['all_required_columns_present'] = len(missing_cols) == 0
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) > 0:
+        validation_results['numeric_stats'] = df[numeric_cols].describe().to_dict()
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', None, 'David', 'Eve'],
+        'age': [25, 30, None, 35, 40],
+        'score': [85.5, 92.0, 78.5, None, 88.0],
+        'department': ['HR', 'IT', 'IT', None, 'Finance']
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    print("Testing data cleaning utility...")
+    cleaned_df = clean_csv_data('test_data.csv', missing_strategy='mean')
+    
+    print("\nValidating cleaned data...")
+    validation = validate_dataframe(cleaned_df)
+    
+    for key, value in validation.items():
+        if key != 'numeric_stats':
+            print(f"{key}: {value}")
+    
+    import os
+    if os.path.exists('test_data.csv'):
+        os.remove('test_data.csv')
+    if os.path.exists('test_data_cleaned.csv'):
+        os.remove('test_data_cleaned.csv')
