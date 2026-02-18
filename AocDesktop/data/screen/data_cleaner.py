@@ -176,3 +176,117 @@ def example_usage():
 
 if __name__ == "__main__":
     example_usage()
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_threshold=0.5, fill_strategy='mean'):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    drop_threshold (float): Threshold for dropping columns with nulls (0 to 1)
+    fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode')
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    # Create a copy to avoid modifying original
+    cleaned_df = df.copy()
+    
+    # Standardize column names
+    cleaned_df.columns = cleaned_df.columns.str.strip().str.lower().str.replace(' ', '_')
+    
+    # Drop columns with too many nulls
+    null_ratio = cleaned_df.isnull().sum() / len(cleaned_df)
+    cols_to_drop = null_ratio[null_ratio > drop_threshold].index
+    cleaned_df = cleaned_df.drop(columns=cols_to_drop)
+    
+    # Fill remaining missing values
+    for col in cleaned_df.columns:
+        if cleaned_df[col].isnull().any():
+            if cleaned_df[col].dtype in ['int64', 'float64']:
+                if fill_strategy == 'mean':
+                    fill_value = cleaned_df[col].mean()
+                elif fill_strategy == 'median':
+                    fill_value = cleaned_df[col].median()
+                else:
+                    fill_value = cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 0
+                cleaned_df[col] = cleaned_df[col].fillna(fill_value)
+            else:
+                # For categorical columns, fill with most frequent value
+                most_frequent = cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'unknown'
+                cleaned_df[col] = cleaned_df[col].fillna(most_frequent)
+    
+    # Remove duplicate rows
+    cleaned_df = cleaned_df.drop_duplicates()
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    # Check if input is a DataFrame
+    if not isinstance(df, pd.DataFrame):
+        validation_results['is_valid'] = False
+        validation_results['errors'].append('Input is not a pandas DataFrame')
+        return validation_results
+    
+    # Check for empty DataFrame
+    if df.empty:
+        validation_results['warnings'].append('DataFrame is empty')
+    
+    # Check required columns
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f'Missing required columns: {missing_columns}')
+    
+    # Check for all-null columns
+    null_columns = df.columns[df.isnull().all()].tolist()
+    if null_columns:
+        validation_results['warnings'].append(f'Columns with all null values: {null_columns}')
+    
+    return validation_results
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'Customer ID': [1, 2, 3, None, 5],
+        'Order Value': [100.5, None, 75.2, 200.0, 150.0],
+        'Product Category': ['A', 'B', None, 'A', 'B'],
+        'Region': ['North', 'South', 'East', 'West', None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned = clean_dataset(df, drop_threshold=0.3, fill_strategy='mean')
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print("\n" + "="*50 + "\n")
+    
+    # Validate the cleaned data
+    validation = validate_dataframe(cleaned, required_columns=['customer_id', 'order_value'])
+    print("Validation Results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
