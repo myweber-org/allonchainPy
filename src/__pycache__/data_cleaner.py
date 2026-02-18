@@ -310,3 +310,67 @@ def get_data_summary(dataframe):
         'basic_stats': dataframe.describe().to_dict()
     }
     return summary
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Parameters:
+    data (list or np.array): The dataset containing the column to clean.
+    column (int): Index of the column to process.
+    
+    Returns:
+    np.array: Data with outliers removed from the specified column.
+    """
+    data = np.array(data)
+    column_data = data[:, column].astype(float)
+    
+    Q1 = np.percentile(column_data, 25)
+    Q3 = np.percentile(column_data, 75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    mask = (column_data >= lower_bound) & (column_data <= upper_bound)
+    cleaned_data = data[mask]
+    
+    return cleaned_data
+
+def clean_dataset(data, columns_to_clean):
+    """
+    Clean multiple columns in a dataset by removing outliers.
+    
+    Parameters:
+    data (list or np.array): The dataset to clean.
+    columns_to_clean (list): List of column indices to process.
+    
+    Returns:
+    np.array: Dataset with outliers removed from specified columns.
+    """
+    cleaned_data = np.array(data)
+    
+    for column in columns_to_clean:
+        cleaned_data = remove_outliers_iqr(cleaned_data, column)
+    
+    return cleaned_data
+
+if __name__ == "__main__":
+    sample_data = [
+        [1.0, 2.0, 100.0],
+        [2.0, 3.0, 101.0],
+        [3.0, 4.0, 102.0],
+        [4.0, 5.0, 1000.0],
+        [5.0, 6.0, 103.0],
+        [6.0, 7.0, 104.0],
+        [7.0, 8.0, 2000.0]
+    ]
+    
+    print("Original data:")
+    print(sample_data)
+    
+    cleaned = clean_dataset(sample_data, [2])
+    
+    print("\nCleaned data (outliers removed from column 2):")
+    print(cleaned)
