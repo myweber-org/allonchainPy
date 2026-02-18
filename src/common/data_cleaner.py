@@ -241,3 +241,40 @@ if __name__ == "__main__":
     print("\nCleaned data shape:", cleaned_df.shape)
     print("\nCleaned summary for column 'A':")
     print(calculate_summary_stats(cleaned_df, 'A'))
+import pandas as pd
+import numpy as np
+
+def clean_missing_data(df, strategy='mean', columns=None):
+    """
+    Clean missing data in a pandas DataFrame.
+
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    strategy (str): The strategy to handle missing values. Options: 'mean', 'median', 'mode', 'drop'.
+    columns (list): List of column names to apply the cleaning. If None, applies to all columns.
+
+    Returns:
+    pd.DataFrame: The cleaned DataFrame.
+    """
+    if columns is None:
+        columns = df.columns
+
+    df_clean = df.copy()
+
+    for col in columns:
+        if df_clean[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df_clean[col].mean()
+            elif strategy == 'median':
+                fill_value = df_clean[col].median()
+            elif strategy == 'mode':
+                fill_value = df_clean[col].mode()[0]
+            elif strategy == 'drop':
+                df_clean = df_clean.dropna(subset=[col])
+                continue
+            else:
+                raise ValueError("Invalid strategy. Choose from 'mean', 'median', 'mode', 'drop'.")
+
+            df_clean[col].fillna(fill_value, inplace=True)
+
+    return df_clean
