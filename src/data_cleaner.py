@@ -196,3 +196,22 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
         raise ValueError("Method must be 'iqr' or 'zscore'")
     
     return df[mask]
+import pandas as pd
+import numpy as np
+
+def clean_missing_with_median(df):
+    """
+    Replace missing values in numeric columns with the column's median.
+    Non-numeric columns are left unchanged.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    df_clean = df.copy()
+    
+    for column in df_clean.select_dtypes(include=[np.number]).columns:
+        if df_clean[column].isnull().any():
+            median_val = df_clean[column].median()
+            df_clean[column].fillna(median_val, inplace=True)
+    
+    return df_clean
