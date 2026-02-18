@@ -243,3 +243,93 @@ class DataCleaner:
             'numeric_columns': list(self.df.select_dtypes(include=[np.number]).columns)
         }
         return summary
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def remove_outliers_iqr(df, columns=None, factor=1.5):
+    """
+    Remove outliers using IQR method.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    for col in columns:
+        Q1 = df_clean[col].quantile(0.25)
+        Q3 = df_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - factor * IQR
+        upper_bound = Q3 + factor * IQR
+        
+        mask = (df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)
+        df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def normalize_minmax(df, columns=None):
+    """
+    Normalize data using min-max scaling.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_normalized = df.copy()
+    for col in columns:
+        min_val = df_normalized[col].min()
+        max_val = df_normalized[col].max()
+        if max_val != min_val:
+            df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+    
+    return df_normalized
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values with specified strategy.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_filled = df.copy()
+    for col in columns:
+        if df_filled[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df_filled[col].mean()
+            elif strategy == 'median':
+                fill_value = df_filled[col].median()
+            elif strategy == 'mode':
+                fill_value = df_filled[col].mode()[0]
+            elif strategy == 'zero':
+                fill_value = 0
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            df_filled[col] = df_filled[col].fillna(fill_value)
+    
+    return df_filled
+
+def clean_dataset(df, outlier_columns=None, normalize_columns=None, missing_strategy='mean'):
+    """
+    Comprehensive data cleaning pipeline.
+    """
+    df_clean = df.copy()
+    
+    df_clean = handle_missing_values(df_clean, strategy=missing_strategy)
+    df_clean = remove_outliers_iqr(df_clean, columns=outlier_columns)
+    df_clean = normalize_minmax(df_clean, columns=normalize_columns)
+    
+    return df_clean
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 3, 4, 5, 100, 7, 8, 9, 10],
+        'B': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+        'C': [5, 15, 25, 35, 45, 55, 65, 75, 85, 95]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned_df = clean_dataset(df)
+    print(cleaned_df)
