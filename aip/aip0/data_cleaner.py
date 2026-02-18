@@ -545,3 +545,115 @@ if __name__ == "__main__":
         os.remove('test_data.csv')
     if os.path.exists('test_data_cleaned.csv'):
         os.remove('test_data_cleaned.csv')
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using IQR method
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
+
+def impute_missing_values(data, column, method='mean'):
+    """
+    Impute missing values using specified method
+    """
+    if method == 'mean':
+        fill_value = data[column].mean()
+    elif method == 'median':
+        fill_value = data[column].median()
+    elif method == 'mode':
+        fill_value = data[column].mode()[0]
+    else:
+        fill_value = 0
+    
+    data[column] = data[column].fillna(fill_value)
+    return data
+
+def remove_duplicates(data, subset=None, keep='first'):
+    """
+    Remove duplicate rows from dataset
+    """
+    return data.drop_duplicates(subset=subset, keep=keep)
+
+def normalize_column(data, column, method='minmax'):
+    """
+    Normalize column values
+    """
+    if method == 'minmax':
+        min_val = data[column].min()
+        max_val = data[column].max()
+        data[column] = (data[column] - min_val) / (max_val - min_val)
+    elif method == 'zscore':
+        mean_val = data[column].mean()
+        std_val = data[column].std()
+        data[column] = (data[column] - mean_val) / std_val
+    
+    return data
+
+def clean_dataset(data, outlier_columns=None, impute_columns=None, 
+                  impute_method='mean', normalize_columns=None):
+    """
+    Comprehensive dataset cleaning pipeline
+    """
+    cleaned_data = data.copy()
+    
+    # Remove duplicates
+    cleaned_data = remove_duplicates(cleaned_data)
+    
+    # Impute missing values
+    if impute_columns:
+        for col in impute_columns:
+            if col in cleaned_data.columns:
+                cleaned_data = impute_missing_values(cleaned_data, col, impute_method)
+    
+    # Handle outliers
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in cleaned_data.columns:
+                outliers = detect_outliers_iqr(cleaned_data, col)
+                if not outliers.empty:
+                    median_val = cleaned_data[col].median()
+                    cleaned_data.loc[outliers.index, col] = median_val
+    
+    # Normalize columns
+    if normalize_columns:
+        for col in normalize_columns:
+            if col in cleaned_data.columns:
+                cleaned_data = normalize_column(cleaned_data, col)
+    
+    return cleaned_data
+
+def validate_data(data, required_columns=None, min_rows=1):
+    """
+    Validate dataset structure and content
+    """
+    if len(data) < min_rows:
+        raise ValueError(f"Dataset must have at least {min_rows} rows")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in data.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+def export_cleaned_data(data, output_path, format='csv'):
+    """
+    Export cleaned dataset to file
+    """
+    if format == 'csv':
+        data.to_csv(output_path, index=False)
+    elif format == 'excel':
+        data.to_excel(output_path, index=False)
+    elif format == 'json':
+        data.to_json(output_path, orient='records')
+    else:
+        raise ValueError(f"Unsupported format: {format}")
