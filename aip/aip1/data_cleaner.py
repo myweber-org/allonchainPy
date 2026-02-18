@@ -340,4 +340,92 @@ def remove_duplicates_preserve_order(sequence):
         if item not in seen:
             seen.add(item)
             result.append(item)
-    return result
+    return resultimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using IQR method
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    z_scores = np.abs(stats.zscore(data[column]))
+    filtered_data = data[z_scores < threshold]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    return data
+
+def standardize_data(data, column):
+    """
+    Standardize data using Z-score normalization
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    data[column + '_standardized'] = (data[column] - mean_val) / std_val
+    return data
+
+def clean_dataset(df, numeric_columns, outlier_method='zscore', normalize=True):
+    """
+    Main cleaning function for datasets
+    """
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if outlier_method == 'zscore':
+            cleaned_df = remove_outliers_zscore(cleaned_df, col)
+        elif outlier_method == 'iqr':
+            outliers = detect_outliers_iqr(cleaned_df, col)
+            cleaned_df = cleaned_df.drop(outliers.index)
+        
+        if normalize:
+            cleaned_df = normalize_minmax(cleaned_df, col)
+            cleaned_df = standardize_data(cleaned_df, col)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns):
+    """
+    Validate dataframe structure and content
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    return True
+
+def handle_missing_values(df, strategy='mean'):
+    """
+    Handle missing values in numeric columns
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    elif strategy == 'median':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+    elif strategy == 'drop':
+        df = df.dropna(subset=numeric_cols)
+    
+    return df
