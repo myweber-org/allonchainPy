@@ -434,3 +434,52 @@ def remove_outliers_iqr(data, column):
     
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
     return filtered_data
+import pandas as pd
+import hashlib
+
+def remove_duplicates(input_file, output_file, key_columns=None):
+    """
+    Load a CSV file, remove duplicate rows based on specified columns,
+    and save the cleaned data to a new file.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Loaded data from {input_file}. Shape: {df.shape}")
+        
+        if key_columns is None:
+            key_columns = df.columns.tolist()
+        
+        initial_count = len(df)
+        df_cleaned = df.drop_duplicates(subset=key_columns, keep='first')
+        final_count = len(df_cleaned)
+        removed_count = initial_count - final_count
+        
+        df_cleaned.to_csv(output_file, index=False)
+        print(f"Removed {removed_count} duplicate rows.")
+        print(f"Cleaned data saved to {output_file}. New shape: {df_cleaned.shape}")
+        
+        return df_cleaned
+        
+    except FileNotFoundError:
+        print(f"Error: File {input_file} not found.")
+        return None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+
+def generate_data_hash(df):
+    """
+    Generate a hash for the dataframe to verify data integrity.
+    """
+    data_string = df.to_string(index=False).encode()
+    return hashlib.md5(data_string).hexdigest()
+
+if __name__ == "__main__":
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    cleaned_data = remove_duplicates(input_csv, output_csv)
+    
+    if cleaned_data is not None:
+        data_hash = generate_data_hash(cleaned_data)
+        print(f"Data integrity hash: {data_hash}")
