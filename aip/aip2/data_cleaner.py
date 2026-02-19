@@ -35,3 +35,18 @@ if __name__ == "__main__":
     
     cleaned_df = load_and_clean_data(input_file)
     save_cleaned_data(cleaned_df, output_file)
+def filter_invalid_entries(data_list, key, invalid_values=None):
+    """
+    Filters out entries from a list of dictionaries where the specified key's value
+    is in the invalid_values set or is None/empty if invalid_values is not provided.
+    """
+    if invalid_values is None:
+        invalid_values = {None, ''}
+    else:
+        invalid_values = set(invalid_values)
+
+    filtered_data = []
+    for entry in data_list:
+        if key in entry and entry[key] not in invalid_values:
+            filtered_data.append(entry)
+    return filtered_data
