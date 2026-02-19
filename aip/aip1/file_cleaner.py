@@ -1,38 +1,63 @@
 
-import sys
+import os
+import shutil
+import tempfile
+from pathlib import Path
 
-def remove_empty_lines(input_file, output_file=None):
+def clean_temporary_files(directory_path, extensions=None, days_old=7):
     """
-    Read a file, remove all empty lines, and write the result.
-    If output_file is not provided, overwrite the input file.
+    Remove temporary files from a specified directory.
+    Files can be filtered by extension and age.
     """
-    if output_file is None:
-        output_file = input_file
+    if extensions is None:
+        extensions = ['.tmp', '.temp', '.log', '.cache']
+    
+    target_dir = Path(directory_path)
+    if not target_dir.exists() or not target_dir.is_dir():
+        raise ValueError(f"Invalid directory: {directory_path}")
+    
+    current_time = os.path.getctime(target_dir)
+    removed_count = 0
+    
+    for item in target_dir.iterdir():
+        if item.is_file():
+            file_age = current_time - os.path.getctime(item)
+            if file_age > days_old * 86400:
+                if any(item.suffix.lower() in ext for ext in extensions):
+                    try:
+                        item.unlink()
+                        removed_count += 1
+                        print(f"Removed: {item.name}")
+                    except OSError as e:
+                        print(f"Error removing {item.name}: {e}")
+    
+    return removed_count
 
-    try:
-        with open(input_file, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-
-        non_empty_lines = [line for line in lines if line.strip()]
-
-        with open(output_file, 'w', encoding='utf-8') as f:
-            f.writelines(non_empty_lines)
-
-        print(f"Removed {len(lines) - len(non_empty_lines)} empty lines.")
-        return True
-
-    except FileNotFoundError:
-        print(f"Error: File '{input_file}' not found.")
-        return False
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return False
+def create_sample_temporary_files():
+    """Helper function to create sample temporary files for testing."""
+    temp_dir = tempfile.gettempdir()
+    sample_files = [
+        "test_file.tmp",
+        "another_file.temp",
+        "log_file.log",
+        "cache_file.cache",
+        "keep_file.txt"
+    ]
+    
+    for filename in sample_files:
+        filepath = os.path.join(temp_dir, filename)
+        with open(filepath, 'w') as f:
+            f.write("Temporary content")
+    
+    return temp_dir
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python file_cleaner.py <input_file> [output_file]")
-        sys.exit(1)
-
-    input_file = sys.argv[1]
-    output_file = sys.argv[2] if len(sys.argv) > 2 else None
-    remove_empty_lines(input_file, output_file)
+    try:
+        sample_dir = create_sample_temporary_files()
+        print(f"Created sample files in: {sample_dir}")
+        
+        cleaned = clean_temporary_files(sample_dir)
+        print(f"Cleaned {cleaned} temporary files")
+        
+    except Exception as e:
+        print(f"An error occurred: {e}")
