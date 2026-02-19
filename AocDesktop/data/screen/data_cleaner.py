@@ -482,4 +482,71 @@ if __name__ == "__main__":
     
     if cleaned_data is not None:
         data_hash = generate_data_hash(cleaned_data)
-        print(f"Data integrity hash: {data_hash}")
+        print(f"Data integrity hash: {data_hash}")import pandas as pd
+
+def clean_dataset(df, column_mapping=None, drop_duplicates=True, fill_na=True):
+    """
+    Clean a pandas DataFrame by standardizing columns, removing duplicates,
+    and handling missing values.
+    """
+    cleaned_df = df.copy()
+    
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_na:
+        for col in cleaned_df.select_dtypes(include=['object']).columns:
+            cleaned_df[col] = cleaned_df[col].fillna('Unknown')
+        for col in cleaned_df.select_dtypes(include=['number']).columns:
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    return cleaned_df
+
+def validate_email_format(email_series):
+    """
+    Validate email format using regex pattern.
+    Returns boolean series.
+    """
+    import re
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return email_series.str.match(pattern, na=False)
+
+def standardize_phone_numbers(phone_series, country_code='+1'):
+    """
+    Standardize phone numbers to E.164 format.
+    """
+    import re
+    def format_phone(phone):
+        if pd.isna(phone):
+            return None
+        digits = re.sub(r'\D', '', str(phone))
+        if len(digits) == 10:
+            return f"{country_code}{digits}"
+        elif len(digits) == 11 and digits.startswith('1'):
+            return f"{country_code}{digits[1:]}"
+        return None
+    
+    return phone_series.apply(format_phone)
+
+if __name__ == "__main__":
+    sample_data = {
+        'name': ['Alice', 'Bob', 'Alice', None],
+        'email': ['alice@example.com', 'invalid-email', 'alice@example.com', 'bob@test.org'],
+        'phone': ['123-456-7890', '555-1234', '1234567890', None],
+        'age': [25, 30, 25, 35]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned = clean_dataset(df)
+    print(cleaned)
+    print("\nValid emails:")
+    print(validate_email_format(cleaned['email']))
+    print("\nStandardized phones:")
+    print(standardize_phone_numbers(cleaned['phone']))
