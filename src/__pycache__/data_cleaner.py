@@ -137,3 +137,74 @@ def process_numerical_column(data, column):
     cleaned_stats = calculate_summary_stats(cleaned_data, column)
     
     return cleaned_data, original_stats, cleaned_stats
+import re
+import pandas as pd
+from typing import Optional, List, Dict, Any
+
+def remove_special_characters(text: str, keep_chars: str = '') -> str:
+    pattern = f'[^a-zA-Z0-9\\s{re.escape(keep_chars)}]'
+    return re.sub(pattern, '', text)
+
+def validate_email(email: str) -> bool:
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def normalize_phone_number(phone: str, country_code: str = '+1') -> Optional[str]:
+    digits = re.sub(r'\D', '', phone)
+    if not digits:
+        return None
+    if not digits.startswith('1'):
+        digits = '1' + digits
+    return f'{country_code}{digits[1:]}'
+
+def clean_dataframe(df: pd.DataFrame, 
+                    drop_na_threshold: float = 0.5,
+                    date_columns: List[str] = None) -> pd.DataFrame:
+    cleaned_df = df.copy()
+    
+    if date_columns:
+        for col in date_columns:
+            if col in cleaned_df.columns:
+                cleaned_df[col] = pd.to_datetime(cleaned_df[col], errors='coerce')
+    
+    na_percentage = cleaned_df.isna().sum() / len(cleaned_df)
+    columns_to_drop = na_percentage[na_percentage > drop_na_threshold].index
+    cleaned_df = cleaned_df.drop(columns=columns_to_drop)
+    
+    cleaned_df = cleaned_df.dropna(thresh=len(cleaned_df.columns) * 0.7)
+    
+    return cleaned_df
+
+def generate_summary_statistics(df: pd.DataFrame) -> Dict[str, Any]:
+    summary = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isna().sum().sum(),
+        'numeric_columns': df.select_dtypes(include=['number']).columns.tolist(),
+        'categorical_columns': df.select_dtypes(include=['object']).columns.tolist(),
+        'date_columns': df.select_dtypes(include=['datetime']).columns.tolist()
+    }
+    
+    if summary['numeric_columns']:
+        summary['numeric_stats'] = df[summary['numeric_columns']].describe().to_dict()
+    
+    return summary
+
+def detect_outliers_iqr(series: pd.Series, multiplier: float = 1.5) -> pd.Series:
+    Q1 = series.quantile(0.25)
+    Q3 = series.quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    return (series < lower_bound) | (series > upper_bound)
+
+def format_column_names(df: pd.DataFrame) -> pd.DataFrame:
+    formatted_df = df.copy()
+    formatted_df.columns = (
+        formatted_df.columns
+        .str.lower()
+        .str.replace(r'[^\w\s]', '', regex=True)
+        .str.replace(r'\s+', '_', regex=True)
+        .str.strip('_')
+    )
+    return formatted_df
