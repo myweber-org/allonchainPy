@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-def remove_outliers_iqr(data, column, threshold=1.5):
+def remove_outliers_iqr(data, column, factor=1.5):
     """
     Remove outliers using IQR method
     """
@@ -14,8 +14,8 @@ def remove_outliers_iqr(data, column, threshold=1.5):
     Q3 = data[column].quantile(0.75)
     IQR = Q3 - Q1
     
-    lower_bound = Q1 - threshold * IQR
-    upper_bound = Q3 + threshold * IQR
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
     
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
     removed_count = len(data) - len(filtered_data)
@@ -29,10 +29,8 @@ def remove_outliers_zscore(data, column, threshold=3):
     if column not in data.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    z_scores = np.abs(stats.zscore(data[column].dropna()))
-    mask = z_scores < threshold
-    
-    filtered_data = data[mask]
+    z_scores = np.abs(stats.zscore(data[column]))
+    filtered_data = data[z_scores < threshold]
     removed_count = len(data) - len(filtered_data)
     
     return filtered_data, removed_count
@@ -69,57 +67,71 @@ def normalize_zscore(data, column):
     standardized = (data[column] - mean_val) / std_val
     return standardized
 
-def clean_dataset(data, numeric_columns, outlier_method='iqr', normalize_method='minmax'):
+def clean_dataset(data, numeric_columns=None, outlier_method='iqr', normalize_method='zscore'):
     """
     Comprehensive data cleaning pipeline
     """
-    cleaned_data = data.copy()
-    removal_stats = {}
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
     
-    for col in numeric_columns:
-        if col not in cleaned_data.columns:
+    cleaned_data = data.copy()
+    report = {}
+    
+    for column in numeric_columns:
+        if column not in data.columns:
             continue
             
+        original_count = len(cleaned_data)
+        
         if outlier_method == 'iqr':
-            cleaned_data, removed = remove_outliers_iqr(cleaned_data, col)
+            cleaned_data, removed = remove_outliers_iqr(cleaned_data, column)
         elif outlier_method == 'zscore':
-            cleaned_data, removed = remove_outliers_zscore(cleaned_data, col)
+            cleaned_data, removed = remove_outliers_zscore(cleaned_data, column)
         else:
             removed = 0
         
-        removal_stats[col] = removed
-        
         if normalize_method == 'minmax':
-            cleaned_data[col] = normalize_minmax(cleaned_data, col)
+            cleaned_data[f"{column}_normalized"] = normalize_minmax(cleaned_data, column)
         elif normalize_method == 'zscore':
-            cleaned_data[col] = normalize_zscore(cleaned_data, col)
+            cleaned_data[f"{column}_normalized"] = normalize_zscore(cleaned_data, column)
+        
+        report[column] = {
+            'original_samples': original_count,
+            'remaining_samples': len(cleaned_data),
+            'outliers_removed': removed,
+            'normalization_applied': normalize_method
+        }
     
-    return cleaned_data, removal_stats
+    return cleaned_data, report
 
-def validate_data(data, required_columns, numeric_check=True):
+def validate_data(data, required_columns=None, allow_nan=False):
     """
     Validate dataset structure and content
     """
-    missing_columns = [col for col in required_columns if col not in data.columns]
-    
-    if missing_columns:
-        raise ValueError(f"Missing required columns: {missing_columns}")
-    
-    validation_report = {
-        'total_rows': len(data),
-        'missing_values': data.isnull().sum().to_dict(),
-        'data_types': data.dtypes.to_dict()
+    validation_result = {
+        'is_valid': True,
+        'issues': [],
+        'summary': {}
     }
     
-    if numeric_check:
-        numeric_cols = data.select_dtypes(include=[np.number]).columns
-        validation_report['numeric_stats'] = {
-            col: {
-                'mean': data[col].mean(),
-                'std': data[col].std(),
-                'min': data[col].min(),
-                'max': data[col].max()
-            } for col in numeric_cols
-        }
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in data.columns]
+        if missing_columns:
+            validation_result['is_valid'] = False
+            validation_result['issues'].append(f"Missing required columns: {missing_columns}")
     
-    return validation_report
+    if not allow_nan:
+        nan_counts = data.isna().sum()
+        columns_with_nan = nan_counts[nan_counts > 0].index.tolist()
+        if columns_with_nan:
+            validation_result['is_valid'] = False
+            validation_result['issues'].append(f"Columns with NaN values: {columns_with_nan}")
+    
+    validation_result['summary'] = {
+        'total_rows': len(data),
+        'total_columns': len(data.columns),
+        'data_types': data.dtypes.to_dict(),
+        'memory_usage': data.memory_usage(deep=True).sum()
+    }
+    
+    return validation_result
