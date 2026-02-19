@@ -571,3 +571,105 @@ def clean_dataset(df, numeric_columns=None, outlier_removal=True, normalization=
                 df_clean = standardize_zscore(df_clean, col)
     
     return df_clean
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_outliers_zscore(self, columns=None, threshold=3):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        df_clean = self.df.copy()
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                z_scores = np.abs(stats.zscore(self.df[col].fillna(self.df[col].mean())))
+                df_clean = df_clean[z_scores < threshold]
+        
+        self.df = df_clean
+        removed_count = self.original_shape[0] - self.df.shape[0]
+        print(f"Removed {removed_count} outliers using Z-score method")
+        return self
+        
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val > min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        
+        print("Applied Min-Max normalization to selected columns")
+        return self
+        
+    def fill_missing_mean(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                self.df[col] = self.df[col].fillna(self.df[col].mean())
+        
+        print("Filled missing values with column means")
+        return self
+        
+    def get_cleaned_data(self):
+        return self.df
+        
+    def get_summary(self):
+        summary = {
+            'original_rows': self.original_shape[0],
+            'cleaned_rows': self.df.shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_columns': self.df.shape[1],
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'missing_values': self.df.isnull().sum().sum()
+        }
+        return summary
+
+def process_dataset(file_path):
+    try:
+        df = pd.read_csv(file_path)
+        cleaner = DataCleaner(df)
+        
+        cleaner.fill_missing_mean()
+        cleaner.remove_outliers_zscore(threshold=3)
+        cleaner.normalize_minmax()
+        
+        cleaned_df = cleaner.get_cleaned_data()
+        summary = cleaner.get_summary()
+        
+        return cleaned_df, summary
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None, None
+    except Exception as e:
+        print(f"Error processing dataset: {str(e)}")
+        return None, None
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature1': np.random.normal(100, 15, 1000),
+        'feature2': np.random.exponential(50, 1000),
+        'feature3': np.random.uniform(0, 1, 1000)
+    })
+    
+    sample_data.iloc[10:20, 0] = np.nan
+    sample_data.iloc[50:55, 1] = 1000
+    
+    cleaner = DataCleaner(sample_data)
+    cleaner.fill_missing_mean().remove_outliers_zscore().normalize_minmax()
+    
+    result = cleaner.get_cleaned_data()
+    stats = cleaner.get_summary()
+    
+    print(f"Cleaned dataset shape: {result.shape}")
+    print(f"Processing summary: {stats}")
