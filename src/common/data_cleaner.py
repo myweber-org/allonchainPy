@@ -395,3 +395,128 @@ def validate_dataframe(df):
     if df.empty:
         raise ValueError("DataFrame is empty")
     return True
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_duplicates(self):
+        self.df = self.df.drop_duplicates()
+        return self
+        
+    def handle_missing_values(self, strategy='mean'):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if strategy == 'mean':
+            for col in numeric_cols:
+                self.df[col].fillna(self.df[col].mean(), inplace=True)
+        elif strategy == 'median':
+            for col in numeric_cols:
+                self.df[col].fillna(self.df[col].median(), inplace=True)
+        elif strategy == 'mode':
+            for col in numeric_cols:
+                self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+                
+        return self
+        
+    def detect_outliers_zscore(self, threshold=3):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        outliers_mask = pd.DataFrame(False, index=self.df.index, columns=numeric_cols)
+        
+        for col in numeric_cols:
+            z_scores = np.abs(stats.zscore(self.df[col].dropna()))
+            outliers_mask[col] = z_scores > threshold
+            
+        return outliers_mask
+    
+    def remove_outliers_iqr(self):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        original_len = len(self.df)
+        
+        for col in numeric_cols:
+            Q1 = self.df[col].quantile(0.25)
+            Q3 = self.df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+            
+        removed_count = original_len - len(self.df)
+        return self, removed_count
+    
+    def normalize_data(self, method='minmax'):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if method == 'minmax':
+            for col in numeric_cols:
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val != min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+                    
+        elif method == 'standard':
+            for col in numeric_cols:
+                mean_val = self.df[col].mean()
+                std_val = self.df[col].std()
+                if std_val != 0:
+                    self.df[col] = (self.df[col] - mean_val) / std_val
+                    
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def get_cleaning_report(self):
+        cleaned_shape = self.df.shape
+        report = {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': cleaned_shape[0],
+            'cleaned_columns': cleaned_shape[1],
+            'rows_removed': self.original_shape[0] - cleaned_shape[0],
+            'columns_removed': self.original_shape[1] - cleaned_shape[1]
+        }
+        return report
+
+def create_sample_data():
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 100),
+        'feature_b': np.random.exponential(50, 100),
+        'feature_c': np.random.uniform(0, 1, 100)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    df.iloc[5, 0] = np.nan
+    df.iloc[10, 1] = np.nan
+    df.iloc[15, 2] = np.nan
+    
+    df = pd.concat([df, df.iloc[:5]], ignore_index=True)
+    
+    df.iloc[0, 0] = 500
+    df.iloc[1, 1] = 300
+    
+    return df
+
+if __name__ == "__main__":
+    sample_df = create_sample_data()
+    cleaner = DataCleaner(sample_df)
+    
+    cleaner.remove_duplicates()
+    cleaner.handle_missing_values(strategy='mean')
+    cleaner.remove_outliers_iqr()
+    cleaner.normalize_data(method='minmax')
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    report = cleaner.get_cleaning_report()
+    
+    print("Data cleaning completed successfully")
+    print(f"Original shape: {report['original_rows']}x{report['original_columns']}")
+    print(f"Cleaned shape: {report['cleaned_rows']}x{report['cleaned_columns']}")
+    print(f"Rows removed: {report['rows_removed']}")
