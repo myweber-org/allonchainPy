@@ -1,44 +1,73 @@
 
 import pandas as pd
-import numpy as np
-from scipy import stats
 
-def load_and_clean_data(filepath):
-    df = pd.read_csv(filepath)
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
-    # Remove duplicates
-    df = df.drop_duplicates()
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to remove duplicate rows.
+        fill_missing (bool): Whether to fill missing values.
+        fill_value: Value to use for filling missing data.
     
-    # Handle missing values
-    for column in df.select_dtypes(include=[np.number]).columns:
-        df[column] = df[column].fillna(df[column].median())
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
     
-    # Remove outliers using z-score
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    z_scores = np.abs(stats.zscore(df[numeric_cols]))
-    df = df[(z_scores < 3).all(axis=1)]
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
     
-    # Normalize numeric columns
-    for column in numeric_cols:
-        if df[column].std() != 0:
-            df[column] = (df[column] - df[column].mean()) / df[column].std()
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
     
-    return df
+    return cleaned_df
 
-def save_cleaned_data(df, output_path):
-    df.to_csv(output_path, index=False)
-    print(f"Cleaned data saved to {output_path}")
-
-if __name__ == "__main__":
-    input_file = "raw_data.csv"
-    output_file = "cleaned_data.csv"
+def remove_outliers(df, column, threshold=3):
+    """
+    Remove outliers from a specific column using z-score method.
     
-    try:
-        cleaned_df = load_and_clean_data(input_file)
-        save_cleaned_data(cleaned_df, output_file)
-        print(f"Original shape: {pd.read_csv(input_file).shape}")
-        print(f"Cleaned shape: {cleaned_df.shape}")
-    except FileNotFoundError:
-        print(f"Error: {input_file} not found")
-    except Exception as e:
-        print(f"Error during processing: {str(e)}")
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column (str): Column name to process.
+        threshold (float): Z-score threshold for outlier detection.
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed.
+    """
+    from scipy import stats
+    import numpy as np
+    
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = np.abs(stats.zscore(df[column].dropna()))
+    mask = z_scores < threshold
+    
+    valid_indices = df[column].dropna().index[mask]
+    return df.loc[valid_indices].reset_index(drop=True)
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
