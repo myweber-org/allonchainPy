@@ -1,152 +1,82 @@
-
-import numpy as np
 import pandas as pd
-from scipy import stats
+import numpy as np
 
-def remove_outliers_iqr(dataframe, column, threshold=1.5):
+def remove_outliers_iqr(df, column):
     """
-    Remove outliers from a DataFrame column using IQR method.
+    Remove outliers from a DataFrame column using the IQR method.
     
-    Parameters:
-    dataframe (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
-    threshold (float): IQR multiplier (default 1.5)
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+        pd.DataFrame: DataFrame with outliers removed
     """
-    if column not in dataframe.columns:
+    if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    q1 = dataframe[column].quantile(0.25)
-    q3 = dataframe[column].quantile(0.75)
-    iqr = q3 - q1
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    lower_bound = q1 - threshold * iqr
-    upper_bound = q3 + threshold * iqr
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
-                           (dataframe[column] <= upper_bound)]
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
-    return filtered_df.copy()
+    return filtered_df
 
-def normalize_minmax(dataframe, columns=None):
+def clean_dataset(df, numeric_columns=None):
     """
-    Normalize specified columns using min-max scaling.
+    Clean dataset by removing outliers from numeric columns.
     
-    Parameters:
-    dataframe (pd.DataFrame): Input DataFrame
-    columns (list): List of column names to normalize (default: all numeric columns)
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        numeric_columns (list, optional): List of numeric columns to clean
     
     Returns:
-    pd.DataFrame: DataFrame with normalized columns
+        pd.DataFrame: Cleaned DataFrame
     """
-    if columns is None:
-        columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
     
-    result_df = dataframe.copy()
+    cleaned_df = df.copy()
     
-    for col in columns:
-        if col not in result_df.columns:
-            continue
-            
-        if result_df[col].dtype in [np.float64, np.int64]:
-            min_val = result_df[col].min()
-            max_val = result_df[col].max()
-            
-            if max_val > min_val:
-                result_df[col] = (result_df[col] - min_val) / (max_val - min_val)
+    for column in numeric_columns:
+        if column in cleaned_df.columns:
+            original_len = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            removed_count = original_len - len(cleaned_df)
+            print(f"Removed {removed_count} outliers from column '{column}'")
     
-    return result_df
+    return cleaned_df
 
-def detect_skewed_columns(dataframe, skew_threshold=0.5):
+def save_cleaned_data(df, input_path, suffix="_cleaned"):
     """
-    Identify columns with significant skewness.
+    Save cleaned DataFrame to a new CSV file.
     
-    Parameters:
-    dataframe (pd.DataFrame): Input DataFrame
-    skew_threshold (float): Absolute skewness threshold (default 0.5)
-    
-    Returns:
-    dict: Dictionary with column names and their skewness values
+    Args:
+        df (pd.DataFrame): Cleaned DataFrame
+        input_path (str): Original file path
+        suffix (str): Suffix to add to filename
     """
-    skewed_cols = {}
-    
-    numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
-    
-    for col in numeric_cols:
-        skewness = stats.skew(dataframe[col].dropna())
-        if abs(skewness) > skew_threshold:
-            skewed_cols[col] = skewness
-    
-    return skewed_cols
+    if input_path.endswith('.csv'):
+        output_path = input_path.replace('.csv', f'{suffix}.csv')
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+    else:
+        raise ValueError("Only CSV files are supported")
 
-def clean_dataset(dataframe, outlier_columns=None, normalize=True, skew_threshold=0.5):
-    """
-    Comprehensive data cleaning pipeline.
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'id': range(100),
+        'value': np.concatenate([
+            np.random.normal(100, 10, 90),
+            np.random.normal(300, 50, 10)
+        ]),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    })
     
-    Parameters:
-    dataframe (pd.DataFrame): Input DataFrame
-    outlier_columns (list): Columns to process for outliers (default: all numeric)
-    normalize (bool): Whether to normalize numeric columns
-    skew_threshold (float): Skewness detection threshold
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    dict: Dictionary with cleaning statistics
-    """
-    if outlier_columns is None:
-        outlier_columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
-    
-    cleaned_df = dataframe.copy()
-    stats_dict = {
-        'original_rows': len(dataframe),
-        'original_columns': len(dataframe.columns),
-        'outlier_removal': {},
-        'skewed_columns': {}
-    }
-    
-    for col in outlier_columns:
-        if col in cleaned_df.columns and cleaned_df[col].dtype in [np.float64, np.int64]:
-            original_count = len(cleaned_df)
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-            removed = original_count - len(cleaned_df)
-            stats_dict['outlier_removal'][col] = removed
-    
-    if normalize:
-        cleaned_df = normalize_minmax(cleaned_df)
-        stats_dict['normalized'] = True
-    
-    skewed_cols = detect_skewed_columns(cleaned_df, skew_threshold)
-    stats_dict['skewed_columns'] = skewed_cols
-    stats_dict['final_rows'] = len(cleaned_df)
-    
-    return cleaned_df, stats_dict
-
-def validate_dataframe(dataframe, required_columns=None, min_rows=10):
-    """
-    Validate DataFrame structure and content.
-    
-    Parameters:
-    dataframe (pd.DataFrame): DataFrame to validate
-    required_columns (list): List of required column names
-    min_rows (int): Minimum number of rows required
-    
-    Returns:
-    tuple: (is_valid, error_message)
-    """
-    if not isinstance(dataframe, pd.DataFrame):
-        return False, "Input is not a pandas DataFrame"
-    
-    if len(dataframe) < min_rows:
-        return False, f"DataFrame has fewer than {min_rows} rows"
-    
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in dataframe.columns]
-        if missing_cols:
-            return False, f"Missing required columns: {missing_cols}"
-    
-    if dataframe.isnull().all().any():
-        return False, "Some columns contain only null values"
-    
-    return True, "DataFrame validation passed"
+    print(f"Original data shape: {sample_data.shape}")
+    cleaned_data = clean_dataset(sample_data, ['value'])
+    print(f"Cleaned data shape: {cleaned_data.shape}")
