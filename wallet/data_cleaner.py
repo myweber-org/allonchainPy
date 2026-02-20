@@ -357,3 +357,125 @@ def example_usage():
 
 if __name__ == "__main__":
     result = example_usage()
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, missing_strategy='mean', outlier_method='iqr'):
+    """
+    Clean a dataset by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    missing_strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
+    outlier_method (str): Method for detecting outliers ('iqr', 'zscore')
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if missing_strategy == 'mean':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mean())
+    elif missing_strategy == 'median':
+        cleaned_df = cleaned_df.fillna(cleaned_df.median())
+    elif missing_strategy == 'mode':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
+    elif missing_strategy == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    
+    # Handle outliers for numeric columns only
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        if outlier_method == 'iqr':
+            Q1 = cleaned_df[col].quantile(0.25)
+            Q3 = cleaned_df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            # Cap outliers
+            cleaned_df[col] = cleaned_df[col].clip(lower=lower_bound, upper=upper_bound)
+            
+        elif outlier_method == 'zscore':
+            mean_val = cleaned_df[col].mean()
+            std_val = cleaned_df[col].std()
+            
+            # Calculate z-scores
+            z_scores = np.abs((cleaned_df[col] - mean_val) / std_val)
+            
+            # Replace outliers with mean
+            cleaned_df.loc[z_scores > 3, col] = mean_val
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): Dataframe to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    # Check if dataframe is empty
+    if df.empty:
+        validation_results['is_valid'] = False
+        validation_results['errors'].append('Dataframe is empty')
+        return validation_results
+    
+    # Check required columns
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f'Missing required columns: {missing_cols}')
+    
+    # Check for duplicate rows
+    duplicate_count = df.duplicated().sum()
+    if duplicate_count > 0:
+        validation_results['warnings'].append(f'Found {duplicate_count} duplicate rows')
+    
+    # Check data types
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            unique_count = df[col].nunique()
+            if unique_count / len(df) > 0.5:
+                validation_results['warnings'].append(f'Column {col} has high cardinality: {unique_count} unique values')
+    
+    return validation_results
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 100],
+        'B': [5, 6, 7, np.nan, 9],
+        'C': ['x', 'y', 'z', 'x', 'y']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    # Clean the data
+    cleaned = clean_dataset(df, missing_strategy='mean', outlier_method='iqr')
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print("\n")
+    
+    # Validate the cleaned data
+    validation = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
+    print("Validation Results:")
+    print(validation)
