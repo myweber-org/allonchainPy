@@ -261,4 +261,93 @@ if __name__ == "__main__":
     for city, country in locations:
         weather = fetcher.get_weather(city, country)
         display_weather(weather)
-        time.sleep(1)  # Be nice to the API
+        time.sleep(1)  # Be nice to the APIimport requests
+import json
+import os
+
+def get_weather(city_name, api_key=None):
+    """
+    Fetch current weather data for a given city.
+    
+    Args:
+        city_name (str): Name of the city
+        api_key (str): OpenWeatherMap API key. If None, reads from WEATHER_API_KEY env variable.
+    
+    Returns:
+        dict: Weather data if successful, None otherwise
+    """
+    if api_key is None:
+        api_key = os.getenv('WEATHER_API_KEY')
+    
+    if not api_key:
+        print("API key not provided. Set WEATHER_API_KEY environment variable.")
+        return None
+    
+    base_url = "http://api.openweathermap.org/data/2.5/weather"
+    params = {
+        'q': city_name,
+        'appid': api_key,
+        'units': 'metric'
+    }
+    
+    try:
+        response = requests.get(base_url, params=params, timeout=10)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        if data.get('cod') != 200:
+            print(f"Error: {data.get('message', 'Unknown error')}")
+            return None
+        
+        return {
+            'city': data['name'],
+            'country': data['sys']['country'],
+            'temperature': data['main']['temp'],
+            'feels_like': data['main']['feels_like'],
+            'humidity': data['main']['humidity'],
+            'pressure': data['main']['pressure'],
+            'weather': data['weather'][0]['description'],
+            'wind_speed': data['wind']['speed'],
+            'wind_direction': data['wind'].get('deg', 0),
+            'visibility': data.get('visibility', 0),
+            'clouds': data['clouds']['all']
+        }
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Network error: {e}")
+        return None
+    except (KeyError, json.JSONDecodeError) as e:
+        print(f"Data parsing error: {e}")
+        return None
+
+def display_weather(weather_data):
+    """
+    Display weather data in a readable format.
+    
+    Args:
+        weather_data (dict): Weather data dictionary
+    """
+    if not weather_data:
+        print("No weather data to display.")
+        return
+    
+    print(f"Weather in {weather_data['city']}, {weather_data['country']}:")
+    print(f"  Temperature: {weather_data['temperature']}°C")
+    print(f"  Feels like: {weather_data['feels_like']}°C")
+    print(f"  Weather: {weather_data['weather'].title()}")
+    print(f"  Humidity: {weather_data['humidity']}%")
+    print(f"  Pressure: {weather_data['pressure']} hPa")
+    print(f"  Wind: {weather_data['wind_speed']} m/s at {weather_data['wind_direction']}°")
+    print(f"  Visibility: {weather_data['visibility']} meters")
+    print(f"  Cloud cover: {weather_data['clouds']}%")
+
+if __name__ == "__main__":
+    # Example usage
+    city = "London"
+    weather = get_weather(city)
+    
+    if weather:
+        display_weather(weather)
+    else:
+        print(f"Failed to fetch weather data for {city}")
