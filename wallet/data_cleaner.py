@@ -561,4 +561,22 @@ def example_usage():
 
 if __name__ == "__main__":
     result = example_usage()
-    print(result.head())
+    print(result.head())import re
+
+def clean_string(text):
+    """
+    Clean and normalize a string by:
+    1. Removing leading and trailing whitespace.
+    2. Replacing multiple spaces with a single space.
+    3. Converting the entire string to lowercase.
+    """
+    if not isinstance(text, str):
+        raise TypeError("Input must be a string")
+
+    # Strip leading/trailing whitespace
+    text = text.strip()
+    # Replace multiple spaces/newlines/tabs with a single space
+    text = re.sub(r'\s+', ' ', text)
+    # Convert to lowercase
+    text = text.lower()
+    return text
