@@ -234,3 +234,102 @@ def validate_dataset(df, required_columns=None):
         validation_results['all_columns_present'] = len(missing_cols) == 0
     
     return validation_results
+import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        subset: column label or sequence of labels to consider for duplicates
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def handle_missing_values(df, strategy='drop', fill_value=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        strategy: 'drop' to remove rows, 'fill' to replace values
+        fill_value: value to use when strategy is 'fill'
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill':
+        if fill_value is not None:
+            return df.fillna(fill_value)
+        else:
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+            return df
+    else:
+        raise ValueError("Strategy must be 'drop' or 'fill'")
+
+def clean_column_names(df):
+    """
+    Standardize column names to lowercase with underscores.
+    
+    Args:
+        df: pandas DataFrame
+    
+    Returns:
+        DataFrame with cleaned column names
+    """
+    df.columns = df.columns.str.lower().str.replace(' ', '_')
+    return df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: pandas DataFrame
+        required_columns: list of column names that must be present
+    
+    Returns:
+        tuple of (is_valid, error_message)
+    """
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    return True, "Data validation passed"
+
+def process_dataframe(df, cleaning_steps=None):
+    """
+    Apply multiple cleaning steps to DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        cleaning_steps: list of cleaning function names to apply
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if cleaning_steps is None:
+        cleaning_steps = ['clean_column_names', 'remove_duplicates', 'handle_missing_values']
+    
+    result_df = df.copy()
+    
+    for step in cleaning_steps:
+        if step == 'clean_column_names':
+            result_df = clean_column_names(result_df)
+        elif step == 'remove_duplicates':
+            result_df = remove_duplicates(result_df)
+        elif step == 'handle_missing_values':
+            result_df = handle_missing_values(result_df, strategy='fill')
+    
+    return result_df
