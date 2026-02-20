@@ -158,4 +158,37 @@ def get_data_summary(df):
         'missing_values': df.isnull().sum().to_dict()
     }
     
-    return summary
+    return summaryimport pandas as pd
+import numpy as np
+
+def load_data(filepath):
+    """Load data from CSV file."""
+    return pd.read_csv(filepath)
+
+def remove_outliers(df, column, threshold=3):
+    """Remove outliers using z-score method."""
+    z_scores = np.abs((df[column] - df[column].mean()) / df[column].std())
+    return df[z_scores < threshold]
+
+def normalize_column(df, column):
+    """Normalize column using min-max scaling."""
+    df[column] = (df[column] - df[column].min()) / (df[column].max() - df[column].min())
+    return df
+
+def clean_data(df, numeric_columns):
+    """Main cleaning pipeline."""
+    for col in numeric_columns:
+        df = remove_outliers(df, col)
+        df = normalize_column(df, col)
+    df = df.dropna()
+    return df.reset_index(drop=True)
+
+def save_cleaned_data(df, output_path):
+    """Save cleaned data to CSV."""
+    df.to_csv(output_path, index=False)
+
+if __name__ == "__main__":
+    raw_data = load_data("raw_dataset.csv")
+    numeric_cols = ["age", "income", "score"]
+    cleaned_data = clean_data(raw_data, numeric_cols)
+    save_cleaned_data(cleaned_data, "cleaned_dataset.csv")
