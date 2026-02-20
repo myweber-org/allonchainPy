@@ -492,3 +492,11 @@ if __name__ == "__main__":
         save_cleaned_data(cleaned_df, output_file)
     except Exception as e:
         print(f"Error during data cleaning: {e}")
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
