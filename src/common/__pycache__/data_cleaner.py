@@ -405,3 +405,90 @@ if __name__ == "__main__":
     
     cleaned_df = load_and_clean_data(input_file)
     save_cleaned_data(cleaned_df, output_file)
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, fill_method='mean', drop_threshold=0.5):
+    """
+    Clean CSV data by handling missing values and removing invalid rows.
+    
+    Parameters:
+    file_path (str): Path to the CSV file
+    fill_method (str): Method for filling missing values ('mean', 'median', 'mode', 'zero')
+    drop_threshold (float): Threshold for dropping rows with too many missing values (0 to 1)
+    
+    Returns:
+    pandas.DataFrame: Cleaned dataframe
+    """
+    
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {file_path}")
+    
+    original_shape = df.shape
+    
+    # Remove duplicate rows
+    df = df.drop_duplicates()
+    
+    # Drop rows with too many missing values
+    missing_ratio = df.isnull().sum(axis=1) / df.shape[1]
+    df = df[missing_ratio <= drop_threshold]
+    
+    # Fill missing values based on specified method
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if fill_method == 'mean':
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].mean())
+    elif fill_method == 'median':
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].median())
+    elif fill_method == 'zero':
+        df[numeric_cols] = df[numeric_cols].fillna(0)
+    elif fill_method == 'mode':
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 0)
+    
+    # Fill remaining non-numeric columns with forward fill
+    df = df.fillna(method='ffill').fillna(method='bfill')
+    
+    # Remove outliers using IQR method for numeric columns
+    for col in numeric_cols:
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        df = df[(df[col] >= lower_bound) & (df[col] <= upper_bound)]
+    
+    cleaned_shape = df.shape
+    
+    print(f"Original data shape: {original_shape}")
+    print(f"Cleaned data shape: {cleaned_shape}")
+    print(f"Rows removed: {original_shape[0] - cleaned_shape[0]}")
+    print(f"Columns: {cleaned_shape[1]}")
+    
+    return df
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned dataframe to CSV file.
+    
+    Parameters:
+    df (pandas.DataFrame): Cleaned dataframe
+    output_path (str): Path to save the cleaned CSV file
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to: {output_path}")
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    try:
+        cleaned_df = clean_csv_data(input_file, fill_method='median', drop_threshold=0.3)
+        save_cleaned_data(cleaned_df, output_file)
+    except Exception as e:
+        print(f"Error during data cleaning: {e}")
