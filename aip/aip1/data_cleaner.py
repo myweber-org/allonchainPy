@@ -351,3 +351,11 @@ if __name__ == "__main__":
     print(cleaned)
     print("\nValidation after cleaning:")
     print(validate_dataset(cleaned))
+def deduplicate_list(original_list):
+    seen = set()
+    result = []
+    for item in original_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
