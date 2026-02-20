@@ -486,3 +486,89 @@ if __name__ == "__main__":
     validation = validate_dataframe(cleaned)
     for key, value in validation.items():
         print(f"{key}: {value}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, factor=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    """
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    return filtered_df
+
+def remove_outliers_zscore(dataframe, column, threshold=3):
+    """
+    Remove outliers using Z-score method.
+    """
+    z_scores = np.abs(stats.zscore(dataframe[column]))
+    filtered_df = dataframe[z_scores < threshold]
+    return filtered_df
+
+def normalize_minmax(dataframe, columns):
+    """
+    Normalize specified columns using Min-Max scaling.
+    """
+    df_normalized = dataframe.copy()
+    for col in columns:
+        if col in df_normalized.columns:
+            min_val = df_normalized[col].min()
+            max_val = df_normalized[col].max()
+            if max_val != min_val:
+                df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+    return df_normalized
+
+def normalize_zscore(dataframe, columns):
+    """
+    Normalize specified columns using Z-score standardization.
+    """
+    df_normalized = dataframe.copy()
+    for col in columns:
+        if col in df_normalized.columns:
+            mean_val = df_normalized[col].mean()
+            std_val = df_normalized[col].std()
+            if std_val > 0:
+                df_normalized[col] = (df_normalized[col] - mean_val) / std_val
+    return df_normalized
+
+def clean_dataset(dataframe, numeric_columns, outlier_method='iqr', normalize_method='minmax'):
+    """
+    Main cleaning function that applies outlier removal and normalization.
+    """
+    df_clean = dataframe.copy()
+    
+    for col in numeric_columns:
+        if col not in df_clean.columns:
+            continue
+            
+        if outlier_method == 'iqr':
+            df_clean = remove_outliers_iqr(df_clean, col)
+        elif outlier_method == 'zscore':
+            df_clean = remove_outliers_zscore(df_clean, col)
+    
+    if normalize_method == 'minmax':
+        df_clean = normalize_minmax(df_clean, numeric_columns)
+    elif normalize_method == 'zscore':
+        df_clean = normalize_zscore(df_clean, numeric_columns)
+    
+    return df_clean
+
+def get_data_summary(dataframe):
+    """
+    Generate statistical summary of the dataframe.
+    """
+    summary = {
+        'original_rows': len(dataframe),
+        'numeric_columns': dataframe.select_dtypes(include=[np.number]).columns.tolist(),
+        'categorical_columns': dataframe.select_dtypes(include=['object']).columns.tolist(),
+        'missing_values': dataframe.isnull().sum().to_dict(),
+        'basic_stats': dataframe.describe().to_dict()
+    }
+    return summary
