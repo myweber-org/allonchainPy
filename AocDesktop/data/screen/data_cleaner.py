@@ -134,3 +134,34 @@ if __name__ == "__main__":
     print(f"Data cleaning completed")
     print(f"Removed {stats_summary['removed_rows']} outliers")
     print(f"Final dataset shape: {cleaned_data.shape}")
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
+def clean_dataset(input_file, output_file):
+    df = pd.read_csv(input_file)
+    
+    # Remove duplicate rows
+    df = df.drop_duplicates()
+    
+    # Standardize date column if exists
+    if 'date' in df.columns:
+        df['date'] = pd.to_datetime(df['date'], errors='coerce')
+        df = df.dropna(subset=['date'])
+        df['date'] = df['date'].dt.strftime('%Y-%m-%d')
+    
+    # Fill missing numeric values with column mean
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    
+    # Remove rows with too many missing values
+    threshold = len(df.columns) * 0.3
+    df = df.dropna(thresh=threshold)
+    
+    # Save cleaned data
+    df.to_csv(output_file, index=False)
+    print(f"Cleaned data saved to {output_file}")
+    print(f"Original rows: {len(pd.read_csv(input_file))}, Cleaned rows: {len(df)}")
+
+if __name__ == "__main__":
+    clean_dataset('raw_data.csv', 'cleaned_data.csv')
