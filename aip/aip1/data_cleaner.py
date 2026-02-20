@@ -358,4 +358,131 @@ def deduplicate_list(original_list):
         if item not in seen:
             seen.add(item)
             result.append(item)
-    return result
+    return resultimport numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        data (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data.copy()
+
+def normalize_minmax(data, columns=None):
+    """
+    Normalize specified columns using min-max scaling.
+    
+    Args:
+        data (pd.DataFrame): Input DataFrame
+        columns (list): List of column names to normalize. If None, normalize all numeric columns.
+    
+    Returns:
+        pd.DataFrame: DataFrame with normalized columns
+    """
+    if columns is None:
+        numeric_cols = data.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    normalized_data = data.copy()
+    
+    for col in columns:
+        if col not in normalized_data.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame")
+        
+        if not pd.api.types.is_numeric_dtype(normalized_data[col]):
+            raise TypeError(f"Column '{col}' is not numeric")
+        
+        col_min = normalized_data[col].min()
+        col_max = normalized_data[col].max()
+        
+        if col_max == col_min:
+            normalized_data[col] = 0.5
+        else:
+            normalized_data[col] = (normalized_data[col] - col_min) / (col_max - col_min)
+    
+    return normalized_data
+
+def clean_dataset(data, outlier_columns=None, normalize_columns=None):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        data (pd.DataFrame): Input DataFrame
+        outlier_columns (list): Columns to remove outliers from
+        normalize_columns (list): Columns to normalize
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_data = data.copy()
+    
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in cleaned_data.columns:
+                cleaned_data = remove_outliers_iqr(cleaned_data, col)
+    
+    if normalize_columns:
+        cleaned_data = normalize_minmax(cleaned_data, normalize_columns)
+    
+    cleaned_data.reset_index(drop=True, inplace=True)
+    return cleaned_data
+
+def validate_dataframe(data):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        data (pd.DataFrame): DataFrame to validate
+    
+    Returns:
+        dict: Validation results
+    """
+    validation_results = {
+        'is_dataframe': isinstance(data, pd.DataFrame),
+        'rows': len(data),
+        'columns': list(data.columns),
+        'missing_values': data.isnull().sum().to_dict(),
+        'numeric_columns': list(data.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(data.select_dtypes(include=['object', 'category']).columns)
+    }
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(2, 1000),
+        'feature_c': np.random.randint(1, 50, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    })
+    
+    print("Original data shape:", sample_data.shape)
+    
+    cleaned = clean_dataset(
+        sample_data,
+        outlier_columns=['feature_a', 'feature_b'],
+        normalize_columns=['feature_a', 'feature_b', 'feature_c']
+    )
+    
+    print("Cleaned data shape:", cleaned.shape)
+    print("\nValidation results:")
+    validation = validate_dataframe(cleaned)
+    for key, value in validation.items():
+        print(f"{key}: {value}")
