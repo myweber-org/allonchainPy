@@ -632,3 +632,113 @@ def validate_dataframe(dataframe, required_columns):
         return False
     
     return True
+import pandas as pd
+import numpy as np
+
+def clean_missing_data(df, strategy='mean', columns=None):
+    """
+    Handle missing values in a DataFrame using specified strategy.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
+    columns (list): List of columns to apply cleaning to, None for all columns
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if df.empty:
+        return df
+    
+    if columns is None:
+        columns = df.columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col not in df_clean.columns:
+            continue
+            
+        if df_clean[col].isnull().any():
+            if strategy == 'mean':
+                if pd.api.types.is_numeric_dtype(df_clean[col]):
+                    df_clean[col].fillna(df_clean[col].mean(), inplace=True)
+            elif strategy == 'median':
+                if pd.api.types.is_numeric_dtype(df_clean[col]):
+                    df_clean[col].fillna(df_clean[col].median(), inplace=True)
+            elif strategy == 'mode':
+                if not df_clean[col].mode().empty:
+                    df_clean[col].fillna(df_clean[col].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                df_clean = df_clean.dropna(subset=[col])
+    
+    return df_clean
+
+def remove_outliers(df, columns=None, threshold=3):
+    """
+    Remove outliers using z-score method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of columns to check for outliers
+    threshold (float): Z-score threshold for outlier detection
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if df.empty or columns is None:
+        return df
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col not in df_clean.columns or not pd.api.types.is_numeric_dtype(df_clean[col]):
+            continue
+            
+        z_scores = np.abs((df_clean[col] - df_clean[col].mean()) / df_clean[col].std())
+        df_clean = df_clean[z_scores < threshold]
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+def save_cleaned_data(df, output_path, index=False):
+    """
+    Save cleaned DataFrame to CSV file.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to save
+    output_path (str): Path to save the CSV file
+    index (bool): Whether to save index
+    
+    Returns:
+    bool: True if successful, False otherwise
+    """
+    try:
+        df.to_csv(output_path, index=index)
+        return True
+    except Exception as e:
+        print(f"Error saving data: {e}")
+        return False
