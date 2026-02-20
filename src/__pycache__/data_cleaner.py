@@ -133,3 +133,76 @@ if __name__ == "__main__":
     cleaned = clean_dataset(df, ['A', 'B'])
     print("\nCleaned DataFrame:")
     print(cleaned)
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+
+    def remove_outliers_zscore(self, columns=None, threshold=3):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        df_clean = self.df.copy()
+        for col in columns:
+            if col in df_clean.columns:
+                z_scores = np.abs(stats.zscore(df_clean[col].dropna()))
+                df_clean = df_clean[(z_scores < threshold) | (df_clean[col].isna())]
+        
+        removed_count = self.original_shape[0] - df_clean.shape[0]
+        self.df = df_clean
+        return removed_count
+
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        df_normalized = self.df.copy()
+        for col in columns:
+            if col in df_normalized.columns:
+                col_min = df_normalized[col].min()
+                col_max = df_normalized[col].max()
+                if col_max > col_min:
+                    df_normalized[col] = (df_normalized[col] - col_min) / (col_max - col_min)
+        
+        self.df = df_normalized
+        return self.df
+
+    def fill_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns:
+                median_val = self.df[col].median()
+                self.df[col].fillna(median_val, inplace=True)
+        
+        return self.df
+
+    def get_cleaned_data(self):
+        return self.df.copy()
+
+def process_dataset(file_path):
+    try:
+        df = pd.read_csv(file_path)
+        cleaner = DataCleaner(df)
+        
+        print(f"Original shape: {cleaner.original_shape}")
+        
+        outliers_removed = cleaner.remove_outliers_zscore()
+        print(f"Removed {outliers_removed} outliers")
+        
+        cleaner.fill_missing_median()
+        cleaner.normalize_minmax()
+        
+        cleaned_df = cleaner.get_cleaned_data()
+        print(f"Cleaned shape: {cleaned_df.shape}")
+        
+        return cleaned_df
+        
+    except Exception as e:
+        print(f"Error processing dataset: {e}")
+        return None
