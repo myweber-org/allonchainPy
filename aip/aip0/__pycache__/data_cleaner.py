@@ -108,3 +108,159 @@ if __name__ == "__main__":
         print(f"\n{col}:")
         for stat_name, stat_value in col_stats.items():
             print(f"  {stat_name}: {stat_value:.2f}")
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers using the Interquartile Range method.
+    Returns filtered DataFrame and outlier indices.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    
+    return filtered_data, outliers.index.tolist()
+
+def normalize_minmax(data, column):
+    """
+    Normalize column values to range [0, 1] using min-max scaling.
+    Returns new Series with normalized values.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return pd.Series([0.5] * len(data), index=data.index)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize column values using z-score normalization.
+    Returns new Series with standardized values.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return pd.Series([0] * len(data), index=data.index)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean'):
+    """
+    Handle missing values in numeric columns.
+    Supported strategies: 'mean', 'median', 'mode', 'drop'
+    Returns DataFrame with handled missing values.
+    """
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'drop':
+        return data.dropna(subset=numeric_cols)
+    
+    for col in numeric_cols:
+        if data[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = data[col].mean()
+            elif strategy == 'median':
+                fill_value = data[col].median()
+            elif strategy == 'mode':
+                fill_value = data[col].mode()[0]
+            else:
+                raise ValueError(f"Unsupported strategy: {strategy}")
+            
+            data[col] = data[col].fillna(fill_value)
+    
+    return data
+
+def validate_dataframe(data):
+    """
+    Basic DataFrame validation.
+    Returns tuple of (is_valid, issues_list)
+    """
+    issues = []
+    
+    if not isinstance(data, pd.DataFrame):
+        issues.append("Input is not a pandas DataFrame")
+        return False, issues
+    
+    if data.empty:
+        issues.append("DataFrame is empty")
+        return False, issues
+    
+    if data.isnull().all().any():
+        issues.append("Some columns contain only null values")
+    
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) == 0:
+        issues.append("No numeric columns found")
+    
+    return len(issues) == 0, issues
+
+def create_sample_dataset():
+    """
+    Create a sample dataset for testing purposes.
+    Returns DataFrame with sample data containing outliers and missing values.
+    """
+    np.random.seed(42)
+    
+    data = {
+        'feature_a': np.concatenate([
+            np.random.normal(50, 10, 90),
+            np.array([150, -30, 200])
+        ]),
+        'feature_b': np.concatenate([
+            np.random.normal(100, 20, 93),
+            np.array([np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan])
+        ]),
+        'feature_c': np.random.uniform(0, 1, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    
+    df = pd.DataFrame(data)
+    df.loc[95:99, 'feature_a'] = np.nan
+    
+    return df
+
+if __name__ == "__main__":
+    sample_data = create_sample_dataset()
+    print("Sample dataset created:")
+    print(sample_data.head())
+    print(f"\nDataset shape: {sample_data.shape}")
+    
+    is_valid, issues = validate_dataframe(sample_data)
+    print(f"\nData validation: {'Valid' if is_valid else 'Invalid'}")
+    if issues:
+        print("Issues found:", issues)
+    
+    cleaned_data, outliers = remove_outliers_iqr(sample_data, 'feature_a')
+    print(f"\nOutliers removed from 'feature_a': {len(outliers)} rows")
+    
+    normalized = normalize_minmax(cleaned_data, 'feature_c')
+    print(f"\n'feature_c' normalized to range [0, 1]")
+    
+    standardized = standardize_zscore(cleaned_data, 'feature_a')
+    print(f"'feature_a' standardized using z-score")
+    
+    filled_data = handle_missing_values(sample_data, strategy='mean')
+    print(f"\nMissing values handled using mean imputation")
+    print(f"Original null count: {sample_data.isnull().sum().sum()}")
+    print(f"Cleaned null count: {filled_data.isnull().sum().sum()}")
