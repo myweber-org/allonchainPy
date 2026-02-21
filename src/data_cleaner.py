@@ -88,4 +88,114 @@ if __name__ == "__main__":
         if is_valid:
             print("Data cleaning and validation completed successfully.")
         else:
-            print("Data validation failed.")
+            print("Data validation failed.")import pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, fill_strategy='mean', drop_threshold=0.5):
+    """
+    Load and clean CSV data by handling missing values.
+    
+    Args:
+        filepath (str): Path to the CSV file.
+        fill_strategy (str): Strategy for filling missing values.
+            Options: 'mean', 'median', 'mode', 'zero', 'drop'.
+        drop_threshold (float): Threshold for dropping columns/rows with
+            missing values (0.0 to 1.0).
+    
+    Returns:
+        pandas.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(filepath)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    original_shape = df.shape
+    
+    if drop_threshold > 0:
+        col_threshold = int(drop_threshold * len(df))
+        df = df.dropna(axis=1, thresh=col_threshold)
+        
+        row_threshold = int(drop_threshold * len(df.columns))
+        df = df.dropna(axis=0, thresh=row_threshold)
+    
+    if fill_strategy != 'drop':
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        
+        if fill_strategy == 'mean':
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+        elif fill_strategy == 'median':
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+        elif fill_strategy == 'zero':
+            df[numeric_cols] = df[numeric_cols].fillna(0)
+        elif fill_strategy == 'mode':
+            for col in numeric_cols:
+                df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 0)
+        
+        object_cols = df.select_dtypes(include=['object']).columns
+        df[object_cols] = df[object_cols].fillna('Unknown')
+    
+    print(f"Data cleaned: {original_shape} -> {df.shape}")
+    print(f"Missing values remaining: {df.isnull().sum().sum()}")
+    
+    return df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pandas.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        dict: Validation results.
+    """
+    validation = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    if df.empty:
+        validation['is_valid'] = False
+        validation['errors'].append('DataFrame is empty')
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            validation['is_valid'] = False
+            validation['errors'].append(f'Missing required columns: {missing_cols}')
+    
+    if df.duplicated().any():
+        validation['warnings'].append(f'Found {df.duplicated().sum()} duplicate rows')
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if df[col].isnull().any():
+            validation['warnings'].append(f'Column {col} has {df[col].isnull().sum()} missing values')
+    
+    return validation
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, 2, 3, np.nan, 5],
+        'C': ['X', 'Y', np.nan, 'Z', 'W'],
+        'D': [10, 20, 30, 40, 50]
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('test_data.csv', fill_strategy='mean', drop_threshold=0.3)
+    
+    validation_result = validate_dataframe(cleaned_df, required_columns=['A', 'B', 'C', 'D'])
+    
+    print("\nValidation Results:")
+    for key, value in validation_result.items():
+        print(f"{key}: {value}")
+    
+    import os
+    if os.path.exists('test_data.csv'):
+        os.remove('test_data.csv')
