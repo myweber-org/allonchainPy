@@ -190,4 +190,62 @@ def remove_outliers_iqr(data, column):
     upper_bound = Q3 + 1.5 * IQR
     
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    return filtered_dataimport pandas as pd
+import numpy as np
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing numeric values with column median
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].median())
+    
+    # Fill missing categorical values with mode
+    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if df_cleaned[col].isnull().any():
+            mode_val = df_cleaned[col].mode()[0]
+            df_cleaned[col] = df_cleaned[col].fillna(mode_val)
+    
+    return df_cleaned
+
+def validate_data(df):
+    """
+    Validate data after cleaning.
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'duplicate_rows': df.duplicated().sum(),
+        'missing_values': df.isnull().sum().sum(),
+        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(df.select_dtypes(include=['object']).columns)
+    }
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', None, 'Eve', 'Frank'],
+        'age': [25, 30, 30, 35, None, 40],
+        'score': [85.5, 92.0, 92.0, 78.5, 88.0, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nDataFrame Info:")
+    print(df.info())
+    
+    cleaned_df = clean_dataset(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    validation = validate_data(cleaned_df)
+    print("\nValidation Results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
