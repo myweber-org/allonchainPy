@@ -357,3 +357,125 @@ def remove_outliers_iqr(data, column):
     upper_bound = Q3 + 1.5 * IQR
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
     return filtered_data
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_outliers_iqr(self, columns=None, factor=1.5):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        clean_df = self.df.copy()
+        for col in columns:
+            if col in clean_df.columns:
+                Q1 = clean_df[col].quantile(0.25)
+                Q3 = clean_df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - factor * IQR
+                upper_bound = Q3 + factor * IQR
+                clean_df = clean_df[(clean_df[col] >= lower_bound) & (clean_df[col] <= upper_bound)]
+        
+        removed_count = self.original_shape[0] - clean_df.shape[0]
+        self.df = clean_df
+        return removed_count
+    
+    def normalize_data(self, columns=None, method='zscore'):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        normalized_df = self.df.copy()
+        for col in columns:
+            if col in normalized_df.columns:
+                if method == 'zscore':
+                    normalized_df[col] = stats.zscore(normalized_df[col])
+                elif method == 'minmax':
+                    min_val = normalized_df[col].min()
+                    max_val = normalized_df[col].max()
+                    normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+                elif method == 'robust':
+                    median = normalized_df[col].median()
+                    iqr = normalized_df[col].quantile(0.75) - normalized_df[col].quantile(0.25)
+                    normalized_df[col] = (normalized_df[col] - median) / iqr
+        
+        self.df = normalized_df
+        return self.df
+    
+    def handle_missing_values(self, strategy='mean', columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        filled_df = self.df.copy()
+        for col in columns:
+            if col in filled_df.columns and filled_df[col].isnull().any():
+                if strategy == 'mean':
+                    fill_value = filled_df[col].mean()
+                elif strategy == 'median':
+                    fill_value = filled_df[col].median()
+                elif strategy == 'mode':
+                    fill_value = filled_df[col].mode()[0]
+                elif strategy == 'ffill':
+                    filled_df[col] = filled_df[col].fillna(method='ffill')
+                    continue
+                elif strategy == 'bfill':
+                    filled_df[col] = filled_df[col].fillna(method='bfill')
+                    continue
+                else:
+                    fill_value = 0
+                
+                filled_df[col] = filled_df[col].fillna(fill_value)
+        
+        self.df = filled_df
+        return self.df
+    
+    def get_cleaned_data(self):
+        return self.df.copy()
+    
+    def get_summary(self):
+        summary = {
+            'original_rows': self.original_shape[0],
+            'current_rows': self.df.shape[0],
+            'columns': self.df.shape[1],
+            'missing_values': self.df.isnull().sum().sum(),
+            'numeric_columns': list(self.df.select_dtypes(include=[np.number]).columns),
+            'categorical_columns': list(self.df.select_dtypes(include=['object']).columns)
+        }
+        return summary
+
+def create_sample_data():
+    np.random.seed(42)
+    dates = pd.date_range('2023-01-01', periods=100, freq='D')
+    data = {
+        'date': dates,
+        'temperature': np.random.normal(20, 5, 100),
+        'humidity': np.random.uniform(30, 80, 100),
+        'pressure': np.random.normal(1013, 10, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    
+    df = pd.DataFrame(data)
+    df.loc[10:15, 'temperature'] = np.nan
+    df.loc[5, 'temperature'] = 100
+    df.loc[6, 'humidity'] = 150
+    return df
+
+if __name__ == "__main__":
+    sample_df = create_sample_data()
+    cleaner = DataCleaner(sample_df)
+    
+    print("Initial data shape:", cleaner.get_summary()['original_rows'])
+    print("Missing values:", cleaner.get_summary()['missing_values'])
+    
+    cleaner.handle_missing_values(strategy='mean')
+    removed = cleaner.remove_outliers_iqr(factor=1.5)
+    cleaner.normalize_data(method='zscore')
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    print("\nCleaned data shape:", cleaned_df.shape)
+    print("Outliers removed:", removed)
+    print("\nFirst 5 rows of cleaned data:")
+    print(cleaned_df.head())
