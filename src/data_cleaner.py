@@ -583,4 +583,30 @@ if __name__ == "__main__":
     output_file = sys.argv[2]
     key_column = sys.argv[3]
     
-    remove_duplicates(input_file, output_file, key_column)
+    remove_duplicates(input_file, output_file, key_column)def remove_duplicates(data_list):
+    seen = set()
+    unique_data = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            unique_data.append(item)
+    return unique_data
+
+def clean_data_with_order(data_list, key=None):
+    if key is None:
+        key = lambda x: x
+    seen = set()
+    cleaned = []
+    for item in data_list:
+        identifier = key(item)
+        if identifier not in seen:
+            seen.add(identifier)
+            cleaned.append(item)
+    return cleaned
+
+if __name__ == "__main__":
+    sample = [1, 2, 2, 3, 4, 4, 5]
+    print(remove_duplicates(sample))
+    
+    sample_complex = [{"id": 1}, {"id": 2}, {"id": 1}, {"id": 3}]
+    print(clean_data_with_order(sample_complex, key=lambda x: x["id"]))
