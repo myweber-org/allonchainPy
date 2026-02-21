@@ -292,3 +292,11 @@ def process_dataset(file_path, column_name):
     cleaned_stats = calculate_summary_statistics(cleaned_df, column_name)
     
     return cleaned_df, original_stats, cleaned_stats
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
