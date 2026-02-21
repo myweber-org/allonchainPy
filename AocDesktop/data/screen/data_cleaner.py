@@ -165,3 +165,158 @@ def clean_dataset(input_file, output_file):
 
 if __name__ == "__main__":
     clean_dataset('raw_data.csv', 'cleaned_data.csv')
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers from a DataFrame column using IQR method.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    threshold (float): IQR multiplier for outlier detection
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df.copy()
+
+def normalize_column_zscore(dataframe, column):
+    """
+    Normalize a column using Z-score normalization.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    column (str): Column name to normalize
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    result_df = dataframe.copy()
+    mean_val = result_df[column].mean()
+    std_val = result_df[column].std()
+    
+    if std_val > 0:
+        result_df[f'{column}_normalized'] = (result_df[column] - mean_val) / std_val
+    else:
+        result_df[f'{column}_normalized'] = 0
+    
+    return result_df
+
+def detect_skewed_columns(dataframe, skew_threshold=0.5):
+    """
+    Detect columns with significant skewness.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    skew_threshold (float): Absolute skewness threshold
+    
+    Returns:
+    dict: Dictionary with column names and their skewness values
+    """
+    skewed_columns = {}
+    
+    for col in dataframe.select_dtypes(include=[np.number]).columns:
+        skewness = dataframe[col].skew()
+        if abs(skewness) > skew_threshold:
+            skewed_columns[col] = skewness
+    
+    return skewed_columns
+
+def apply_log_transform(dataframe, column):
+    """
+    Apply log transformation to reduce skewness.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    column (str): Column name to transform
+    
+    Returns:
+    pd.DataFrame: DataFrame with transformed column
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    result_df = dataframe.copy()
+    
+    if (result_df[column] <= 0).any():
+        min_val = result_df[column].min()
+        if min_val <= 0:
+            shift = abs(min_val) + 1
+            result_df[column] = result_df[column] + shift
+    
+    result_df[f'{column}_log'] = np.log1p(result_df[column])
+    
+    return result_df
+
+def clean_dataset(dataframe, numeric_columns=None, outlier_threshold=1.5):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    numeric_columns (list): List of numeric columns to process
+    outlier_threshold (float): IQR threshold for outlier removal
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = dataframe.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col, outlier_threshold)
+            cleaned_df = normalize_column_zscore(cleaned_df, col)
+    
+    return cleaned_df
+
+def validate_cleaned_data(dataframe, original_dataframe):
+    """
+    Validate that cleaning operations were successful.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Cleaned DataFrame
+    original_dataframe (pd.DataFrame): Original DataFrame
+    
+    Returns:
+    dict: Validation metrics
+    """
+    validation_results = {
+        'rows_removed': len(original_dataframe) - len(dataframe),
+        'percentage_removed': (len(original_dataframe) - len(dataframe)) / len(original_dataframe) * 100,
+        'original_columns': len(original_dataframe.columns),
+        'cleaned_columns': len(dataframe.columns),
+        'new_columns_added': len(set(dataframe.columns) - set(original_dataframe.columns))
+    }
+    
+    numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        if col in original_dataframe.columns:
+            validation_results[f'{col}_original_mean'] = original_dataframe[col].mean()
+            validation_results[f'{col}_cleaned_mean'] = dataframe[col].mean()
+            validation_results[f'{col}_original_std'] = original_dataframe[col].std()
+            validation_results[f'{col}_cleaned_std'] = dataframe[col].std()
+    
+    return validation_results
