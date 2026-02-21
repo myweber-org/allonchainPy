@@ -103,4 +103,122 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid, message = validate_dataframe(cleaned)
-    print(f"\nValidation: {message}")
+    print(f"\nValidation: {message}")import pandas as pd
+import numpy as np
+
+def clean_dataset(df, numeric_columns=None, strategy='median', outlier_threshold=3):
+    """
+    Clean dataset by handling missing values and removing outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    numeric_columns (list): List of numeric column names
+    strategy (str): Imputation strategy ('mean', 'median', 'mode')
+    outlier_threshold (float): Z-score threshold for outlier detection
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_clean = df.copy()
+    
+    # Handle missing values
+    for col in numeric_columns:
+        if df_clean[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df_clean[col].mean()
+            elif strategy == 'median':
+                fill_value = df_clean[col].median()
+            elif strategy == 'mode':
+                fill_value = df_clean[col].mode()[0]
+            else:
+                fill_value = 0
+            
+            df_clean[col].fillna(fill_value, inplace=True)
+    
+    # Remove outliers using Z-score method
+    z_scores = np.abs((df_clean[numeric_columns] - df_clean[numeric_columns].mean()) / 
+                      df_clean[numeric_columns].std())
+    
+    outlier_mask = (z_scores < outlier_threshold).all(axis=1)
+    df_clean = df_clean[outlier_mask].reset_index(drop=True)
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): Dataframe to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+def calculate_statistics(df, numeric_columns=None):
+    """
+    Calculate basic statistics for numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    numeric_columns (list): List of numeric column names
+    
+    Returns:
+    pd.DataFrame: Statistics dataframe
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    stats = pd.DataFrame({
+        'mean': df[numeric_columns].mean(),
+        'median': df[numeric_columns].median(),
+        'std': df[numeric_columns].std(),
+        'min': df[numeric_columns].min(),
+        'max': df[numeric_columns].max(),
+        'missing': df[numeric_columns].isnull().sum()
+    })
+    
+    return stats
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.randn(100),
+        'feature_b': np.random.randn(100) * 2 + 5,
+        'feature_c': np.random.randn(100) * 0.5 + 10
+    }
+    
+    # Introduce some missing values and outliers
+    sample_df = pd.DataFrame(data)
+    sample_df.loc[10:15, 'feature_a'] = np.nan
+    sample_df.loc[95, 'feature_b'] = 50  # Outlier
+    
+    print("Original DataFrame shape:", sample_df.shape)
+    print("\nMissing values:")
+    print(sample_df.isnull().sum())
+    
+    # Clean the data
+    cleaned_df = clean_dataset(sample_df, strategy='median')
+    
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("\nCleaned statistics:")
+    stats = calculate_statistics(cleaned_df)
+    print(stats)
