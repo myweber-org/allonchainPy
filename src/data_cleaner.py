@@ -328,3 +328,111 @@ def validate_data(data, required_columns=None, allow_nan=False):
         validation_result['warnings'].append("No numeric columns found in dataset")
     
     return validation_result
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    column_mapping (dict): Optional dictionary to rename columns
+    drop_duplicates (bool): Whether to remove duplicate rows
+    normalize_text (bool): Whether to normalize text columns (strip, lower case)
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Rename columns if mapping provided
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    # Remove duplicate rows
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    # Normalize text columns
+    if normalize_text:
+        text_columns = cleaned_df.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            cleaned_df[col] = cleaned_df[col].astype(str).str.strip().str.lower()
+        print(f"Normalized {len(text_columns)} text columns")
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None, check_missing=True):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of columns that must be present
+    check_missing (bool): Whether to check for missing values
+    
+    Returns:
+    dict: Dictionary with validation results
+    """
+    
+    validation_results = {
+        'row_count': len(df),
+        'column_count': len(df.columns),
+        'missing_values': {},
+        'column_types': df.dtypes.to_dict()
+    }
+    
+    # Check required columns
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        validation_results['missing_columns'] = missing_cols
+    
+    # Check for missing values
+    if check_missing:
+        missing_counts = df.isnull().sum()
+        columns_with_missing = missing_counts[missing_counts > 0]
+        validation_results['missing_values'] = columns_with_missing.to_dict()
+    
+    return validation_results
+
+def sample_data_processing():
+    """
+    Example usage of the data cleaning functions.
+    """
+    
+    # Create sample data
+    sample_data = {
+        'Name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson', 'Alice Brown'],
+        'Email': ['john@example.com', 'jane@example.com', 'john@example.com', 'bob@example.com', 'alice@example.com'],
+        'Age': [25, 30, 25, 35, 28],
+        'City': ['New York', 'Los Angeles', 'New York', 'Chicago', 'Boston']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned_df = clean_dataframe(df, drop_duplicates=True, normalize_text=True)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print("\n" + "="*50 + "\n")
+    
+    # Validate the data
+    validation = validate_dataframe(cleaned_df, required_columns=['Name', 'Email', 'Age'])
+    print("Validation Results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
+
+if __name__ == "__main__":
+    sample_data_processing()
