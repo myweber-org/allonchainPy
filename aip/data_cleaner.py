@@ -536,3 +536,42 @@ def clean_dataset(input_file, output_file):
 
 if __name__ == "__main__":
     cleaned_df = clean_dataset('raw_data.csv', 'cleaned_data.csv')
+import re
+import unicodedata
+
+def normalize_whitespace(text):
+    """Replace multiple whitespace characters with a single space."""
+    return re.sub(r'\s+', ' ', text.strip())
+
+def remove_special_characters(text, keep_punctuation=False):
+    """Remove special characters from text."""
+    if keep_punctuation:
+        pattern = r'[^A-Za-z0-9\s.,!?;:\'"-]'
+    else:
+        pattern = r'[^A-Za-z0-9\s]'
+    return re.sub(pattern, '', text)
+
+def normalize_unicode(text, form='NFKD'):
+    """Normalize unicode characters to a specified form."""
+    return unicodedata.normalize(form, text)
+
+def clean_text(text, normalize_unicode_flag=True, remove_special_flag=True, keep_punctuation=False):
+    """Apply a series of cleaning operations to text."""
+    if not isinstance(text, str):
+        return ''
+    
+    cleaned = text
+    
+    if normalize_unicode_flag:
+        cleaned = normalize_unicode(cleaned)
+    
+    if remove_special_flag:
+        cleaned = remove_special_characters(cleaned, keep_punctuation)
+    
+    cleaned = normalize_whitespace(cleaned)
+    
+    return cleaned
+
+def batch_clean(texts, **kwargs):
+    """Clean a list of text strings."""
+    return [clean_text(text, **kwargs) for text in texts]
