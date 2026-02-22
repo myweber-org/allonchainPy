@@ -250,3 +250,113 @@ if __name__ == "__main__":
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("\nCleaned statistics for column 'A':")
     print(calculate_summary_statistics(cleaned_df, 'A'))
+import pandas as pd
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing=False, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default True.
+    fill_missing (bool): Whether to fill missing values. Default False.
+    fill_value: Value to fill missing entries with. Default 0.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
+    
+    return cleaned_df
+
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Remove outliers from a specific column in a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to process.
+    method (str): Method for outlier detection ('iqr' or 'zscore').
+    threshold (float): Threshold for outlier detection.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    data = df[column].dropna()
+    
+    if method == 'iqr':
+        Q1 = data.quantile(0.25)
+        Q3 = data.quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        mask = (df[column] >= lower_bound) & (df[column] <= upper_bound)
+    
+    elif method == 'zscore':
+        mean = data.mean()
+        std = data.std()
+        z_scores = (df[column] - mean) / std
+        mask = abs(z_scores) <= threshold
+    
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+    
+    return df[mask]
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize specified columns to have zero mean and unit variance.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns (list): List of column names to standardize. If None, standardize all numeric columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with standardized columns.
+    """
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns
+        columns = list(numeric_cols)
+    
+    standardized_df = df.copy()
+    
+    for col in columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            mean = df[col].mean()
+            std = df[col].std()
+            if std > 0:
+                standardized_df[col] = (df[col] - mean) / std
+    
+    return standardized_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, 5, 100],
+        'B': [10, 20, None, 40, 50, 60],
+        'C': [100, 200, 300, 400, 500, 600]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataframe(df, fill_missing=True, fill_value=0)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    no_outliers = remove_outliers(cleaned, 'A', method='iqr')
+    print("\nDataFrame without outliers in column A:")
+    print(no_outliers)
+    
+    standardized = standardize_columns(no_outliers, columns=['A', 'C'])
+    print("\nStandardized DataFrame:")
+    print(standardized)
