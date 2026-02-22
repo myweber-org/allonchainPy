@@ -416,4 +416,41 @@ if __name__ == "__main__":
         print(f"Data cleaning successful. Shape: {processed_data.shape}")
         print(processed_data.describe())
     else:
-        print("Data validation failed.")
+        print("Data validation failed.")import pandas as pd
+import numpy as np
+
+def load_and_clean_data(filepath):
+    """Load CSV data, remove outliers, and normalize numeric columns."""
+    df = pd.read_csv(filepath)
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        
+        df = df[(df[col] >= lower_bound) & (df[col] <= upper_bound)]
+    
+    for col in numeric_cols:
+        if col in df.columns:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val > min_val:
+                df[col] = (df[col] - min_val) / (max_val - min_val)
+    
+    return df
+
+def save_cleaned_data(df, output_path):
+    """Save cleaned DataFrame to CSV."""
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = load_and_clean_data(input_file)
+    save_cleaned_data(cleaned_df, output_file)
