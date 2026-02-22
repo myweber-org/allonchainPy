@@ -136,4 +136,107 @@ def validate_cleaning(df_before, df_after, column):
         'min': df_after[column].min(),
         'max': df_after[column].max()
     }
-    return {'before': stats_before, 'after': stats_after}
+    return {'before': stats_before, 'after': stats_after}import pandas as pd
+import numpy as np
+
+def clean_dataset(df, strategy='mean', outlier_threshold=3):
+    """
+    Clean dataset by handling missing values and removing outliers.
+    
+    Args:
+        df: pandas DataFrame
+        strategy: Method for imputation ('mean', 'median', 'mode')
+        outlier_threshold: Z-score threshold for outlier detection
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    df_clean = df.copy()
+    
+    # Handle missing values
+    numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        if df_clean[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df_clean[col].mean()
+            elif strategy == 'median':
+                fill_value = df_clean[col].median()
+            elif strategy == 'mode':
+                fill_value = df_clean[col].mode()[0]
+            else:
+                fill_value = 0
+            
+            df_clean[col].fillna(fill_value, inplace=True)
+    
+    # Remove outliers using Z-score method
+    z_scores = np.abs((df_clean[numeric_cols] - df_clean[numeric_cols].mean()) / df_clean[numeric_cols].std())
+    outlier_mask = (z_scores < outlier_threshold).all(axis=1)
+    df_clean = df_clean[outlier_mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def validate_data(df, required_columns=None, min_rows=10):
+    """
+    Validate dataset structure and content.
+    
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: List of required column names
+        min_rows: Minimum number of rows required
+    
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if len(df) < min_rows:
+        return False, f"Dataset must have at least {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Dataset is valid"
+
+def export_cleaned_data(df, output_path, format='csv'):
+    """
+    Export cleaned dataset to file.
+    
+    Args:
+        df: pandas DataFrame to export
+        output_path: Path for output file
+        format: Output format ('csv', 'excel', 'json')
+    """
+    if format == 'csv':
+        df.to_csv(output_path, index=False)
+    elif format == 'excel':
+        df.to_excel(output_path, index=False)
+    elif format == 'json':
+        df.to_json(output_path, orient='records')
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data with missing values and outliers
+    sample_data = {
+        'feature_a': [1, 2, 3, 4, 5, 100, 7, 8, 9, 10, None],
+        'feature_b': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110],
+        'feature_c': [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, None]
+    }
+    
+    df_sample = pd.DataFrame(sample_data)
+    print("Original dataset:")
+    print(df_sample)
+    print(f"\nOriginal shape: {df_sample.shape}")
+    
+    # Clean the dataset
+    df_cleaned = clean_dataset(df_sample, strategy='median', outlier_threshold=2.5)
+    print("\nCleaned dataset:")
+    print(df_cleaned)
+    print(f"\nCleaned shape: {df_cleaned.shape}")
+    
+    # Validate the cleaned data
+    is_valid, message = validate_data(df_cleaned, min_rows=5)
+    print(f"\nValidation result: {is_valid}")
+    print(f"Validation message: {message}")
