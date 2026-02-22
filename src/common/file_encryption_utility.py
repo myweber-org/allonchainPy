@@ -1,46 +1,98 @@
+
 import os
-import sys
+import base64
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
 
-def xor_cipher(data, key):
-    """Encrypt or decrypt data using XOR cipher."""
-    return bytes([b ^ key for b in data])
-
-def process_file(input_path, output_path, key):
-    """Read a file, process it with XOR cipher, and write to output."""
-    try:
+class FileEncryptor:
+    def __init__(self, password):
+        self.password = password.encode()
+        self.salt = os.urandom(16)
+        self.backend = default_backend()
+    
+    def _derive_key(self, salt):
+        kdf = PBKDF2(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100000,
+            backend=self.backend
+        )
+        return kdf.derive(self.password)
+    
+    def encrypt_file(self, input_path, output_path):
+        with open(input_path, 'rb') as f:
+            plaintext = f.read()
+        
+        key = self._derive_key(self.salt)
+        iv = os.urandom(16)
+        
+        cipher = Cipher(
+            algorithms.AES(key),
+            modes.CBC(iv),
+            backend=self.backend
+        )
+        encryptor = cipher.encryptor()
+        
+        pad_length = 16 - (len(plaintext) % 16)
+        padded_data = plaintext + bytes([pad_length] * pad_length)
+        
+        ciphertext = encryptor.update(padded_data) + encryptor.finalize()
+        
+        with open(output_path, 'wb') as f:
+            f.write(self.salt + iv + ciphertext)
+        
+        return True
+    
+    def decrypt_file(self, input_path, output_path):
         with open(input_path, 'rb') as f:
             data = f.read()
-        processed_data = xor_cipher(data, key)
+        
+        salt = data[:16]
+        iv = data[16:32]
+        ciphertext = data[32:]
+        
+        key = self._derive_key(salt)
+        
+        cipher = Cipher(
+            algorithms.AES(key),
+            modes.CBC(iv),
+            backend=self.backend
+        )
+        decryptor = cipher.decryptor()
+        
+        padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+        
+        pad_length = padded_plaintext[-1]
+        plaintext = padded_plaintext[:-pad_length]
+        
         with open(output_path, 'wb') as f:
-            f.write(processed_data)
-        print(f"File processed successfully: {output_path}")
+            f.write(plaintext)
+        
         return True
-    except Exception as e:
-        print(f"Error processing file: {e}")
-        return False
 
 def main():
-    if len(sys.argv) != 4:
-        print("Usage: python file_encryption_utility.py <input_file> <output_file> <key>")
-        print("Key must be an integer between 0 and 255.")
-        sys.exit(1)
-
-    input_file = sys.argv[1]
-    output_file = sys.argv[2]
-
-    try:
-        key = int(sys.argv[3])
-        if not (0 <= key <= 255):
-            raise ValueError
-    except ValueError:
-        print("Error: Key must be an integer between 0 and 255.")
-        sys.exit(1)
-
-    if not os.path.exists(input_file):
-        print(f"Error: Input file '{input_file}' not found.")
-        sys.exit(1)
-
-    process_file(input_file, output_file, key)
+    encryptor = FileEncryptor("secure_password_123")
+    
+    test_data = b"This is a secret message that needs encryption."
+    with open("test_plain.txt", "wb") as f:
+        f.write(test_data)
+    
+    encryptor.encrypt_file("test_plain.txt", "test_encrypted.bin")
+    encryptor.decrypt_file("test_encrypted.bin", "test_decrypted.txt")
+    
+    with open("test_decrypted.txt", "rb") as f:
+        decrypted = f.read()
+    
+    print("Original:", test_data)
+    print("Decrypted:", decrypted)
+    print("Match:", test_data == decrypted)
+    
+    os.remove("test_plain.txt")
+    os.remove("test_encrypted.bin")
+    os.remove("test_decrypted.txt")
 
 if __name__ == "__main__":
     main()
