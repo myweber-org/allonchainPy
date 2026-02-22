@@ -204,3 +204,96 @@ def handle_missing_values(df, strategy='mean', columns=None):
             df_processed = df_processed.dropna(subset=[col])
     
     return df_processed.reset_index(drop=True)
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+class DataCleaner:
+    def __init__(self, file_path):
+        self.file_path = Path(file_path)
+        self.df = None
+        
+    def load_data(self):
+        try:
+            self.df = pd.read_csv(self.file_path)
+            print(f"Loaded {len(self.df)} rows from {self.file_path.name}")
+            return True
+        except Exception as e:
+            print(f"Error loading file: {e}")
+            return False
+    
+    def remove_duplicates(self):
+        if self.df is not None:
+            initial_count = len(self.df)
+            self.df.drop_duplicates(inplace=True)
+            removed = initial_count - len(self.df)
+            print(f"Removed {removed} duplicate rows")
+    
+    def handle_missing_values(self, strategy='mean', columns=None):
+        if self.df is not None:
+            if columns is None:
+                columns = self.df.select_dtypes(include=[np.number]).columns
+            
+            for col in columns:
+                if col in self.df.columns:
+                    missing_count = self.df[col].isnull().sum()
+                    if missing_count > 0:
+                        if strategy == 'mean':
+                            fill_value = self.df[col].mean()
+                        elif strategy == 'median':
+                            fill_value = self.df[col].median()
+                        elif strategy == 'mode':
+                            fill_value = self.df[col].mode()[0]
+                        else:
+                            fill_value = strategy
+                        
+                        self.df[col].fillna(fill_value, inplace=True)
+                        print(f"Filled {missing_count} missing values in column '{col}' with {strategy}")
+    
+    def remove_outliers(self, columns=None, threshold=3):
+        if self.df is not None:
+            if columns is None:
+                columns = self.df.select_dtypes(include=[np.number]).columns
+            
+            initial_count = len(self.df)
+            for col in columns:
+                if col in self.df.columns:
+                    z_scores = np.abs((self.df[col] - self.df[col].mean()) / self.df[col].std())
+                    self.df = self.df[z_scores < threshold]
+            
+            removed = initial_count - len(self.df)
+            print(f"Removed {removed} outliers using z-score threshold {threshold}")
+    
+    def save_cleaned_data(self, output_path=None):
+        if self.df is not None:
+            if output_path is None:
+                output_path = self.file_path.parent / f"cleaned_{self.file_path.name}"
+            
+            self.df.to_csv(output_path, index=False)
+            print(f"Saved cleaned data to {output_path}")
+            return output_path
+    
+    def get_summary(self):
+        if self.df is not None:
+            summary = {
+                'total_rows': len(self.df),
+                'total_columns': len(self.df.columns),
+                'missing_values': self.df.isnull().sum().sum(),
+                'data_types': self.df.dtypes.to_dict()
+            }
+            return summary
+
+def clean_csv_file(input_file, output_file=None):
+    cleaner = DataCleaner(input_file)
+    
+    if cleaner.load_data():
+        cleaner.remove_duplicates()
+        cleaner.handle_missing_values(strategy='median')
+        cleaner.remove_outliers(threshold=3)
+        
+        if output_file:
+            return cleaner.save_cleaned_data(output_file)
+        else:
+            return cleaner.save_cleaned_data()
+    
+    return None
