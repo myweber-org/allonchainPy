@@ -477,3 +477,11 @@ def handle_missing_values(df, column, strategy='mean'):
     
     df_copy[column] = df_copy[column].fillna(fill_value)
     return df_copy
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
