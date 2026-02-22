@@ -358,4 +358,11 @@ def validate_data(df, numeric_columns):
             'skewness': df[col].skew()
         }
     
-    return validation_report
+    return validation_reportdef remove_duplicates(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
