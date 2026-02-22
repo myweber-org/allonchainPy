@@ -450,4 +450,39 @@ def validate_dataframe(df, required_columns=None):
         if missing_columns:
             return False, f"Missing required columns: {missing_columns}"
     
-    return True, "DataFrame is valid"
+    return True, "DataFrame is valid"import pandas as pd
+
+def clean_dataset(df, sort_column=None):
+    """
+    Remove duplicate rows from a DataFrame and optionally sort by a column.
+
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    sort_column (str, optional): Column name to sort by. Defaults to None.
+
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.drop_duplicates().reset_index(drop=True)
+    
+    if sort_column and sort_column in cleaned_df.columns:
+        cleaned_df = cleaned_df.sort_values(by=sort_column).reset_index(drop=True)
+    
+    return cleaned_df
+
+def main():
+    sample_data = {
+        'id': [1, 2, 2, 3, 1],
+        'value': [10, 20, 20, 30, 10],
+        'name': ['A', 'B', 'B', 'C', 'A']
+    }
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataset(df, sort_column='id')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+
+if __name__ == "__main__":
+    main()
