@@ -164,3 +164,31 @@ if __name__ == "__main__":
     print(f"Original dataset shape: {sample_df.shape}")
     cleaned_df = clean_dataset(sample_df)
     print(f"Cleaned dataset shape: {cleaned_df.shape}")
+def remove_duplicates(input_list):
+    """
+    Remove duplicate elements from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    unique_list = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            unique_list.append(item)
+    return unique_list
+
+def clean_data(data):
+    """
+    Main function to clean data by removing duplicates.
+    Handles both list and tuple inputs.
+    """
+    if isinstance(data, (list, tuple)):
+        return remove_duplicates(list(data))
+    else:
+        raise TypeError("Input must be a list or tuple")
+
+if __name__ == "__main__":
+    sample_data = [1, 2, 2, 3, 4, 4, 5, 1, 6]
+    cleaned = clean_data(sample_data)
+    print(f"Original: {sample_data}")
+    print(f"Cleaned: {cleaned}")
