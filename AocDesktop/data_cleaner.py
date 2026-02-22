@@ -635,4 +635,72 @@ if __name__ == "__main__":
     print("Cleaned:", remove_duplicates(sample_data))
     
     mixed_data = [1, "2", 3.5, "invalid", 5]
-    print("Numeric cleaning:", clean_numeric_data(mixed_data))
+    print("Numeric cleaning:", clean_numeric_data(mixed_data))import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns):
+    """
+    Remove outliers using IQR method.
+    """
+    df_clean = df.copy()
+    for col in columns:
+        Q1 = df_clean[col].quantile(0.25)
+        Q3 = df_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean
+
+def remove_outliers_zscore(df, columns, threshold=3):
+    """
+    Remove outliers using Z-score method.
+    """
+    df_clean = df.copy()
+    for col in columns:
+        z_scores = np.abs(stats.zscore(df_clean[col]))
+        df_clean = df_clean[z_scores < threshold]
+    return df_clean
+
+def normalize_minmax(df, columns):
+    """
+    Normalize data using Min-Max scaling.
+    """
+    df_norm = df.copy()
+    for col in columns:
+        min_val = df_norm[col].min()
+        max_val = df_norm[col].max()
+        df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+    return df_norm
+
+def normalize_zscore(df, columns):
+    """
+    Normalize data using Z-score standardization.
+    """
+    df_norm = df.copy()
+    for col in columns:
+        mean_val = df_norm[col].mean()
+        std_val = df_norm[col].std()
+        df_norm[col] = (df_norm[col] - mean_val) / std_val
+    return df_norm
+
+def handle_missing_mean(df, columns):
+    """
+    Fill missing values with column mean.
+    """
+    df_filled = df.copy()
+    for col in columns:
+        mean_val = df_filled[col].mean()
+        df_filled[col].fillna(mean_val, inplace=True)
+    return df_filled
+
+def handle_missing_median(df, columns):
+    """
+    Fill missing values with column median.
+    """
+    df_filled = df.copy()
+    for col in columns:
+        median_val = df_filled[col].median()
+        df_filled[col].fillna(median_val, inplace=True)
+    return df_filled
