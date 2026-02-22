@@ -485,3 +485,109 @@ def remove_duplicates_preserve_order(sequence):
             seen.add(item)
             result.append(item)
     return result
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    outliers_removed = len(data) - len(filtered_data)
+    
+    return filtered_data, outliers_removed
+
+def normalize_minmax(data, columns=None):
+    """
+    Normalize data using min-max scaling
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    normalized_data = data.copy()
+    
+    for col in columns:
+        if col in data.columns and np.issubdtype(data[col].dtype, np.number):
+            col_min = data[col].min()
+            col_max = data[col].max()
+            
+            if col_max != col_min:
+                normalized_data[col] = (data[col] - col_min) / (col_max - col_min)
+            else:
+                normalized_data[col] = 0
+    
+    return normalized_data
+
+def standardize_zscore(data, columns=None):
+    """
+    Standardize data using z-score normalization
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    standardized_data = data.copy()
+    
+    for col in columns:
+        if col in data.columns and np.issubdtype(data[col].dtype, np.number):
+            col_mean = data[col].mean()
+            col_std = data[col].std()
+            
+            if col_std > 0:
+                standardized_data[col] = (data[col] - col_mean) / col_std
+            else:
+                standardized_data[col] = 0
+    
+    return standardized_data
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values using specified strategy
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    cleaned_data = data.copy()
+    
+    for col in columns:
+        if col in data.columns and data[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = data[col].mean()
+            elif strategy == 'median':
+                fill_value = data[col].median()
+            elif strategy == 'mode':
+                fill_value = data[col].mode()[0]
+            elif strategy == 'drop':
+                cleaned_data = cleaned_data.dropna(subset=[col])
+                continue
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            cleaned_data[col] = data[col].fillna(fill_value)
+    
+    return cleaned_data
+
+def get_data_summary(data):
+    """
+    Generate comprehensive data summary
+    """
+    summary = {
+        'total_rows': len(data),
+        'total_columns': len(data.columns),
+        'numeric_columns': list(data.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(data.select_dtypes(include=['object']).columns),
+        'missing_values': data.isnull().sum().to_dict(),
+        'data_types': data.dtypes.to_dict()
+    }
+    
+    return summary
