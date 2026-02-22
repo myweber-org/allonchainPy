@@ -603,3 +603,36 @@ if __name__ == "__main__":
     print("\nStatistics for 'value' column:")
     for key, value in stats.items():
         print(f"{key}: {value:.2f}")
+def remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    unique_list = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            unique_list.append(item)
+    return unique_list
+
+def clean_numeric_data(values, default=0):
+    """
+    Clean a list of numeric values by converting non-numeric entries to default.
+    Returns a list of cleaned numeric values.
+    """
+    cleaned = []
+    for val in values:
+        try:
+            cleaned.append(float(val))
+        except (ValueError, TypeError):
+            cleaned.append(default)
+    return cleaned
+
+if __name__ == "__main__":
+    sample_data = [1, 2, 2, 3, 4, 4, 5]
+    print("Original:", sample_data)
+    print("Cleaned:", remove_duplicates(sample_data))
+    
+    mixed_data = [1, "2", 3.5, "invalid", 5]
+    print("Numeric cleaning:", clean_numeric_data(mixed_data))
