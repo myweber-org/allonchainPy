@@ -228,3 +228,164 @@ def sample_data_cleaning():
 
 if __name__ == "__main__":
     sample_data_cleaning()
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers from a DataFrame column using IQR method.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    threshold (float): IQR multiplier for outlier detection
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df.copy()
+
+def normalize_minmax(dataframe, columns=None):
+    """
+    Normalize specified columns using min-max scaling.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to normalize. If None, normalize all numeric columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    normalized_df = dataframe.copy()
+    
+    for col in columns:
+        if col in dataframe.columns and np.issubdtype(dataframe[col].dtype, np.number):
+            col_min = dataframe[col].min()
+            col_max = dataframe[col].max()
+            
+            if col_max != col_min:
+                normalized_df[col] = (dataframe[col] - col_min) / (col_max - col_min)
+            else:
+                normalized_df[col] = 0
+    
+    return normalized_df
+
+def handle_missing_values(dataframe, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame columns.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    strategy (str): Imputation strategy ('mean', 'median', 'mode', or 'drop')
+    columns (list): List of column names to process. If None, process all columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = dataframe.columns.tolist()
+    
+    processed_df = dataframe.copy()
+    
+    for col in columns:
+        if col not in processed_df.columns:
+            continue
+            
+        missing_mask = processed_df[col].isna()
+        
+        if not missing_mask.any():
+            continue
+            
+        if strategy == 'drop':
+            processed_df = processed_df.dropna(subset=[col])
+        elif strategy == 'mean':
+            if np.issubdtype(processed_df[col].dtype, np.number):
+                fill_value = processed_df[col].mean()
+                processed_df[col] = processed_df[col].fillna(fill_value)
+        elif strategy == 'median':
+            if np.issubdtype(processed_df[col].dtype, np.number):
+                fill_value = processed_df[col].median()
+                processed_df[col] = processed_df[col].fillna(fill_value)
+        elif strategy == 'mode':
+            fill_value = processed_df[col].mode()[0] if not processed_df[col].mode().empty else None
+            processed_df[col] = processed_df[col].fillna(fill_value)
+    
+    return processed_df
+
+def calculate_descriptive_stats(dataframe, columns=None):
+    """
+    Calculate descriptive statistics for specified columns.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to analyze. If None, analyze all numeric columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with descriptive statistics
+    """
+    if columns is None:
+        columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    stats_dict = {}
+    
+    for col in columns:
+        if col in dataframe.columns and np.issubdtype(dataframe[col].dtype, np.number):
+            col_data = dataframe[col].dropna()
+            
+            if len(col_data) > 0:
+                stats_dict[col] = {
+                    'mean': np.mean(col_data),
+                    'median': np.median(col_data),
+                    'std': np.std(col_data),
+                    'min': np.min(col_data),
+                    'max': np.max(col_data),
+                    'q1': np.percentile(col_data, 25),
+                    'q3': np.percentile(col_data, 75),
+                    'skewness': stats.skew(col_data),
+                    'kurtosis': stats.kurtosis(col_data)
+                }
+    
+    stats_df = pd.DataFrame(stats_dict).T
+    return stats_df
+
+def validate_dataframe(dataframe, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    dataframe (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, message)
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if len(dataframe) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in dataframe.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
