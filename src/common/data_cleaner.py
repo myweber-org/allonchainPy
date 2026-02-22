@@ -145,3 +145,11 @@ def clean_dataset(file_path):
 if __name__ == "__main__":
     cleaned_data = clean_dataset('raw_data.csv')
     cleaned_data.to_csv('cleaned_data.csv', index=False)
+def deduplicate_list(original_list):
+    seen = set()
+    result = []
+    for item in original_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
