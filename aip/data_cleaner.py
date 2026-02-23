@@ -637,3 +637,14 @@ def remove_duplicates_preserve_order(sequence):
             seen.add(item)
             result.append(item)
     return result
+def filter_none_values(input_list):
+    """
+    Return a new list with all None values removed.
+    
+    Args:
+        input_list (list): A list that may contain None values.
+    
+    Returns:
+        list: A list without any None values.
+    """
+    return [item for item in input_list if item is not None]
