@@ -165,4 +165,107 @@ def remove_outliers_iqr(data, column):
     upper_bound = Q3 + 1.5 * IQR
     
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    return filtered_dataimport pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_columns = df.columns.tolist()
+    
+    def remove_duplicates(self):
+        initial_count = len(self.df)
+        self.df = self.df.drop_duplicates()
+        removed = initial_count - len(self.df)
+        print(f"Removed {removed} duplicate rows")
+        return self
+    
+    def handle_missing_values(self, strategy='mean', fill_value=None):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if strategy == 'mean':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mean())
+        elif strategy == 'median':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].median())
+        elif strategy == 'mode':
+            for col in numeric_cols:
+                self.df[col] = self.df[col].fillna(self.df[col].mode()[0])
+        elif strategy == 'constant' and fill_value is not None:
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(fill_value)
+        elif strategy == 'drop':
+            self.df = self.df.dropna(subset=numeric_cols)
+        
+        print(f"Handled missing values using '{strategy}' strategy")
+        return self
+    
+    def detect_outliers_zscore(self, threshold=3):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        outliers_mask = pd.Series([False] * len(self.df))
+        
+        for col in numeric_cols:
+            z_scores = np.abs(stats.zscore(self.df[col].dropna()))
+            col_outliers = z_scores > threshold
+            outliers_mask = outliers_mask | col_outliers.reindex(self.df.index, fill_value=False)
+        
+        outlier_count = outliers_mask.sum()
+        print(f"Detected {outlier_count} outliers using Z-score method")
+        return outliers_mask
+    
+    def remove_outliers(self, threshold=3):
+        outliers_mask = self.detect_outliers_zscore(threshold)
+        self.df = self.df[~outliers_mask]
+        print(f"Removed {outliers_mask.sum()} outliers")
+        return self
+    
+    def normalize_data(self, method='minmax'):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if method == 'minmax':
+            for col in numeric_cols:
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val > min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        
+        elif method == 'standard':
+            for col in numeric_cols:
+                mean_val = self.df[col].mean()
+                std_val = self.df[col].std()
+                if std_val > 0:
+                    self.df[col] = (self.df[col] - mean_val) / std_val
+        
+        print(f"Normalized data using '{method}' method")
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def summary(self):
+        print("Data Cleaning Summary")
+        print("=" * 50)
+        print(f"Original columns: {self.original_columns}")
+        print(f"Current shape: {self.df.shape}")
+        print(f"Missing values per column:")
+        print(self.df.isnull().sum())
+        print(f"Data types:")
+        print(self.df.dtypes)
+
+def clean_dataset(df, remove_duplicates=True, handle_missing=True, 
+                  remove_outliers=True, normalize=True):
+    cleaner = DataCleaner(df)
+    
+    if remove_duplicates:
+        cleaner.remove_duplicates()
+    
+    if handle_missing:
+        cleaner.handle_missing_values(strategy='mean')
+    
+    if remove_outliers:
+        cleaner.remove_outliers(threshold=3)
+    
+    if normalize:
+        cleaner.normalize_data(method='minmax')
+    
+    cleaner.summary()
+    return cleaner.get_cleaned_data()
