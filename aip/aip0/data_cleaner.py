@@ -192,3 +192,77 @@ if __name__ == "__main__":
     cleaned = clean_data(sample_data)
     print(f"Original: {sample_data}")
     print(f"Cleaned: {cleaned}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers from specified column using IQR method.
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df
+
+def normalize_minmax(dataframe, columns=None):
+    """
+    Normalize specified columns using min-max scaling.
+    If columns is None, normalize all numeric columns.
+    """
+    if columns is None:
+        numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    normalized_df = dataframe.copy()
+    
+    for col in columns:
+        if col not in normalized_df.columns:
+            continue
+            
+        col_min = normalized_df[col].min()
+        col_max = normalized_df[col].max()
+        
+        if col_max != col_min:
+            normalized_df[col] = (normalized_df[col] - col_min) / (col_max - col_min)
+        else:
+            normalized_df[col] = 0
+    
+    return normalized_df
+
+def remove_missing_rows(dataframe, threshold=0.8):
+    """
+    Remove rows with missing values above specified threshold.
+    """
+    missing_percentage = dataframe.isnull().sum(axis=1) / dataframe.shape[1]
+    filtered_df = dataframe[missing_percentage <= threshold]
+    
+    return filtered_df
+
+def clean_dataset(dataframe, outlier_columns=None, normalize_columns=None, missing_threshold=0.8):
+    """
+    Comprehensive data cleaning pipeline.
+    """
+    cleaned_df = dataframe.copy()
+    
+    cleaned_df = remove_missing_rows(cleaned_df, missing_threshold)
+    
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in cleaned_df.columns:
+                cleaned_df = remove_outliers_iqr(cleaned_df, col)
+    
+    if normalize_columns:
+        cleaned_df = normalize_minmax(cleaned_df, normalize_columns)
+    
+    return cleaned_df
