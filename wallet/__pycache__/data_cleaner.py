@@ -304,4 +304,11 @@ def normalize_column(data, column):
     else:
         data[f'{column}_normalized'] = (data[column] - min_val) / (max_val - min_val)
     
-    return data
+    return datadef remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
