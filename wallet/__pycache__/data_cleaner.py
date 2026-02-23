@@ -150,3 +150,92 @@ if __name__ == "__main__":
     print("\nValidation results:")
     for key, value in validation.items():
         print(f"{key}: {value}")
+import pandas as pd
+import numpy as np
+
+def clean_data(df, column_mapping=None, drop_duplicates=True, fill_missing=True):
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
+    
+    Args:
+        df: Input pandas DataFrame
+        column_mapping: Dictionary to rename columns (optional)
+        drop_duplicates: Boolean to remove duplicate rows
+        fill_missing: Boolean to fill missing values with column mean
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    # Create a copy to avoid modifying original data
+    cleaned_df = df.copy()
+    
+    # Rename columns if mapping provided
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    # Remove duplicate rows
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    # Handle missing values
+    if fill_missing:
+        for column in cleaned_df.select_dtypes(include=[np.number]).columns:
+            if cleaned_df[column].isnull().any():
+                mean_value = cleaned_df[column].mean()
+                cleaned_df[column] = cleaned_df[column].fillna(mean_value)
+                print(f"Filled missing values in '{column}' with mean: {mean_value:.2f}")
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: DataFrame to validate
+        required_columns: List of required column names
+    
+    Returns:
+        Boolean indicating if validation passed
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    # Check for any remaining NaN values
+    if df.isnull().any().any():
+        print("Warning: DataFrame contains NaN values")
+        return False
+    
+    return True
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'value': [10.5, 20.3, 20.3, None, 40.1, 50.0],
+        'category': ['A', 'B', 'B', 'C', None, 'A']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned = clean_data(df, drop_duplicates=True, fill_missing=True)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    # Validate the cleaned data
+    is_valid = validate_data(cleaned, required_columns=['id', 'value'])
+    print(f"\nData validation passed: {is_valid}")
