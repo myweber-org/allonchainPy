@@ -717,4 +717,57 @@ def validate_data(df, required_columns):
     missing_cols = [col for col in required_columns if col not in df.columns]
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
-    return True
+    return Trueimport numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    min_val = data[column].min()
+    max_val = data[column].max()
+    if max_val - min_val == 0:
+        return data[column].apply(lambda x: 0.0)
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    if std_val == 0:
+        return data[column].apply(lambda x: 0.0)
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean'):
+    if strategy == 'mean':
+        return data.fillna(data.mean())
+    elif strategy == 'median':
+        return data.fillna(data.median())
+    elif strategy == 'mode':
+        return data.fillna(data.mode().iloc[0])
+    elif strategy == 'drop':
+        return data.dropna()
+    else:
+        raise ValueError("Unsupported strategy. Use 'mean', 'median', 'mode', or 'drop'.")
+
+def clean_dataset(df, numeric_columns, outlier_removal=True, normalization='minmax', missing_strategy='mean'):
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if outlier_removal:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+        
+        if normalization == 'minmax':
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+        elif normalization == 'zscore':
+            cleaned_df[col] = standardize_zscore(cleaned_df, col)
+    
+    cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
+    return cleaned_df
