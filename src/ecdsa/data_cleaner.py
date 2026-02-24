@@ -246,3 +246,11 @@ def validate_dataframe(data, required_columns=None, check_types=None):
                     raise TypeError(f"Column '{column}' has type {actual_type}, expected {expected_type}")
     
     return True
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
