@@ -539,3 +539,65 @@ def example_usage():
 
 if __name__ == "__main__":
     cleaned_data = example_usage()
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def remove_outliers_iqr(df, columns):
+    cleaned_df = df.copy()
+    for col in columns:
+        if col in cleaned_df.columns:
+            Q1 = cleaned_df[col].quantile(0.25)
+            Q3 = cleaned_df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
+    return cleaned_df
+
+def normalize_minmax(df, columns):
+    normalized_df = df.copy()
+    for col in columns:
+        if col in normalized_df.columns:
+            min_val = normalized_df[col].min()
+            max_val = normalized_df[col].max()
+            if max_val != min_val:
+                normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+    return normalized_df
+
+def handle_missing_values(df, strategy='mean'):
+    handled_df = df.copy()
+    numeric_cols = handled_df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        if handled_df[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = handled_df[col].mean()
+            elif strategy == 'median':
+                fill_value = handled_df[col].median()
+            elif strategy == 'mode':
+                fill_value = handled_df[col].mode()[0]
+            else:
+                fill_value = 0
+            handled_df[col] = handled_df[col].fillna(fill_value)
+    
+    return handled_df
+
+def clean_dataset(df, numeric_columns=None, outlier_method='iqr', normalize=True, missing_strategy='mean'):
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_cleaned = df.copy()
+    
+    df_cleaned = handle_missing_values(df_cleaned, strategy=missing_strategy)
+    
+    if outlier_method == 'iqr':
+        df_cleaned = remove_outliers_iqr(df_cleaned, numeric_columns)
+    elif outlier_method == 'zscore':
+        z_scores = np.abs(stats.zscore(df_cleaned[numeric_columns]))
+        df_cleaned = df_cleaned[(z_scores < 3).all(axis=1)]
+    
+    if normalize:
+        df_cleaned = normalize_minmax(df_cleaned, numeric_columns)
+    
+    return df_cleaned
