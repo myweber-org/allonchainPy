@@ -93,4 +93,99 @@ def example_usage():
 if __name__ == "__main__":
     result = example_usage()
     print("\nFirst 5 rows of cleaned data:")
-    print(result.head())
+    print(result.head())import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        subset (list, optional): Column labels to consider for duplicates.
+        keep (str, optional): Which duplicates to keep.
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed.
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    removed_count = len(df) - len(cleaned_df)
+    
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate rows.")
+    
+    return cleaned_df.reset_index(drop=True)
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list, optional): List of required column names.
+    
+    Returns:
+        bool: True if validation passes, False otherwise.
+    """
+    if not isinstance(df, pd.DataFrame):
+        print("Error: Input is not a pandas DataFrame.")
+        return False
+    
+    if df.empty:
+        print("Warning: DataFrame is empty.")
+        return True
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Error: Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+def clean_numeric_columns(df, columns):
+    """
+    Clean numeric columns by converting to appropriate types and handling errors.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        columns (list): List of column names to clean.
+    
+    Returns:
+        pd.DataFrame: DataFrame with cleaned numeric columns.
+    """
+    for col in columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    
+    return df
+
+def main():
+    """
+    Example usage of data cleaning functions.
+    """
+    sample_data = {
+        'id': [1, 2, 3, 2, 4, 1],
+        'name': ['Alice', 'Bob', 'Charlie', 'Bob', 'David', 'Alice'],
+        'score': [85, 92, 78, 92, 88, 85],
+        'date': ['2023-01-01', '2023-01-02', '2023-01-03', 
+                 '2023-01-02', '2023-01-04', '2023-01-01']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nShape:", df.shape)
+    
+    if validate_dataframe(df, required_columns=['id', 'name', 'score']):
+        cleaned_df = remove_duplicates(df, subset=['id', 'name'], keep='first')
+        cleaned_df = clean_numeric_columns(cleaned_df, ['score'])
+        
+        print("\nCleaned DataFrame:")
+        print(cleaned_df)
+        print("\nShape:", cleaned_df.shape)
+
+if __name__ == "__main__":
+    main()
