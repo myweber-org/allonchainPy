@@ -170,4 +170,81 @@ if __name__ == "__main__":
     print(no_outliers)
     print("\nStandardized columns:")
     standardized = standardize_columns(no_outliers, columns=['A', 'B'])
-    print(standardized)
+    print(standardized)import csv
+import re
+from typing import List, Dict, Optional
+
+def clean_string(value: str) -> str:
+    """Remove extra whitespace and convert to lowercase."""
+    if not isinstance(value, str):
+        return str(value)
+    return re.sub(r'\s+', ' ', value.strip()).lower()
+
+def validate_email(email: str) -> bool:
+    """Basic email validation."""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def read_csv_file(filepath: str) -> List[Dict]:
+    """Read CSV file and return list of dictionaries."""
+    data = []
+    try:
+        with open(filepath, mode='r', newline='', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                data.append(row)
+    except FileNotFoundError:
+        print(f"Error: File '{filepath}' not found.")
+    except Exception as e:
+        print(f"Error reading CSV: {e}")
+    return data
+
+def clean_csv_data(data: List[Dict], email_field: Optional[str] = None) -> List[Dict]:
+    """Clean CSV data and optionally validate email fields."""
+    cleaned_data = []
+    for row in data:
+        cleaned_row = {}
+        for key, value in row.items():
+            cleaned_row[key] = clean_string(value)
+        
+        if email_field and email_field in cleaned_row:
+            if not validate_email(cleaned_row[email_field]):
+                cleaned_row['email_valid'] = False
+            else:
+                cleaned_row['email_valid'] = True
+        
+        cleaned_data.append(cleaned_row)
+    return cleaned_data
+
+def write_csv_file(data: List[Dict], filepath: str) -> bool:
+    """Write cleaned data to a new CSV file."""
+    if not data:
+        return False
+    
+    try:
+        fieldnames = data[0].keys()
+        with open(filepath, mode='w', newline='', encoding='utf-8') as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+        return True
+    except Exception as e:
+        print(f"Error writing CSV: {e}")
+        return False
+
+def process_csv(input_path: str, output_path: str, email_field: Optional[str] = None) -> None:
+    """Main function to process CSV file."""
+    print(f"Processing {input_path}...")
+    raw_data = read_csv_file(input_path)
+    
+    if not raw_data:
+        print("No data to process.")
+        return
+    
+    cleaned_data = clean_csv_data(raw_data, email_field)
+    
+    if write_csv_file(cleaned_data, output_path):
+        print(f"Cleaned data written to {output_path}")
+        print(f"Processed {len(cleaned_data)} records.")
+    else:
+        print("Failed to write output file.")
