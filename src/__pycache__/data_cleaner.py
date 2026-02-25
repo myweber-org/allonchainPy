@@ -656,4 +656,94 @@ if __name__ == "__main__":
     if validate_dataframe(df):
         cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='median')
         print("\nCleaned DataFrame:")
-        print(cleaned)
+        print(cleaned)import pandas as pd
+
+def remove_duplicates(dataframe, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a pandas DataFrame.
+    
+    Args:
+        dataframe: pandas DataFrame to clean.
+        subset: Column label or sequence of labels to consider for duplicates.
+                If None, all columns are used.
+        keep: Determines which duplicates to mark.
+              'first' : Mark duplicates as False except for the first occurrence.
+              'last' : Mark duplicates as False except for the last occurrence.
+              False : Mark all duplicates as True.
+    
+    Returns:
+        Cleaned DataFrame with duplicates removed.
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    cleaned_df = dataframe.drop_duplicates(subset=subset, keep=keep)
+    removed_count = len(dataframe) - len(cleaned_df)
+    
+    print(f"Removed {removed_count} duplicate rows.")
+    print(f"Original shape: {dataframe.shape}, Cleaned shape: {cleaned_df.shape}")
+    
+    return cleaned_df
+
+def validate_dataframe(dataframe, required_columns=None):
+    """
+    Basic validation of DataFrame structure.
+    
+    Args:
+        dataframe: pandas DataFrame to validate.
+        required_columns: List of column names that must be present.
+    
+    Returns:
+        Boolean indicating if validation passed.
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in dataframe.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    if dataframe.empty:
+        print("DataFrame is empty")
+        return False
+    
+    return True
+
+def clean_dataset(file_path, output_path=None):
+    """
+    Load, clean, and save a dataset from CSV file.
+    
+    Args:
+        file_path: Path to input CSV file.
+        output_path: Path to save cleaned CSV file. If None, returns DataFrame.
+    
+    Returns:
+        Cleaned DataFrame if output_path is None, otherwise saves to file.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Loaded dataset with shape: {df.shape}")
+        
+        if not validate_dataframe(df):
+            raise ValueError("DataFrame validation failed")
+        
+        cleaned_df = remove_duplicates(df)
+        
+        if output_path:
+            cleaned_df.to_csv(output_path, index=False)
+            print(f"Cleaned dataset saved to: {output_path}")
+            return None
+        else:
+            return cleaned_df
+            
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        raise
+    except pd.errors.EmptyDataError:
+        print("Error: File is empty")
+        raise
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+        raise
