@@ -382,3 +382,11 @@ class DataCleaner:
             'numeric_columns': list(self.df.select_dtypes(include=[np.number]).columns)
         }
         return summary
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
