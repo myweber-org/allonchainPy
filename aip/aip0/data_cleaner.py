@@ -146,3 +146,76 @@ if __name__ == "__main__":
     
     print("\nProcessed DataFrame:")
     print(processed)
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by removing duplicates and standardizing column names.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Standardize column names: lowercase and replace spaces with underscores
+    df_cleaned.columns = df_cleaned.columns.str.lower().str.replace(' ', '_')
+    
+    # Remove rows with missing values in critical columns
+    critical_columns = ['id', 'name', 'value']
+    existing_critical = [col for col in critical_columns if col in df_cleaned.columns]
+    if existing_critical:
+        df_cleaned = df_cleaned.dropna(subset=existing_critical)
+    
+    return df_cleaned
+
+def validate_data(df, required_columns):
+    """
+    Validate that the DataFrame contains required columns and has no negative values.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    # Check for negative values in numeric columns
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if (df[col] < 0).any():
+            print(f"Warning: Negative values found in column '{col}'")
+    
+    return True
+
+def process_data(input_file, output_file):
+    """
+    Main function to process data from input file and save cleaned data to output file.
+    """
+    try:
+        # Read input data
+        df = pd.read_csv(input_file)
+        
+        # Clean the data
+        df_cleaned = clean_dataframe(df)
+        
+        # Validate the cleaned data
+        required_cols = ['id', 'value']
+        validate_data(df_cleaned, required_cols)
+        
+        # Save cleaned data
+        df_cleaned.to_csv(output_file, index=False)
+        print(f"Data cleaned successfully. Saved to {output_file}")
+        
+        return df_cleaned
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+    except Exception as e:
+        print(f"Error processing data: {str(e)}")
+
+if __name__ == "__main__":
+    # Example usage
+    input_path = "raw_data.csv"
+    output_path = "cleaned_data.csv"
+    
+    cleaned_df = process_data(input_path, output_path)
+    if cleaned_df is not None:
+        print(f"Cleaned data shape: {cleaned_df.shape}")
+        print("Sample of cleaned data:")
+        print(cleaned_df.head())
