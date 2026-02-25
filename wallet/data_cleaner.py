@@ -2004,3 +2004,148 @@ def validate_dataframe(dataframe, required_columns=None, min_rows=1):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    outliers_removed = len(data) - len(filtered_data)
+    
+    return filtered_data, outliers_removed
+
+def z_score_normalization(data, column):
+    """
+    Normalize data using z-score method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column]
+    
+    normalized = (data[column] - mean_val) / std_val
+    return normalized
+
+def min_max_normalization(data, column, feature_range=(0, 1)):
+    """
+    Normalize data using min-max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column]
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    
+    if feature_range != (0, 1):
+        new_min, new_max = feature_range
+        normalized = normalized * (new_max - new_min) + new_min
+    
+    return normalized
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns
+    """
+    if columns is None:
+        columns = data.columns
+    
+    data_filled = data.copy()
+    
+    for col in columns:
+        if col not in data.columns:
+            continue
+            
+        if data[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = data[col].mean()
+            elif strategy == 'median':
+                fill_value = data[col].median()
+            elif strategy == 'mode':
+                fill_value = data[col].mode()[0]
+            elif strategy == 'ffill':
+                data_filled[col] = data[col].fillna(method='ffill')
+                continue
+            elif strategy == 'bfill':
+                data_filled[col] = data[col].fillna(method='bfill')
+                continue
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            data_filled[col] = data[col].fillna(fill_value)
+    
+    return data_filled
+
+def create_sample_data():
+    """
+    Create sample data for testing
+    """
+    np.random.seed(42)
+    data = {
+        'feature1': np.random.normal(100, 15, 100),
+        'feature2': np.random.exponential(50, 100),
+        'feature3': np.random.uniform(0, 200, 100)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    indices = np.random.choice(100, 10, replace=False)
+    df.loc[indices, 'feature1'] = np.nan
+    
+    return df
+
+def main():
+    """
+    Example usage of data cleaning functions
+    """
+    print("Creating sample data...")
+    df = create_sample_data()
+    print(f"Original data shape: {df.shape}")
+    print(f"Missing values:\n{df.isnull().sum()}")
+    
+    print("\nHandling missing values...")
+    df_clean = handle_missing_values(df, strategy='mean')
+    print(f"After cleaning shape: {df_clean.shape}")
+    
+    print("\nRemoving outliers from feature1...")
+    df_filtered, outliers = remove_outliers_iqr(df_clean, 'feature1')
+    print(f"Outliers removed: {outliers}")
+    print(f"Filtered data shape: {df_filtered.shape}")
+    
+    print("\nNormalizing feature2...")
+    df_filtered['feature2_normalized'] = z_score_normalization(df_filtered, 'feature2')
+    print(f"Feature2 normalized - mean: {df_filtered['feature2_normalized'].mean():.3f}, "
+          f"std: {df_filtered['feature2_normalized'].std():.3f}")
+    
+    print("\nMin-max scaling feature3...")
+    df_filtered['feature3_scaled'] = min_max_normalization(df_filtered, 'feature3', feature_range=(-1, 1))
+    print(f"Feature3 scaled - min: {df_filtered['feature3_scaled'].min():.3f}, "
+          f"max: {df_filtered['feature3_scaled'].max():.3f}")
+    
+    return df_filtered
+
+if __name__ == "__main__":
+    cleaned_data = main()
+    print(f"\nFinal cleaned data shape: {cleaned_data.shape}")
+    print("Data cleaning completed successfully.")
