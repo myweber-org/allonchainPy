@@ -574,4 +574,102 @@ if __name__ == "__main__":
     output_file = sys.argv[2]
     
     success = clean_data(input_file, output_file)
-    sys.exit(0 if success else 1)
+    sys.exit(0 if success else 1)import pandas as pd
+import numpy as np
+
+def clean_dataset(df, missing_strategy='mean', outlier_threshold=3):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        missing_strategy (str): Strategy for handling missing values.
+                               Options: 'mean', 'median', 'mode', 'drop'
+        outlier_threshold (float): Number of standard deviations for outlier detection
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if missing_strategy == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif missing_strategy == 'mean':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+    elif missing_strategy == 'median':
+        cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+    elif missing_strategy == 'mode':
+        for column in cleaned_df.columns:
+            if cleaned_df[column].dtype == 'object':
+                cleaned_df[column] = cleaned_df[column].fillna(cleaned_df[column].mode()[0] if not cleaned_df[column].mode().empty else 'Unknown')
+    
+    # Handle outliers for numeric columns
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        if cleaned_df[col].notna().any():
+            mean = cleaned_df[col].mean()
+            std = cleaned_df[col].std()
+            
+            if std > 0:  # Avoid division by zero
+                z_scores = np.abs((cleaned_df[col] - mean) / std)
+                outlier_mask = z_scores > outlier_threshold
+                
+                # Cap outliers to threshold * std from mean
+                upper_bound = mean + outlier_threshold * std
+                lower_bound = mean - outlier_threshold * std
+                
+                cleaned_df.loc[outlier_mask & (cleaned_df[col] > mean), col] = upper_bound
+                cleaned_df.loc[outlier_mask & (cleaned_df[col] < mean), col] = lower_bound
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+        min_rows (int): Minimum number of rows required
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Data validation passed"
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data with missing values and outliers
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 100],  # Contains outlier (100) and missing value
+        'B': [5, 6, 7, 8, 9],
+        'C': ['x', 'y', np.nan, 'z', 'x']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nDataFrame info:")
+    print(df.info())
+    
+    # Clean the data
+    cleaned = clean_dataset(df, missing_strategy='mean', outlier_threshold=2)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    # Validate the cleaned data
+    is_valid, message = validate_data(cleaned, required_columns=['A', 'B'], min_rows=3)
+    print(f"\nValidation: {is_valid} - {message}")
