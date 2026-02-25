@@ -559,3 +559,129 @@ def validate_data(data, min_rows=10, required_columns=None):
             return False, f"Missing required columns: {missing_cols}"
     
     return True, "Data validation passed"
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+        
+    def detect_outliers_iqr(self, column, threshold=1.5):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        outliers = self.df[(self.df[column] < lower_bound) | (self.df[column] > upper_bound)]
+        return outliers.index.tolist()
+    
+    def detect_outliers_zscore(self, column, threshold=3):
+        z_scores = np.abs(stats.zscore(self.df[column].dropna()))
+        outlier_indices = np.where(z_scores > threshold)[0]
+        original_indices = self.df[column].dropna().index[outlier_indices]
+        return original_indices.tolist()
+    
+    def remove_outliers(self, method='iqr', threshold=3):
+        outlier_indices = []
+        for col in self.numeric_columns:
+            if method == 'iqr':
+                indices = self.detect_outliers_iqr(col, threshold)
+            elif method == 'zscore':
+                indices = self.detect_outliers_zscore(col, threshold)
+            outlier_indices.extend(indices)
+        
+        unique_indices = list(set(outlier_indices))
+        cleaned_df = self.df.drop(unique_indices)
+        return cleaned_df, unique_indices
+    
+    def impute_missing_mean(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        imputed_df = self.df.copy()
+        for col in columns:
+            if col in self.numeric_columns:
+                mean_value = imputed_df[col].mean()
+                imputed_df[col] = imputed_df[col].fillna(mean_value)
+        return imputed_df
+    
+    def impute_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        imputed_df = self.df.copy()
+        for col in columns:
+            if col in self.numeric_columns:
+                median_value = imputed_df[col].median()
+                imputed_df[col] = imputed_df[col].fillna(median_value)
+        return imputed_df
+    
+    def impute_missing_mode(self, columns=None):
+        if columns is None:
+            columns = self.df.columns
+        
+        imputed_df = self.df.copy()
+        for col in columns:
+            mode_value = imputed_df[col].mode()[0] if not imputed_df[col].mode().empty else None
+            imputed_df[col] = imputed_df[col].fillna(mode_value)
+        return imputed_df
+    
+    def get_missing_summary(self):
+        missing_counts = self.df.isnull().sum()
+        missing_percentage = (missing_counts / len(self.df)) * 100
+        summary = pd.DataFrame({
+            'missing_count': missing_counts,
+            'missing_percentage': missing_percentage
+        })
+        return summary[summary['missing_count'] > 0].sort_values('missing_count', ascending=False)
+    
+    def clean_dataset(self, outlier_method='iqr', outlier_threshold=3, impute_method='median'):
+        print("Starting data cleaning process...")
+        print(f"Original shape: {self.df.shape}")
+        
+        missing_summary = self.get_missing_summary()
+        if not missing_summary.empty:
+            print("\nMissing values detected:")
+            print(missing_summary)
+            
+            if impute_method == 'mean':
+                self.df = self.impute_missing_mean()
+            elif impute_method == 'median':
+                self.df = self.impute_missing_median()
+            elif impute_method == 'mode':
+                self.df = self.impute_missing_mode()
+            print("Missing values imputed using", impute_method, "method")
+        
+        cleaned_df, removed_indices = self.remove_outliers(method=outlier_method, threshold=outlier_threshold)
+        print(f"Removed {len(removed_indices)} outliers using {outlier_method} method")
+        print(f"Cleaned shape: {cleaned_df.shape}")
+        
+        return cleaned_df
+
+def example_usage():
+    np.random.seed(42)
+    data = {
+        'age': np.random.normal(35, 10, 100),
+        'salary': np.random.normal(50000, 15000, 100),
+        'experience': np.random.normal(10, 5, 100)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    df.loc[10:15, 'age'] = np.nan
+    df.loc[5, 'salary'] = 200000
+    df.loc[6, 'salary'] = -50000
+    df.loc[20:25, 'experience'] = np.nan
+    
+    cleaner = DataCleaner(df)
+    cleaned_df = cleaner.clean_dataset(outlier_method='zscore', impute_method='median')
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    result = example_usage()
+    print("\nCleaning completed successfully!")
+    print("First 5 rows of cleaned data:")
+    print(result.head())
