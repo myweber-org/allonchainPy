@@ -370,3 +370,133 @@ if __name__ == "__main__":
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B', 'C'], min_rows=3)
     print(f"\nValidation result: {is_valid}")
     print(f"Validation message: {message}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_outliers_iqr(self, columns=None, factor=1.5):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        clean_df = self.df.copy()
+        for col in columns:
+            if col in clean_df.columns:
+                Q1 = clean_df[col].quantile(0.25)
+                Q3 = clean_df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - factor * IQR
+                upper_bound = Q3 + factor * IQR
+                clean_df = clean_df[(clean_df[col] >= lower_bound) & (clean_df[col] <= upper_bound)]
+        
+        removed_count = len(self.df) - len(clean_df)
+        self.df = clean_df
+        return removed_count
+    
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        normalized_df = self.df.copy()
+        for col in columns:
+            if col in normalized_df.columns:
+                min_val = normalized_df[col].min()
+                max_val = normalized_df[col].max()
+                if max_val > min_val:
+                    normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+        
+        self.df = normalized_df
+        return self
+    
+    def standardize_zscore(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        standardized_df = self.df.copy()
+        for col in columns:
+            if col in standardized_df.columns:
+                mean_val = standardized_df[col].mean()
+                std_val = standardized_df[col].std()
+                if std_val > 0:
+                    standardized_df[col] = (standardized_df[col] - mean_val) / std_val
+        
+        self.df = standardized_df
+        return self
+    
+    def fill_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        filled_df = self.df.copy()
+        for col in columns:
+            if col in filled_df.columns and filled_df[col].isnull().any():
+                median_val = filled_df[col].median()
+                filled_df[col] = filled_df[col].fillna(median_val)
+        
+        self.df = filled_df
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def get_summary(self):
+        original_rows, original_cols = self.original_shape
+        cleaned_rows, cleaned_cols = self.df.shape
+        
+        summary = {
+            'original_rows': original_rows,
+            'original_columns': original_cols,
+            'cleaned_rows': cleaned_rows,
+            'cleaned_columns': cleaned_cols,
+            'rows_removed': original_rows - cleaned_rows,
+            'rows_removed_percentage': ((original_rows - cleaned_rows) / original_rows * 100) if original_rows > 0 else 0
+        }
+        
+        return summary
+
+def create_sample_data():
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.uniform(0, 200, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    }
+    
+    df = pd.DataFrame(data)
+    df.loc[np.random.choice(df.index, 50), 'feature_a'] = np.nan
+    df.loc[np.random.choice(df.index, 30), 'feature_b'] = np.nan
+    
+    outliers = np.random.choice(df.index, 20)
+    df.loc[outliers, 'feature_c'] = df.loc[outliers, 'feature_c'] * 10
+    
+    return df
+
+if __name__ == "__main__":
+    sample_df = create_sample_data()
+    cleaner = DataCleaner(sample_df)
+    
+    print("Original data shape:", cleaner.original_shape)
+    print("\nMissing values before cleaning:")
+    print(sample_df.isnull().sum())
+    
+    removed = cleaner.remove_outliers_iqr(['feature_c'])
+    cleaner.fill_missing_median()
+    cleaner.normalize_minmax(['feature_a', 'feature_b'])
+    cleaner.standardize_zscore(['feature_c'])
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    summary = cleaner.get_summary()
+    
+    print(f"\nRemoved {removed} outliers")
+    print("\nCleaned data shape:", cleaned_df.shape)
+    print("\nMissing values after cleaning:")
+    print(cleaned_df.isnull().sum())
+    
+    print("\nSummary:")
+    for key, value in summary.items():
+        print(f"{key}: {value:.2f}" if isinstance(value, float) else f"{key}: {value}")
