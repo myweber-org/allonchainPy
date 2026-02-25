@@ -115,3 +115,49 @@ def validate_data_types(data, expected_types):
             validation_results[column] = {'valid': True, 'message': f'Already {expected_type}'}
     
     return validation_results
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    cleaned_df = df.copy()
+
+    if drop_duplicates:
+        initial_rows = cleaned_df.shape[0]
+        cleaned_df.drop_duplicates(inplace=True)
+        removed = initial_rows - cleaned_df.shape[0]
+        print(f"Removed {removed} duplicate rows.")
+
+    if cleaned_df.isnull().sum().any():
+        print("Handling missing values...")
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        non_numeric_cols = cleaned_df.select_dtypes(exclude=[np.number]).columns
+
+        if fill_missing == 'mean' and len(numeric_cols) > 0:
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+        elif fill_missing == 'median' and len(numeric_cols) > 0:
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].median())
+        elif fill_missing == 'zero' and len(numeric_cols) > 0:
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(0)
+
+        for col in non_numeric_cols:
+            if cleaned_df[col].isnull().any():
+                cleaned_df[col].fillna('Unknown', inplace=True)
+
+    print(f"Data cleaning complete. Final shape: {cleaned_df.shape}")
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, np.nan, 5],
+        'B': [10.5, np.nan, 10.5, 13.2, 15.0],
+        'C': ['X', 'Y', 'X', np.nan, 'Z']
+    }
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    cleaned = clean_dataframe(df, fill_missing='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
