@@ -1,82 +1,148 @@
-
+import numpy as np
 import pandas as pd
 
-def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+def remove_outliers_iqr(df, column):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Remove outliers from a DataFrame column using the IQR method.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean.
-        drop_duplicates (bool): Whether to drop duplicate rows.
-        fill_missing (bool): Whether to fill missing values.
-        fill_value: Value to use for filling missing data.
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame.
+    pd.DataFrame: DataFrame with outliers removed
     """
-    cleaned_df = df.copy()
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    if fill_missing:
-        cleaned_df = cleaned_df.fillna(fill_value)
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def calculate_summary_statistics(df):
+    """
+    Calculate summary statistics for numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    pd.DataFrame: Summary statistics
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    summary = df[numeric_cols].describe()
+    
+    return summary
+
+def clean_missing_values(df, strategy='mean'):
+    """
+    Handle missing values in numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): Strategy for imputation ('mean', 'median', 'drop')
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'drop':
+        cleaned_df = df.dropna(subset=numeric_cols)
+    elif strategy == 'mean':
+        cleaned_df = df.copy()
+        for col in numeric_cols:
+            cleaned_df[col].fillna(df[col].mean(), inplace=True)
+    elif strategy == 'median':
+        cleaned_df = df.copy()
+        for col in numeric_cols:
+            cleaned_df[col].fillna(df[col].median(), inplace=True)
+    else:
+        raise ValueError("Strategy must be 'mean', 'median', or 'drop'")
     
     return cleaned_df
 
-def validate_data(df, required_columns=None):
+def normalize_data(df, columns=None):
     """
-    Validate that the DataFrame meets basic requirements.
+    Normalize specified columns using min-max scaling.
     
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_columns (list): List of column names that must be present.
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of columns to normalize
     
     Returns:
-        tuple: (is_valid, error_message)
+    pd.DataFrame: DataFrame with normalized columns
     """
-    if df.empty:
-        return False, "DataFrame is empty"
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
     
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
+    normalized_df = df.copy()
     
-    return True, "Data validation passed"
+    for col in columns:
+        if col in df.columns:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            
+            if max_val != min_val:
+                normalized_df[col] = (df[col] - min_val) / (max_val - min_val)
+            else:
+                normalized_df[col] = 0
+    
+    return normalized_df
 
-def process_data(file_path, output_path=None):
+def process_data_pipeline(df, outlier_columns=None, missing_strategy='mean', normalize_cols=None):
     """
-    Load, clean, and optionally save a dataset.
+    Complete data processing pipeline.
     
-    Args:
-        file_path (str): Path to input CSV file.
-        output_path (str, optional): Path to save cleaned data.
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    outlier_columns (list): Columns to remove outliers from
+    missing_strategy (str): Strategy for handling missing values
+    normalize_cols (list): Columns to normalize
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame.
+    pd.DataFrame: Processed DataFrame
     """
-    try:
-        df = pd.read_csv(file_path)
-        
-        is_valid, message = validate_data(df)
-        if not is_valid:
-            raise ValueError(f"Data validation failed: {message}")
-        
-        cleaned_df = clean_dataset(df)
-        
-        if output_path:
-            cleaned_df.to_csv(output_path, index=False)
-            print(f"Cleaned data saved to: {output_path}")
-        
-        return cleaned_df
-        
-    except FileNotFoundError:
-        print(f"Error: File not found at {file_path}")
-        raise
-    except pd.errors.EmptyDataError:
-        print("Error: The file is empty")
-        raise
-    except Exception as e:
-        print(f"Error processing data: {str(e)}")
-        raise
+    processed_df = df.copy()
+    
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in processed_df.columns:
+                processed_df = remove_outliers_iqr(processed_df, col)
+    
+    processed_df = clean_missing_values(processed_df, strategy=missing_strategy)
+    
+    if normalize_cols:
+        processed_df = normalize_data(processed_df, columns=normalize_cols)
+    
+    return processed_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 3, 4, 5, 100],
+        'B': [10, 20, 30, 40, 50, 60],
+        'C': [1.1, 2.2, 3.3, 4.4, 5.5, 6.6]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nSummary Statistics:")
+    print(calculate_summary_statistics(df))
+    
+    processed = process_data_pipeline(
+        df, 
+        outlier_columns=['A'],
+        missing_strategy='mean',
+        normalize_cols=['B', 'C']
+    )
+    
+    print("\nProcessed DataFrame:")
+    print(processed)
