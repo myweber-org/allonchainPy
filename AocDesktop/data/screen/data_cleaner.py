@@ -268,4 +268,58 @@ if __name__ == "__main__":
     print("\nCleaned DataFrame:")
     print(cleaned_df)
     print("\nCleaned Statistics:")
-    print(calculate_basic_stats(cleaned_df, 'values'))
+    print(calculate_basic_stats(cleaned_df, 'values'))import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    if max_val == min_val:
+        return df[column].apply(lambda x: 0.0)
+    return df[column].apply(lambda x: (x - min_val) / (max_val - min_val))
+
+def clean_dataset(df, numeric_columns):
+    cleaned_df = df.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+    return cleaned_df.reset_index(drop=True)
+
+def validate_dataframe(df):
+    required_checks = [
+        lambda x: isinstance(x, pd.DataFrame),
+        lambda x: not x.empty,
+        lambda x: x.isnull().sum().sum() == 0
+    ]
+    for check in required_checks:
+        if not check(df):
+            return False
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'feature_a': [1, 2, 3, 100, 5, 6, 7, 8, 9, 10],
+        'feature_b': [10, 20, 30, 40, 50, 60, 70, 80, 90, 1000],
+        'category': ['A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    if validate_dataframe(df):
+        numeric_cols = ['feature_a', 'feature_b']
+        cleaned = clean_dataset(df, numeric_cols)
+        print("\nCleaned DataFrame:")
+        print(cleaned)
+    else:
+        print("DataFrame validation failed.")
