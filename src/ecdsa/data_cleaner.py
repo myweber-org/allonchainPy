@@ -100,3 +100,95 @@ def clean_dataset(df, outlier_threshold=3, normalize=True):
         cleaner.normalize_data(method='minmax')
     
     return cleaner.get_cleaned_data(), cleaner.get_summary()
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(dataframe, column):
+    """
+    Remove outliers from a specified column using the IQR method.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input dataframe
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: Dataframe with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df.copy()
+
+def calculate_basic_stats(dataframe, column):
+    """
+    Calculate basic statistics for a column.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input dataframe
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing statistics
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    stats = {
+        'mean': dataframe[column].mean(),
+        'median': dataframe[column].median(),
+        'std': dataframe[column].std(),
+        'min': dataframe[column].min(),
+        'max': dataframe[column].max(),
+        'count': len(dataframe)
+    }
+    
+    return stats
+
+def clean_numeric_data(dataframe, columns=None):
+    """
+    Clean numeric data by removing NaN values and converting to appropriate types.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input dataframe
+    columns (list): List of columns to clean, defaults to all numeric columns
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    if columns is None:
+        columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = dataframe.copy()
+    
+    for col in columns:
+        if col in cleaned_df.columns:
+            cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
+            cleaned_df = cleaned_df.dropna(subset=[col])
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'values': [1, 2, 3, 4, 5, 100, 200, 300, 400, 500],
+        'category': ['A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B']
+    })
+    
+    print("Original data:")
+    print(sample_data)
+    print("\nBasic statistics:")
+    print(calculate_basic_stats(sample_data, 'values'))
+    
+    cleaned_data = remove_outliers_iqr(sample_data, 'values')
+    print("\nData after outlier removal:")
+    print(cleaned_data)
+    print(f"\nRemoved {len(sample_data) - len(cleaned_data)} outliers")
