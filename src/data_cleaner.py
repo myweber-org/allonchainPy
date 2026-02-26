@@ -666,3 +666,127 @@ if __name__ == "__main__":
     cleaned_df = clean_dataframe(df, drop_duplicates=True, fill_missing='mean')
     print("\nCleaned DataFrame:")
     print(cleaned_df)
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, handle_nulls='drop'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling null values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    handle_nulls (str): Method to handle nulls - 'drop', 'fill_mean', 'fill_median', or 'fill_zero'.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    null_count = cleaned_df.isnull().sum().sum()
+    if null_count > 0:
+        print(f"Found {null_count} null values")
+        
+        if handle_nulls == 'drop':
+            cleaned_df = cleaned_df.dropna()
+            print(f"Dropped rows with null values")
+        elif handle_nulls == 'fill_mean':
+            numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+            print(f"Filled numeric nulls with column mean")
+        elif handle_nulls == 'fill_median':
+            numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].median())
+            print(f"Filled numeric nulls with column median")
+        elif handle_nulls == 'fill_zero':
+            cleaned_df = cleaned_df.fillna(0)
+            print(f"Filled all nulls with zero")
+        else:
+            print(f"Unknown null handling method: {handle_nulls}")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
+    min_rows (int): Minimum number of rows required.
+    
+    Returns:
+    bool: True if validation passes, False otherwise.
+    """
+    if not isinstance(df, pd.DataFrame):
+        print("Error: Input is not a pandas DataFrame")
+        return False
+    
+    if len(df) < min_rows:
+        print(f"Error: DataFrame has only {len(df)} rows, minimum required is {min_rows}")
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Error: Missing required columns: {missing_cols}")
+            return False
+    
+    return True
+
+def get_data_summary(df):
+    """
+    Generate a summary of the DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    
+    Returns:
+    dict: Dictionary containing summary statistics.
+    """
+    summary = {
+        'rows': len(df),
+        'columns': len(df.columns),
+        'memory_usage': df.memory_usage(deep=True).sum(),
+        'null_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'dtypes': df.dtypes.to_dict()
+    }
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) > 0:
+        summary['numeric_stats'] = df[numeric_cols].describe().to_dict()
+    
+    return summary
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, 2, 3, None, 5],
+        'B': [10, 20, 20, None, 50, 60],
+        'C': ['x', 'y', 'y', 'z', 'z', 'x']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50)
+    
+    # Clean the data
+    cleaned = clean_dataset(df, handle_nulls='fill_mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    # Validate
+    is_valid = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
+    print(f"\nDataFrame validation: {is_valid}")
+    
+    # Get summary
+    summary = get_data_summary(cleaned)
+    print(f"\nData Summary - Rows: {summary['rows']}, Columns: {summary['columns']}")
