@@ -177,3 +177,131 @@ def validate_data(data, required_columns=None, check_missing=True, check_duplica
             validation_results['is_valid'] = False
     
     return validation_results
+import pandas as pd
+import numpy as np
+from typing import Optional
+
+def clean_csv_data(file_path: str, 
+                   missing_strategy: str = 'drop',
+                   fill_value: Optional[float] = None) -> pd.DataFrame:
+    """
+    Load and clean CSV data by handling missing values.
+    
+    Args:
+        file_path: Path to CSV file
+        missing_strategy: Strategy for handling missing values ('drop', 'fill', 'mean')
+        fill_value: Value to use when strategy is 'fill'
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    try:
+        df = pd.read_csv(file_path)
+        
+        if missing_strategy == 'drop':
+            df_cleaned = df.dropna()
+        elif missing_strategy == 'fill':
+            if fill_value is None:
+                raise ValueError("fill_value must be provided when using 'fill' strategy")
+            df_cleaned = df.fillna(fill_value)
+        elif missing_strategy == 'mean':
+            df_cleaned = df.fillna(df.mean(numeric_only=True))
+        else:
+            raise ValueError(f"Unknown strategy: {missing_strategy}")
+        
+        print(f"Cleaned data: {len(df_cleaned)} rows, {len(df_cleaned.columns)} columns")
+        print(f"Removed {len(df) - len(df_cleaned)} rows with missing values")
+        
+        return df_cleaned
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        raise
+    except pd.errors.EmptyDataError:
+        print("Error: CSV file is empty")
+        raise
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        raise
+
+def detect_outliers_iqr(df: pd.DataFrame, column: str, threshold: float = 1.5) -> pd.Series:
+    """
+    Detect outliers using Interquartile Range method.
+    
+    Args:
+        df: DataFrame containing the data
+        column: Column name to check for outliers
+        threshold: IQR multiplier threshold
+    
+    Returns:
+        Boolean Series indicating outliers
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        raise ValueError(f"Column '{column}' must be numeric")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    outliers = (df[column] < lower_bound) | (df[column] > upper_bound)
+    
+    outlier_count = outliers.sum()
+    if outlier_count > 0:
+        print(f"Detected {outlier_count} outliers in column '{column}'")
+    
+    return outliers
+
+def normalize_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """
+    Normalize a column using min-max scaling.
+    
+    Args:
+        df: DataFrame containing the data
+        column: Column name to normalize
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        raise ValueError(f"Column '{column}' must be numeric")
+    
+    df_normalized = df.copy()
+    min_val = df[column].min()
+    max_val = df[column].max()
+    
+    if max_val == min_val:
+        df_normalized[f"{column}_normalized"] = 0.5
+    else:
+        df_normalized[f"{column}_normalized"] = (df[column] - min_val) / (max_val - min_val)
+    
+    return df_normalized
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [10, 20, 30, np.nan, 50],
+        'C': [100, 200, 300, 400, 500]
+    }
+    
+    df_sample = pd.DataFrame(sample_data)
+    df_sample.to_csv('sample_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('sample_data.csv', missing_strategy='mean')
+    print("\nSample cleaned data:")
+    print(cleaned_df)
+    
+    outliers = detect_outliers_iqr(cleaned_df, 'C')
+    print(f"\nOutliers in column C: {outliers.sum()}")
+    
+    normalized_df = normalize_column(cleaned_df, 'C')
+    print("\nData with normalized column C:")
+    print(normalized_df[['C', 'C_normalized']].head())
