@@ -429,3 +429,32 @@ if __name__ == "__main__":
     print("Summary statistics for column 'A':")
     for key, value in stats.items():
         print(f"{key}: {value}")
+import pandas as pd
+
+def clean_dataset(df):
+    """
+    Remove rows with any null values and standardize column names.
+    """
+    # Drop rows with any missing values
+    df_cleaned = df.dropna()
+    
+    # Standardize column names: strip whitespace and convert to lowercase
+    df_cleaned.columns = df_cleaned.columns.str.strip().str.lower()
+    
+    return df_cleaned
+
+def main():
+    # Example usage
+    data = {'Name': ['Alice', 'Bob', None, 'David'],
+            'Age': [25, None, 35, 40],
+            'City': ['NYC', 'LA', 'Chicago', None]}
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataset(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+
+if __name__ == "__main__":
+    main()
