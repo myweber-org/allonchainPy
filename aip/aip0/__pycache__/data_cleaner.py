@@ -126,3 +126,152 @@ def clean_dataset(df, outlier_threshold=1.5, skew_threshold=0.5):
     print("Data normalization completed")
     
     return df_normalized
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        multiplier: IQR multiplier for outlier detection
+        
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+        
+    Returns:
+        Series with normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return pd.Series([0.5] * len(data), index=data.index)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using Z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to standardize
+        
+    Returns:
+        Series with standardized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return pd.Series([0] * len(data), index=data.index)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def detect_skewness(data, column, threshold=0.5):
+    """
+    Detect skewness in data column.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to check
+        threshold: absolute skewness threshold
+        
+    Returns:
+        Tuple of (skewness_value, is_skewed)
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    skewness = data[column].skew()
+    is_skewed = abs(skewness) > threshold
+    
+    return skewness, is_skewed
+
+def apply_log_transform(data, column):
+    """
+    Apply log transformation to reduce skewness.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to transform
+        
+    Returns:
+        Series with log-transformed values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if (data[column] <= 0).any():
+        shifted_data = data[column] - data[column].min() + 1
+        transformed = np.log(shifted_data)
+    else:
+        transformed = np.log(data[column])
+    
+    return transformed
+
+def clean_dataset(data, numeric_columns=None, outlier_multiplier=1.5):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        data: pandas DataFrame
+        numeric_columns: list of numeric columns to clean
+        outlier_multiplier: IQR multiplier for outlier detection
+        
+    Returns:
+        Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            # Remove outliers
+            cleaned_data = remove_outliers_iqr(cleaned_data, column, outlier_multiplier)
+            
+            # Check and fix skewness
+            skewness, is_skewed = detect_skewness(cleaned_data, column)
+            
+            if is_skewed:
+                cleaned_data[f"{column}_log"] = apply_log_transform(cleaned_data, column)
+            
+            # Add normalized and standardized versions
+            cleaned_data[f"{column}_normalized"] = normalize_minmax(cleaned_data, column)
+            cleaned_data[f"{column}_standardized"] = standardize_zscore(cleaned_data, column)
+    
+    return cleaned_data
