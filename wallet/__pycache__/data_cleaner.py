@@ -174,3 +174,65 @@ def validate_data(data, required_columns=None, check_missing=True, check_infinit
                     validation_results['is_valid'] = False
     
     return validation_results
+import pandas as pd
+import numpy as np
+import sys
+
+def clean_data(input_file, output_file):
+    try:
+        df = pd.read_csv(input_file)
+        
+        print(f"Original shape: {df.shape}")
+        
+        df = df.drop_duplicates()
+        
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_columns:
+            df[col] = df[col].fillna(df[col].median())
+        
+        categorical_columns = df.select_dtypes(include=['object']).columns
+        for col in categorical_columns:
+            df[col] = df[col].fillna('Unknown')
+        
+        df = df.dropna(how='all')
+        
+        for col in numeric_columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df[col] = np.where((df[col] < lower_bound) | (df[col] > upper_bound), 
+                              df[col].median(), df[col])
+        
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to {output_file}")
+        print(f"Final shape: {df.shape}")
+        
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: File {input_file} not found")
+        return False
+    except pd.errors.EmptyDataError:
+        print("Error: Input file is empty")
+        return False
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return False
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: python data_cleaner.py <input_file> <output_file>")
+        sys.exit(1)
+    
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    
+    success = clean_data(input_file, output_file)
+    
+    if success:
+        print("Data cleaning completed successfully")
+    else:
+        print("Data cleaning failed")
+        sys.exit(1)
