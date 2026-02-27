@@ -894,4 +894,144 @@ def validate_dataframe(df, required_columns=None):
     if df.empty:
         return False, "DataFrame is empty"
     
+    return True, "DataFrame is valid"import pandas as pd
+import numpy as np
+
+def clean_missing_data(df, strategy='mean', columns=None):
+    """
+    Handle missing values in a DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        strategy: Method for handling missing values ('mean', 'median', 'mode', 'drop')
+        columns: List of columns to apply cleaning to (None for all columns)
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    if df.empty:
+        return df
+    
+    if columns is None:
+        columns = df.columns
+    
+    df_cleaned = df.copy()
+    
+    for col in columns:
+        if col not in df_cleaned.columns:
+            continue
+            
+        if df_cleaned[col].isnull().sum() == 0:
+            continue
+        
+        if strategy == 'drop':
+            df_cleaned = df_cleaned.dropna(subset=[col])
+        elif strategy == 'mean':
+            if pd.api.types.is_numeric_dtype(df_cleaned[col]):
+                df_cleaned[col].fillna(df_cleaned[col].mean(), inplace=True)
+        elif strategy == 'median':
+            if pd.api.types.is_numeric_dtype(df_cleaned[col]):
+                df_cleaned[col].fillna(df_cleaned[col].median(), inplace=True)
+        elif strategy == 'mode':
+            if not df_cleaned[col].empty:
+                mode_value = df_cleaned[col].mode()
+                if not mode_value.empty:
+                    df_cleaned[col].fillna(mode_value[0], inplace=True)
+    
+    return df_cleaned
+
+def remove_outliers_iqr(df, columns=None, multiplier=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Args:
+        df: pandas DataFrame
+        columns: List of columns to check for outliers
+        multiplier: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_filtered = df.copy()
+    
+    for col in columns:
+        if col not in df_filtered.columns:
+            continue
+            
+        Q1 = df_filtered[col].quantile(0.25)
+        Q3 = df_filtered[col].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        
+        df_filtered = df_filtered[(df_filtered[col] >= lower_bound) & 
+                                 (df_filtered[col] <= upper_bound)]
+    
+    return df_filtered
+
+def normalize_data(df, columns=None, method='minmax'):
+    """
+    Normalize numerical data in DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        columns: List of columns to normalize
+        method: Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_normalized = df.copy()
+    
+    for col in columns:
+        if col not in df_normalized.columns:
+            continue
+            
+        if method == 'minmax':
+            min_val = df_normalized[col].min()
+            max_val = df_normalized[col].max()
+            if max_val != min_val:
+                df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+        
+        elif method == 'zscore':
+            mean_val = df_normalized[col].mean()
+            std_val = df_normalized[col].std()
+            if std_val != 0:
+                df_normalized[col] = (df_normalized[col] - mean_val) / std_val
+    
+    return df_normalized
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: List of required column names
+        min_rows: Minimum number of rows required
+    
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
     return True, "DataFrame is valid"
