@@ -940,3 +940,54 @@ def remove_duplicates(seq):
             seen.add(item)
             result.append(item)
     return result
+def remove_duplicates(input_list):
+    """
+    Remove duplicate elements from a list while preserving order.
+    
+    Args:
+        input_list: A list containing elements (must be hashable).
+    
+    Returns:
+        A new list with duplicates removed.
+    """
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_data_with_key(data, key_func=None):
+    """
+    Remove duplicates based on a key function.
+    
+    Args:
+        data: List of items to clean.
+        key_func: Function to extract comparison key (optional).
+    
+    Returns:
+        List with duplicates removed based on key.
+    """
+    if key_func is None:
+        return remove_duplicates(data)
+    
+    seen = set()
+    result = []
+    for item in data:
+        key = key_func(item)
+        if key not in seen:
+            seen.add(key)
+            result.append(item)
+    return result
+
+if __name__ == "__main__":
+    sample_data = [1, 2, 2, 3, 4, 4, 5]
+    cleaned = remove_duplicates(sample_data)
+    print(f"Original: {sample_data}")
+    print(f"Cleaned: {cleaned}")
+    
+    sample_objects = [{"id": 1}, {"id": 2}, {"id": 1}, {"id": 3}]
+    cleaned_objects = clean_data_with_key(sample_objects, key_func=lambda x: x["id"])
+    print(f"Original objects: {sample_objects}")
+    print(f"Cleaned objects: {cleaned_objects}")
