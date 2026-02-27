@@ -305,3 +305,17 @@ if __name__ == "__main__":
     normalized_df = normalize_column(cleaned_df, 'C')
     print("\nData with normalized column C:")
     print(normalized_df[['C', 'C_normalized']].head())
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+if __name__ == "__main__":
+    sample_list = [3, 1, 2, 3, 4, 2, 5, 1, 6]
+    cleaned_list = remove_duplicates_preserve_order(sample_list)
+    print(f"Original list: {sample_list}")
+    print(f"Cleaned list: {cleaned_list}")
