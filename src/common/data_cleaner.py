@@ -932,3 +932,11 @@ if __name__ == "__main__":
     
     stats = calculate_statistics(cleaned_data[:, 0])
     print(f"Statistics for column 0: {stats}")
+def remove_duplicates(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
