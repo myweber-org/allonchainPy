@@ -310,4 +310,64 @@ def remove_outliers_iqr(data, column):
     upper_bound = Q3 + 1.5 * IQR
     
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    return filtered_dataimport pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, fill_method='mean'):
+    """
+    Load a CSV file, clean missing values, and return cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Loaded data with shape: {df.shape}")
+        
+        missing_count = df.isnull().sum().sum()
+        if missing_count > 0:
+            print(f"Found {missing_count} missing values.")
+            
+            if fill_method == 'mean':
+                df = df.fillna(df.mean(numeric_only=True))
+            elif fill_method == 'median':
+                df = df.fillna(df.median(numeric_only=True))
+            elif fill_method == 'mode':
+                df = df.fillna(df.mode().iloc[0])
+            elif fill_method == 'drop':
+                df = df.dropna()
+            else:
+                df = df.fillna(0)
+                
+            print(f"Missing values handled using method: {fill_method}")
+        
+        df = df.apply(lambda x: x.astype(str).str.strip() if x.dtype == 'object' else x)
+        
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        if not numeric_cols.empty:
+            df[numeric_cols] = df[numeric_cols].round(2)
+        
+        print(f"Cleaned data shape: {df.shape}")
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to a new CSV file.
+    """
+    if df is not None:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+        return True
+    return False
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_file, fill_method='median')
+    if cleaned_df is not None:
+        save_cleaned_data(cleaned_df, output_file)
