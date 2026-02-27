@@ -374,3 +374,98 @@ def remove_outliers_iqr(df, column, multiplier=1.5):
     filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
     return filtered_df
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas DataFrame column using IQR method.
+    
+    Args:
+        data: pandas DataFrame
+        column: Column name to process
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def calculate_statistics(data, column):
+    """
+    Calculate basic statistics for a column.
+    
+    Args:
+        data: pandas DataFrame
+        column: Column name to analyze
+    
+    Returns:
+        Dictionary with statistics
+    """
+    stats = {
+        'mean': data[column].mean(),
+        'median': data[column].median(),
+        'std': data[column].std(),
+        'min': data[column].min(),
+        'max': data[column].max(),
+        'count': data[column].count()
+    }
+    return stats
+
+def normalize_column(data, column, method='minmax'):
+    """
+    Normalize a column using specified method.
+    
+    Args:
+        data: pandas DataFrame
+        column: Column name to normalize
+        method: Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    data = data.copy()
+    
+    if method == 'minmax':
+        min_val = data[column].min()
+        max_val = data[column].max()
+        data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = data[column].mean()
+        std_val = data[column].std()
+        data[column + '_normalized'] = (data[column] - mean_val) / std_val
+    
+    return data
+
+def handle_missing_values(data, column, strategy='mean'):
+    """
+    Handle missing values in a column.
+    
+    Args:
+        data: pandas DataFrame
+        column: Column name to process
+        strategy: Imputation strategy ('mean', 'median', 'mode', or 'drop')
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    data = data.copy()
+    
+    if strategy == 'mean':
+        fill_value = data[column].mean()
+    elif strategy == 'median':
+        fill_value = data[column].median()
+    elif strategy == 'mode':
+        fill_value = data[column].mode()[0]
+    elif strategy == 'drop':
+        return data.dropna(subset=[column])
+    
+    data[column] = data[column].fillna(fill_value)
+    return data
