@@ -310,3 +310,89 @@ def validate_data(data, column, min_val=None, max_val=None, allowed_values=None)
             validation_results['invalid_indices'].append(idx)
     
     return validation_results
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    fill_missing (str): Method to fill missing values. Options are 'mean', 'median', 'mode', or 'drop'. Default is 'mean'.
+    
+    Returns:
+    pd.DataFrame: The cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows.")
+    
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+        print("Dropped rows with missing values.")
+    elif fill_missing in ['mean', 'median', 'mode']:
+        for column in cleaned_df.select_dtypes(include=[np.number]).columns:
+            if cleaned_df[column].isnull().any():
+                if fill_missing == 'mean':
+                    fill_value = cleaned_df[column].mean()
+                elif fill_missing == 'median':
+                    fill_value = cleaned_df[column].median()
+                elif fill_missing == 'mode':
+                    fill_value = cleaned_df[column].mode()[0]
+                cleaned_df[column].fillna(fill_value, inplace=True)
+                print(f"Filled missing values in column '{column}' with {fill_missing} value: {fill_value:.2f}")
+    
+    return cleaned_df
+
+def validate_dataset(df, check_duplicates=True, check_missing=True):
+    """
+    Validate a DataFrame for duplicates and missing values.
+    
+    Parameters:
+    df (pd.DataFrame): The DataFrame to validate.
+    check_duplicates (bool): Check for duplicate rows.
+    check_missing (bool): Check for missing values.
+    
+    Returns:
+    dict: A dictionary with validation results.
+    """
+    validation_results = {}
+    
+    if check_duplicates:
+        duplicate_count = df.duplicated().sum()
+        validation_results['duplicate_rows'] = duplicate_count
+        validation_results['has_duplicates'] = duplicate_count > 0
+    
+    if check_missing:
+        missing_counts = df.isnull().sum()
+        total_missing = missing_counts.sum()
+        validation_results['missing_values'] = total_missing
+        validation_results['columns_with_missing'] = missing_counts[missing_counts > 0].to_dict()
+        validation_results['has_missing'] = total_missing > 0
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, 5, None, 7],
+        'B': [10, 20, 20, None, 50, 60, 70],
+        'C': ['x', 'y', 'y', 'z', None, 'x', 'z']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nValidation Results:")
+    print(validate_dataset(df))
+    
+    cleaned = clean_dataset(df, fill_missing='median')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    print("\nValidation Results after cleaning:")
+    print(validate_dataset(cleaned))
