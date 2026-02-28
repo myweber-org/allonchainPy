@@ -93,3 +93,76 @@ if __name__ == "__main__":
     else:
         print("Usage: python file_renamer.py <directory> [prefix] [extension]")
         print("Example: python file_renamer.py ./documents image .jpg")
+import os
+import sys
+
+def batch_rename_files(directory, prefix, start_number=1):
+    """
+    Rename all files in a directory with sequential numbering.
+    
+    Args:
+        directory (str): Path to the directory containing files to rename
+        prefix (str): Prefix for the new filenames
+        start_number (int): Starting number for the sequence
+    """
+    if not os.path.exists(directory):
+        print(f"Error: Directory '{directory}' does not exist.")
+        return False
+    
+    if not os.path.isdir(directory):
+        print(f"Error: '{directory}' is not a directory.")
+        return False
+    
+    try:
+        files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+        files.sort()
+        
+        if not files:
+            print("No files found in the directory.")
+            return True
+        
+        print(f"Found {len(files)} files to rename.")
+        print("Preview of changes:")
+        
+        for i, filename in enumerate(files, start=start_number):
+            file_ext = os.path.splitext(filename)[1]
+            new_name = f"{prefix}_{i:03d}{file_ext}"
+            print(f"  {filename} -> {new_name}")
+        
+        confirmation = input("\nProceed with renaming? (y/n): ").strip().lower()
+        
+        if confirmation != 'y':
+            print("Operation cancelled.")
+            return False
+        
+        for i, filename in enumerate(files, start=start_number):
+            file_ext = os.path.splitext(filename)[1]
+            new_name = f"{prefix}_{i:03d}{file_ext}"
+            
+            old_path = os.path.join(directory, filename)
+            new_path = os.path.join(directory, new_name)
+            
+            os.rename(old_path, new_path)
+            print(f"Renamed: {filename} -> {new_name}")
+        
+        print(f"\nSuccessfully renamed {len(files)} files.")
+        return True
+        
+    except Exception as e:
+        print(f"Error during renaming: {e}")
+        return False
+
+def main():
+    if len(sys.argv) < 3:
+        print("Usage: python file_renamer.py <directory> <prefix> [start_number]")
+        print("Example: python file_renamer.py ./photos vacation_ 1")
+        return
+    
+    directory = sys.argv[1]
+    prefix = sys.argv[2]
+    start_number = int(sys.argv[3]) if len(sys.argv) > 3 else 1
+    
+    batch_rename_files(directory, prefix, start_number)
+
+if __name__ == "__main__":
+    main()
