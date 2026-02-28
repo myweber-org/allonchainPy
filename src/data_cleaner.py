@@ -215,3 +215,55 @@ if __name__ == "__main__":
     print("\nCleaned DataFrame shape:", cleaned_df.shape)
     print("Cleaned statistics for column 'A':")
     print(calculate_basic_stats(cleaned_df, 'A'))
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_file, output_file, missing_strategy='mean'):
+    """
+    Clean CSV data by handling missing values and removing duplicates.
+    
+    Args:
+        input_file (str): Path to input CSV file
+        output_file (str): Path to save cleaned CSV file
+        missing_strategy (str): Strategy for handling missing values 
+                               ('mean', 'median', 'drop', 'zero')
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        print(f"Original data shape: {df.shape}")
+        print(f"Missing values per column:\n{df.isnull().sum()}")
+        
+        df_cleaned = df.copy()
+        
+        if missing_strategy == 'drop':
+            df_cleaned = df_cleaned.dropna()
+        elif missing_strategy in ['mean', 'median']:
+            numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+            for col in numeric_cols:
+                if missing_strategy == 'mean':
+                    fill_value = df_cleaned[col].mean()
+                else:
+                    fill_value = df_cleaned[col].median()
+                df_cleaned[col] = df_cleaned[col].fillna(fill_value)
+        elif missing_strategy == 'zero':
+            df_cleaned = df_cleaned.fillna(0)
+        
+        df_cleaned = df_cleaned.drop_duplicates()
+        
+        df_cleaned.to_csv(output_file, index=False)
+        
+        print(f"Cleaned data shape: {df_cleaned.shape}")
+        print(f"Cleaned data saved to: {output_file}")
+        
+        return df_cleaned
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    cleaned_data = clean_csv_data('raw_data.csv', 'cleaned_data.csv', 'mean')
