@@ -278,3 +278,91 @@ def remove_duplicates_preserve_order(sequence):
             seen.add(item)
             result.append(item)
     return result
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, data):
+        self.data = data
+        self.original_shape = data.shape
+        
+    def remove_outliers_iqr(self, columns=None, threshold=1.5):
+        if columns is None:
+            columns = self.data.columns if hasattr(self.data, 'columns') else range(self.data.shape[1])
+        
+        clean_data = self.data.copy()
+        for col in columns:
+            if col in clean_data.columns if hasattr(clean_data, 'columns') else True:
+                col_data = clean_data[col] if hasattr(clean_data, 'columns') else clean_data[:, col]
+                q1 = np.percentile(col_data, 25)
+                q3 = np.percentile(col_data, 75)
+                iqr = q3 - q1
+                lower_bound = q1 - threshold * iqr
+                upper_bound = q3 + threshold * iqr
+                mask = (col_data >= lower_bound) & (col_data <= upper_bound)
+                clean_data = clean_data[mask]
+        
+        self.cleaned_data = clean_data
+        return clean_data
+    
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.data.columns if hasattr(self.data, 'columns') else range(self.data.shape[1])
+        
+        normalized_data = self.data.copy()
+        for col in columns:
+            if col in normalized_data.columns if hasattr(normalized_data, 'columns') else True:
+                col_data = normalized_data[col] if hasattr(normalized_data, 'columns') else normalized_data[:, col]
+                min_val = np.min(col_data)
+                max_val = np.max(col_data)
+                if max_val - min_val > 0:
+                    normalized_data[col] = (col_data - min_val) / (max_val - min_val)
+        
+        return normalized_data
+    
+    def standardize_zscore(self, columns=None):
+        if columns is None:
+            columns = self.data.columns if hasattr(self.data, 'columns') else range(self.data.shape[1])
+        
+        standardized_data = self.data.copy()
+        for col in columns:
+            if col in standardized_data.columns if hasattr(standardized_data, 'columns') else True:
+                col_data = standardized_data[col] if hasattr(standardized_data, 'columns') else standardized_data[:, col]
+                mean_val = np.mean(col_data)
+                std_val = np.std(col_data)
+                if std_val > 0:
+                    standardized_data[col] = (col_data - mean_val) / std_val
+        
+        return standardized_data
+    
+    def get_summary(self):
+        summary = {
+            'original_samples': self.original_shape[0],
+            'original_features': self.original_shape[1],
+            'cleaned_samples': self.cleaned_data.shape[0] if hasattr(self, 'cleaned_data') else self.original_shape[0],
+            'removed_samples': self.original_shape[0] - (self.cleaned_data.shape[0] if hasattr(self, 'cleaned_data') else self.original_shape[0])
+        }
+        return summary
+
+def example_usage():
+    np.random.seed(42)
+    data = pd.DataFrame({
+        'feature1': np.random.normal(0, 1, 100),
+        'feature2': np.random.exponential(1, 100),
+        'feature3': np.random.uniform(-5, 5, 100)
+    })
+    
+    cleaner = DataCleaner(data)
+    cleaned = cleaner.remove_outliers_iqr(threshold=1.5)
+    normalized = cleaner.normalize_minmax()
+    standardized = cleaner.standardize_zscore()
+    
+    print(f"Original shape: {data.shape}")
+    print(f"Cleaned shape: {cleaned.shape}")
+    print(f"Summary: {cleaner.get_summary()}")
+    
+    return cleaned, normalized, standardized
+
+if __name__ == "__main__":
+    example_usage()
