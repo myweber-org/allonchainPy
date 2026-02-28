@@ -385,3 +385,50 @@ class DataCleaner:
         print(f"Numeric columns: {list(self.numeric_columns)}")
         print(f"Categorical columns: {list(self.categorical_columns)}")
         print(f"Missing values after cleaning: {self.df.isnull().sum().sum()}")
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, fill_strategy='mean', columns_to_clean=None):
+    """
+    Load a CSV file and clean missing values based on specified strategy.
+    """
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        print(f"Error: File '{file_path}' not found.")
+        return None
+    except pd.errors.EmptyDataError:
+        print("Error: The file is empty.")
+        return None
+
+    if columns_to_clean is None:
+        columns_to_clean = df.columns
+
+    for column in columns_to_clean:
+        if column in df.columns:
+            if df[column].isnull().any():
+                if fill_strategy == 'mean' and pd.api.types.is_numeric_dtype(df[column]):
+                    fill_value = df[column].mean()
+                elif fill_strategy == 'median' and pd.api.types.is_numeric_dtype(df[column]):
+                    fill_value = df[column].median()
+                elif fill_strategy == 'mode':
+                    fill_value = df[column].mode()[0] if not df[column].mode().empty else np.nan
+                elif fill_strategy == 'zero' and pd.api.types.is_numeric_dtype(df[column]):
+                    fill_value = 0
+                else:
+                    fill_value = df[column].ffill().bfill()
+
+                df[column].fillna(fill_value, inplace=True)
+                print(f"Filled missing values in column '{column}' using '{fill_strategy}' strategy.")
+        else:
+            print(f"Warning: Column '{column}' not found in the dataset.")
+
+    cleaned_file_path = file_path.replace('.csv', '_cleaned.csv')
+    df.to_csv(cleaned_file_path, index=False)
+    print(f"Cleaned data saved to: {cleaned_file_path}")
+    return cleaned_file_path
+
+if __name__ == "__main__":
+    cleaned = clean_csv_data('sample_data.csv', fill_strategy='median')
+    if cleaned:
+        print(f"Data cleaning completed successfully. Output: {cleaned}")
