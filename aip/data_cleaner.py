@@ -1,54 +1,54 @@
 
 import pandas as pd
 import numpy as np
+from scipy import stats
 
 def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
-    
-    Parameters:
-    df (pd.DataFrame): The input DataFrame.
-    column (str): The column name to clean.
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed.
-    """
     Q1 = df[column].quantile(0.25)
     Q3 = df[column].quantile(0.75)
     IQR = Q3 - Q1
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    return filtered_df
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
 
-def clean_dataset(file_path, output_path):
-    """
-    Load a dataset, clean specified columns, and save the cleaned version.
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def clean_dataset(file_path, numeric_columns):
+    df = pd.read_csv(file_path)
     
-    Parameters:
-    file_path (str): Path to the input CSV file.
-    output_path (str): Path to save the cleaned CSV file.
-    """
-    try:
-        df = pd.read_csv(file_path)
-        print(f"Original dataset shape: {df.shape}")
-        
-        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
-        
-        for col in numeric_columns:
+    for col in numeric_columns:
+        if col in df.columns:
             df = remove_outliers_iqr(df, col)
-        
-        print(f"Cleaned dataset shape: {df.shape}")
-        df.to_csv(output_path, index=False)
-        print(f"Cleaned dataset saved to: {output_path}")
-        
-    except FileNotFoundError:
-        print(f"Error: File not found at {file_path}")
-    except Exception as e:
-        print(f"An error occurred: {e}")
+            df = normalize_minmax(df, col)
+    
+    df = df.dropna()
+    return df
+
+def calculate_statistics(df, column):
+    stats_dict = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'skewness': stats.skew(df[column].dropna()),
+        'kurtosis': stats.kurtosis(df[column].dropna())
+    }
+    return stats_dict
 
 if __name__ == "__main__":
-    input_file = "raw_data.csv"
-    output_file = "cleaned_data.csv"
-    clean_dataset(input_file, output_file)
+    data_path = 'sample_data.csv'
+    numeric_cols = ['price', 'quantity', 'rating']
+    
+    cleaned_data = clean_dataset(data_path, numeric_cols)
+    print(f"Original shape: {pd.read_csv(data_path).shape}")
+    print(f"Cleaned shape: {cleaned_data.shape}")
+    
+    for col in numeric_cols:
+        if col in cleaned_data.columns:
+            stats_result = calculate_statistics(cleaned_data, col)
+            print(f"\nStatistics for {col}:")
+            for key, value in stats_result.items():
+                print(f"{key}: {value:.4f}")
