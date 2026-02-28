@@ -53,4 +53,32 @@ def main():
     display_weather(weather_data)
 
 if __name__ == "__main__":
-    main()
+    main()import requests
+
+def get_weather(api_key, city):
+    base_url = "http://api.openweathermap.org/data/2.5/weather"
+    params = {
+        'q': city,
+        'appid': api_key,
+        'units': 'metric'
+    }
+    try:
+        response = requests.get(base_url, params=params)
+        response.raise_for_status()
+        data = response.json()
+        return {
+            'city': data['name'],
+            'temperature': data['main']['temp'],
+            'description': data['weather'][0]['description'],
+            'humidity': data['main']['humidity']
+        }
+    except requests.exceptions.RequestException as e:
+        return {'error': str(e)}
+    except KeyError:
+        return {'error': 'Invalid response from API'}
+
+if __name__ == "__main__":
+    API_KEY = "your_api_key_here"
+    city_name = "London"
+    weather_info = get_weather(API_KEY, city_name)
+    print(weather_info)
