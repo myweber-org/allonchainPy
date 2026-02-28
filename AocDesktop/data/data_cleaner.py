@@ -163,3 +163,89 @@ if __name__ == "__main__":
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("\nCleaned summary statistics:")
     print(get_summary_statistics(cleaned_df, ['A', 'B', 'C']))
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    return dataframe[(dataframe[column] >= lower_bound) & 
+                     (dataframe[column] <= upper_bound)]
+
+def zscore_normalize(dataframe, column):
+    """
+    Normalize column using z-score normalization
+    """
+    mean = dataframe[column].mean()
+    std = dataframe[column].std()
+    
+    if std > 0:
+        dataframe[column] = (dataframe[column] - mean) / std
+    return dataframe
+
+def minmax_normalize(dataframe, column):
+    """
+    Normalize column using min-max scaling
+    """
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    
+    if max_val > min_val:
+        dataframe[column] = (dataframe[column] - min_val) / (max_val - min_val)
+    return dataframe
+
+def detect_skewed_columns(dataframe, threshold=0.5):
+    """
+    Detect columns with significant skewness
+    """
+    skewed_cols = []
+    for col in dataframe.select_dtypes(include=[np.number]).columns:
+        skewness = dataframe[col].skew()
+        if abs(skewness) > threshold:
+            skewed_cols.append((col, skewness))
+    
+    return sorted(skewed_cols, key=lambda x: abs(x[1]), reverse=True)
+
+def apply_log_transform(dataframe, column):
+    """
+    Apply log transformation to reduce skewness
+    """
+    if dataframe[column].min() <= 0:
+        dataframe[column] = dataframe[column] - dataframe[column].min() + 1
+    
+    dataframe[column] = np.log(dataframe[column])
+    return dataframe
+
+def clean_dataset(dataframe, numeric_columns=None, outlier_threshold=1.5, 
+                  normalization_method='zscore', skew_threshold=0.5):
+    """
+    Main cleaning pipeline
+    """
+    df_clean = dataframe.copy()
+    
+    if numeric_columns is None:
+        numeric_columns = df_clean.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in numeric_columns:
+        if col in df_clean.columns:
+            df_clean = remove_outliers_iqr(df_clean, col, outlier_threshold)
+            
+            if normalization_method == 'zscore':
+                df_clean = zscore_normalize(df_clean, col)
+            elif normalization_method == 'minmax':
+                df_clean = minmax_normalize(df_clean, col)
+    
+    skewed_cols = detect_skewed_columns(df_clean, skew_threshold)
+    for col, _ in skewed_cols:
+        if col in df_clean.columns:
+            df_clean = apply_log_transform(df_clean, col)
+    
+    return df_clean, skewed_cols
