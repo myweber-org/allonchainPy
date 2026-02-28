@@ -415,3 +415,93 @@ if __name__ == "__main__":
     normalized_df = normalize_column(filled_df, 'values', method='minmax')
     print("\nDataFrame after normalization:")
     print(normalized_df)
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def calculate_summary_statistics(df, column):
+    """
+    Calculate summary statistics for a column after outlier removal.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
+    
+    return stats
+
+def clean_dataset(df, numeric_columns):
+    """
+    Clean a dataset by removing outliers from multiple numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    numeric_columns (list): List of column names to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    dict: Dictionary of statistics for each column
+    """
+    cleaned_df = df.copy()
+    all_stats = {}
+    
+    for column in numeric_columns:
+        if column in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            all_stats[column] = calculate_summary_statistics(cleaned_df, column)
+    
+    return cleaned_df, all_stats
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.uniform(0, 200, 1000)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.loc[::100, 'A'] = 500  # Add some outliers
+    
+    cleaned_df, stats = clean_dataset(df, ['A', 'B', 'C'])
+    
+    print(f"Original shape: {df.shape}")
+    print(f"Cleaned shape: {cleaned_df.shape}")
+    print(f"Rows removed: {len(df) - len(cleaned_df)}")
+    
+    for col, col_stats in stats.items():
+        print(f"\nStatistics for {col}:")
+        for stat_name, value in col_stats.items():
+            print(f"  {stat_name}: {value:.2f}")
