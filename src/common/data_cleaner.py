@@ -1260,3 +1260,108 @@ if __name__ == "__main__":
     cleaned = remove_duplicates_preserve_order(sample_data)
     print(f"Original: {sample_data}")
     print(f"Cleaned: {cleaned}")
+import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        subset: column label or sequence of labels to consider for identifying duplicates
+        keep: determines which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    if subset is None:
+        subset = df.columns.tolist()
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    
+    print(f"Removed {len(df) - len(cleaned_df)} duplicate rows")
+    print(f"Original shape: {df.shape}, Cleaned shape: {cleaned_df.shape}")
+    
+    return cleaned_df
+
+def clean_numeric_columns(df, columns):
+    """
+    Clean numeric columns by converting to appropriate types and handling errors.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to clean
+    
+    Returns:
+        DataFrame with cleaned numeric columns
+    """
+    for col in columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    
+    return df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: pandas DataFrame
+        required_columns: list of required column names
+    
+    Returns:
+        Boolean indicating if validation passed
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    if df.empty:
+        print("DataFrame is empty")
+        return False
+    
+    return True
+
+def get_data_summary(df):
+    """
+    Generate summary statistics for the DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+    
+    Returns:
+        Dictionary containing summary statistics
+    """
+    summary = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'column_types': df.dtypes.to_dict(),
+        'numeric_columns': df.select_dtypes(include=['number']).columns.tolist(),
+        'categorical_columns': df.select_dtypes(include=['object']).columns.tolist()
+    }
+    
+    return summary
+
+def save_cleaned_data(df, output_path, format='csv'):
+    """
+    Save cleaned DataFrame to file.
+    
+    Args:
+        df: pandas DataFrame
+        output_path: path to save the file
+        format: file format ('csv', 'excel', 'parquet')
+    """
+    if format == 'csv':
+        df.to_csv(output_path, index=False)
+    elif format == 'excel':
+        df.to_excel(output_path, index=False)
+    elif format == 'parquet':
+        df.to_parquet(output_path, index=False)
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+    
+    print(f"Data saved to {output_path}")
