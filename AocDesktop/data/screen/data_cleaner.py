@@ -1,84 +1,46 @@
 
 import pandas as pd
-import numpy as np
 
-def remove_outliers_iqr(df, column):
+def clean_dataset(df, id_column='id'):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range (IQR) method.
-    
-    Parameters:
-    df (pd.DataFrame): The input DataFrame.
-    column (str): The column name to clean.
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed.
+    Remove duplicate rows based on an ID column and standardize column names.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    if df.empty:
+        return df
 
-def calculate_summary_statistics(df, column):
-    """
-    Calculate summary statistics for a column after outlier removal.
-    
-    Parameters:
-    df (pd.DataFrame): The input DataFrame.
-    column (str): The column name to analyze.
-    
-    Returns:
-    dict: Dictionary containing summary statistics.
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
-    }
-    
-    return stats
+    df_clean = df.copy()
 
-def main():
-    # Example usage
-    data = {'values': [10, 12, 12, 13, 12, 11, 14, 13, 15, 102, 12, 14, 13, 12, 11, 14, 13, 12, 11, 10, 15, 12, 13, 14, 11]}
-    df = pd.DataFrame(data)
-    
-    print("Original DataFrame:")
-    print(df)
-    print(f"\nOriginal shape: {df.shape}")
-    
-    # Remove outliers
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    
-    print("\nCleaned DataFrame:")
-    print(cleaned_df)
-    print(f"\nCleaned shape: {cleaned_df.shape}")
-    
-    # Calculate statistics
-    original_stats = calculate_summary_statistics(df, 'values')
-    cleaned_stats = calculate_summary_statistics(cleaned_df, 'values')
-    
-    print("\nOriginal Statistics:")
-    for key, value in original_stats.items():
-        print(f"{key}: {value:.2f}")
-    
-    print("\nCleaned Statistics:")
-    for key, value in cleaned_stats.items():
-        print(f"{key}: {value:.2f}")
+    if id_column in df_clean.columns:
+        df_clean = df_clean.drop_duplicates(subset=[id_column], keep='first')
+    else:
+        df_clean = df_clean.drop_duplicates()
+
+    df_clean.columns = df_clean.columns.str.strip().str.lower().str.replace(' ', '_')
+    df_clean = df_clean.reset_index(drop=True)
+
+    return df_clean
+
+def validate_numeric_columns(df, numeric_columns):
+    """
+    Ensure specified columns contain only numeric data, coerce errors to NaN.
+    """
+    df_valid = df.copy()
+    for col in numeric_columns:
+        if col in df_valid.columns:
+            df_valid[col] = pd.to_numeric(df_valid[col], errors='coerce')
+    return df_valid
 
 if __name__ == "__main__":
-    main()
+    sample_data = {
+        'ID': [1, 2, 2, 3, 4],
+        'Customer Name': ['Alice', 'Bob', 'Bob', 'Charlie', 'David'],
+        'Order Value': ['100', '150', '150', 'two hundred', '300']
+    }
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+
+    cleaned_df = clean_dataset(df, id_column='ID')
+    cleaned_df = validate_numeric_columns(cleaned_df, ['Order Value'])
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
