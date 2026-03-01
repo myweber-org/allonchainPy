@@ -223,3 +223,78 @@ if __name__ == "__main__":
     print(f"Data cleaning complete. Original shape: {pd.read_csv(input_file).shape}")
     print(f"Cleaned shape: {cleaned_df.shape}")
     print(f"Saved to: {output_file}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, id_column='id'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    # Remove duplicate rows based on ID column
+    initial_count = len(df)
+    df = df.drop_duplicates(subset=[id_column], keep='first')
+    duplicates_removed = initial_count - len(df)
+    
+    # Handle missing values
+    # For numeric columns, fill with median
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if df[col].isnull().any():
+            df[col] = df[col].fillna(df[col].median())
+    
+    # For categorical columns, fill with mode
+    categorical_cols = df.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if df[col].isnull().any():
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+    
+    # Log cleaning results
+    print(f"Cleaning completed:")
+    print(f"  - Removed {duplicates_removed} duplicate entries")
+    print(f"  - Handled missing values in {len(numeric_cols) + len(categorical_cols)} columns")
+    print(f"  - Final dataset has {len(df)} rows and {len(df.columns)} columns")
+    
+    return df
+
+def validate_dataset(df, required_columns=None):
+    """
+    Validate dataset structure and content.
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    # Check for any remaining null values
+    null_counts = df.isnull().sum()
+    if null_counts.sum() > 0:
+        print(f"Warning: Dataset still contains {null_counts.sum()} null values")
+        for col, count in null_counts[null_counts > 0].items():
+            print(f"  - Column '{col}': {count} nulls")
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', None, 'Eve', 'Frank'],
+        'age': [25, 30, 30, 35, None, 40],
+        'score': [85.5, 92.0, 92.0, 78.5, 88.0, 95.5]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original dataset:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataset(df, id_column='id')
+    print("\nCleaned dataset:")
+    print(cleaned_df)
+    
+    # Validate the cleaned dataset
+    try:
+        validate_dataset(cleaned_df, required_columns=['id', 'name', 'age', 'score'])
+        print("\nDataset validation passed!")
+    except ValueError as e:
+        print(f"\nValidation error: {e}")
