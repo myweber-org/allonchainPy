@@ -669,4 +669,123 @@ def get_summary_statistics(data):
         'count': numeric_data.count().to_dict()
     }
     
-    return summary
+    return summaryimport pandas as pd
+import numpy as np
+
+def clean_dataset(df, missing_strategy='mean', outlier_threshold=3):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    missing_strategy (str): Strategy for handling missing values. 
+                            Options: 'mean', 'median', 'mode', 'drop'.
+    outlier_threshold (float): Number of standard deviations for outlier detection.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if missing_strategy == 'mean':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+    elif missing_strategy == 'median':
+        cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+    elif missing_strategy == 'mode':
+        for col in cleaned_df.columns:
+            if cleaned_df[col].dtype == 'object':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'Unknown')
+            else:
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 0)
+    elif missing_strategy == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    
+    # Handle outliers for numeric columns
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        col_mean = cleaned_df[col].mean()
+        col_std = cleaned_df[col].std()
+        if col_std > 0:  # Avoid division by zero
+            z_scores = np.abs((cleaned_df[col] - col_mean) / col_std)
+            cleaned_df.loc[z_scores > outlier_threshold, col] = col_mean
+    
+    return cleaned_df
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    subset (list): Columns to consider for identifying duplicates.
+    keep (str): Which duplicates to keep. Options: 'first', 'last', False.
+    
+    Returns:
+    pd.DataFrame: DataFrame with duplicates removed.
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def normalize_columns(df, columns=None, method='minmax'):
+    """
+    Normalize specified columns in DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns (list): Columns to normalize. If None, normalize all numeric columns.
+    method (str): Normalization method. Options: 'minmax', 'zscore'.
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    normalized_df = df.copy()
+    
+    for col in columns:
+        if col in normalized_df.columns and normalized_df[col].dtype in [np.float64, np.int64]:
+            if method == 'minmax':
+                col_min = normalized_df[col].min()
+                col_max = normalized_df[col].max()
+                if col_max != col_min:
+                    normalized_df[col] = (normalized_df[col] - col_min) / (col_max - col_min)
+            elif method == 'zscore':
+                col_mean = normalized_df[col].mean()
+                col_std = normalized_df[col].std()
+                if col_std > 0:
+                    normalized_df[col] = (normalized_df[col] - col_mean) / col_std
+    
+    return normalized_df
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5, 100],  # Contains outlier and missing value
+        'B': [10, 20, 30, 40, 50, 60],
+        'C': ['a', 'b', 'a', 'c', 'b', 'a']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    # Clean the data
+    cleaned = clean_dataset(df, missing_strategy='mean', outlier_threshold=2)
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print("\n")
+    
+    # Remove duplicates
+    df_with_duplicates = pd.DataFrame({'A': [1, 1, 2, 3], 'B': [4, 4, 5, 6]})
+    deduplicated = remove_duplicates(df_with_duplicates)
+    print("Deduplicated DataFrame:")
+    print(deduplicated)
+    print("\n")
+    
+    # Normalize columns
+    normalized = normalize_columns(cleaned, method='minmax')
+    print("Normalized DataFrame:")
+    print(normalized)
