@@ -153,4 +153,52 @@ def validate_data(df, required_columns):
     missing_cols = [col for col in required_columns if col not in df.columns]
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
-    return True
+    return Trueimport pandas as pd
+import re
+
+def clean_text_column(df, column_name):
+    """
+    Standardize text by converting to lowercase, removing extra spaces,
+    and stripping special characters (except alphanumeric and spaces).
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    df[column_name] = df[column_name].astype(str).str.lower()
+    df[column_name] = df[column_name].apply(lambda x: re.sub(r'[^a-z0-9\s]', '', x))
+    df[column_name] = df[column_name].str.strip().str.replace(r'\s+', ' ', regex=True)
+    return df
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def clean_dataset(df, text_columns=None, deduplicate=True, subset=None):
+    """
+    Main cleaning function to process text columns and remove duplicates.
+    """
+    if text_columns:
+        for col in text_columns:
+            df = clean_text_column(df, col)
+    
+    if deduplicate:
+        df = remove_duplicates(df, subset=subset)
+    
+    return df
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 3, 4, 5],
+        'name': ['  John DOE  ', 'Jane Smith', 'JOHN DOE', 'Alice', 'Jane Smith'],
+        'email': ['john@email.com', 'jane@email.com', 'JOHN@EMAIL.COM', 'alice@email.com', 'jane@email.com']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataset(df, text_columns=['name', 'email'], deduplicate=True, subset=['email'])
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
