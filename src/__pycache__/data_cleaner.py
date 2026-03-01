@@ -252,3 +252,11 @@ def clean_dataset(df, outlier_columns=None, missing_strategy='mean', normalize=F
         cleaned_df = normalize_data(cleaned_df)
     
     return cleaned_df
+def deduplicate_list(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
