@@ -1,48 +1,29 @@
-
-def deduplicate_list(input_list):
-    seen = set()
-    result = []
-    for item in input_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return resultimport numpy as np
 import pandas as pd
+import numpy as np
 from scipy import stats
 
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
-    return df
-
-def standardize_zscore(df, column):
-    mean_val = df[column].mean()
-    std_val = df[column].std()
-    df[column + '_standardized'] = (df[column] - mean_val) / std_val
-    return df
-
-def handle_missing_mean(df, column):
-    mean_val = df[column].mean()
-    df[column].fillna(mean_val, inplace=True)
-    return df
-
-def process_dataset(filepath):
+def load_and_clean_data(filepath):
+    """
+    Load CSV data, remove outliers using z-score,
+    and normalize numeric columns.
+    """
     df = pd.read_csv(filepath)
+    
     numeric_cols = df.select_dtypes(include=[np.number]).columns
     
     for col in numeric_cols:
-        df = remove_outliers_iqr(df, col)
-        df = normalize_minmax(df, col)
-        df = standardize_zscore(df, col)
-        df = handle_missing_mean(df, col)
+        z_scores = np.abs(stats.zscore(df[col].dropna()))
+        df = df[(z_scores < 3) | df[col].isna()]
     
-    return df
+    for col in numeric_cols:
+        if df[col].std() > 0:
+            df[col] = (df[col] - df[col].mean()) / df[col].std()
+    
+    return df.reset_index(drop=True)
+
+def save_cleaned_data(df, output_path):
+    df.to_csv(output_path, index=False)
+
+if __name__ == "__main__":
+    cleaned_df = load_and_clean_data("raw_data.csv")
+    save_cleaned_data(cleaned_df, "cleaned_data.csv")
