@@ -177,3 +177,82 @@ def get_data_summary(df):
     }
     
     return summary
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a dataset using the Interquartile Range (IQR) method.
+    
+    Parameters:
+    data (np.ndarray): Input data array.
+    column (int): Index of the column to process.
+    
+    Returns:
+    np.ndarray: Data with outliers removed.
+    """
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Input data must be a numpy array")
+    
+    if column >= data.shape[1]:
+        raise IndexError("Column index out of bounds")
+    
+    col_data = data[:, column]
+    q1 = np.percentile(col_data, 25)
+    q3 = np.percentile(col_data, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    mask = (col_data >= lower_bound) & (col_data <= upper_bound)
+    return data[mask]
+
+def calculate_statistics(data):
+    """
+    Calculate basic statistics for the cleaned data.
+    
+    Parameters:
+    data (np.ndarray): Input data array.
+    
+    Returns:
+    dict: Dictionary containing mean, median, and standard deviation.
+    """
+    if data.size == 0:
+        return {"mean": np.nan, "median": np.nan, "std": np.nan}
+    
+    return {
+        "mean": np.mean(data),
+        "median": np.median(data),
+        "std": np.std(data)
+    }
+
+def process_dataset(data, column):
+    """
+    Main function to process dataset by removing outliers and calculating statistics.
+    
+    Parameters:
+    data (np.ndarray): Input data array.
+    column (int): Index of the column to process.
+    
+    Returns:
+    tuple: Cleaned data and statistics dictionary.
+    """
+    cleaned_data = remove_outliers_iqr(data, column)
+    stats = calculate_statistics(cleaned_data[:, column])
+    return cleaned_data, stats
+
+if __name__ == "__main__":
+    sample_data = np.array([
+        [1.2, 10.5],
+        [2.3, 12.1],
+        [3.1, 100.0],
+        [4.2, 13.2],
+        [5.5, 14.8],
+        [6.7, 15.3],
+        [7.9, 200.0],
+        [8.4, 16.7]
+    ])
+    
+    result, statistics = process_dataset(sample_data, column=1)
+    print("Cleaned data shape:", result.shape)
+    print("Statistics:", statistics)
