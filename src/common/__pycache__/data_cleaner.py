@@ -372,3 +372,11 @@ if __name__ == "__main__":
     print("Cleaned data shape:", cleaner.df.shape)
     print("Rows removed:", cleaner.get_cleaning_stats()['rows_removed'])
     print("Cleaning complete.")
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
