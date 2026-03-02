@@ -457,3 +457,115 @@ def clean_dataset(df, columns_to_clean=None):
             print(f"Removed {removed_count} outliers from column '{column}'")
     
     return cleaned_df
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+class DataCleaner:
+    def __init__(self, file_path):
+        self.file_path = Path(file_path)
+        self.df = None
+        
+    def load_data(self):
+        if not self.file_path.exists():
+            raise FileNotFoundError(f"File not found: {self.file_path}")
+        
+        self.df = pd.read_csv(self.file_path)
+        return self.df
+    
+    def handle_missing_values(self, strategy='mean', columns=None):
+        if self.df is None:
+            self.load_data()
+        
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns and self.df[col].isnull().any():
+                if strategy == 'mean':
+                    fill_value = self.df[col].mean()
+                elif strategy == 'median':
+                    fill_value = self.df[col].median()
+                elif strategy == 'mode':
+                    fill_value = self.df[col].mode()[0]
+                elif strategy == 'drop':
+                    self.df = self.df.dropna(subset=[col])
+                    continue
+                else:
+                    fill_value = strategy
+                
+                self.df[col] = self.df[col].fillna(fill_value)
+        
+        return self.df
+    
+    def remove_duplicates(self, subset=None, keep='first'):
+        if self.df is None:
+            self.load_data()
+        
+        initial_count = len(self.df)
+        self.df = self.df.drop_duplicates(subset=subset, keep=keep)
+        removed_count = initial_count - len(self.df)
+        
+        return self.df, removed_count
+    
+    def normalize_column(self, column, method='minmax'):
+        if self.df is None:
+            self.load_data()
+        
+        if column not in self.df.columns:
+            raise ValueError(f"Column '{column}' not found in dataframe")
+        
+        if method == 'minmax':
+            col_min = self.df[column].min()
+            col_max = self.df[column].max()
+            if col_max != col_min:
+                self.df[f'{column}_normalized'] = (self.df[column] - col_min) / (col_max - col_min)
+            else:
+                self.df[f'{column}_normalized'] = 0.5
+        
+        elif method == 'zscore':
+            col_mean = self.df[column].mean()
+            col_std = self.df[column].std()
+            if col_std > 0:
+                self.df[f'{column}_normalized'] = (self.df[column] - col_mean) / col_std
+            else:
+                self.df[f'{column}_normalized'] = 0
+        
+        return self.df
+    
+    def save_cleaned_data(self, output_path=None):
+        if self.df is None:
+            raise ValueError("No data to save. Load data first.")
+        
+        if output_path is None:
+            output_path = self.file_path.parent / f"cleaned_{self.file_path.name}"
+        
+        self.df.to_csv(output_path, index=False)
+        return output_path
+    
+    def get_summary(self):
+        if self.df is None:
+            self.load_data()
+        
+        summary = {
+            'total_rows': len(self.df),
+            'total_columns': len(self.df.columns),
+            'missing_values': self.df.isnull().sum().sum(),
+            'duplicate_rows': self.df.duplicated().sum(),
+            'data_types': self.df.dtypes.to_dict()
+        }
+        
+        return summary
+
+def clean_csv_file(input_file, output_file=None, missing_strategy='mean'):
+    cleaner = DataCleaner(input_file)
+    cleaner.load_data()
+    cleaner.handle_missing_values(strategy=missing_strategy)
+    cleaner.remove_duplicates()
+    output_path = cleaner.save_cleaned_data(output_file)
+    
+    summary = cleaner.get_summary()
+    print(f"Data cleaning completed. Output saved to: {output_path}")
+    print(f"Summary: {summary}")
+    
+    return cleaner.df
