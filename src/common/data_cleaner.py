@@ -786,3 +786,11 @@ def save_cleaned_data(df, input_path, suffix="_cleaned"):
     print(f"Cleaned data saved to: {output_path}")
     
     return output_path
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
