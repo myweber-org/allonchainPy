@@ -771,3 +771,11 @@ def validate_data(data, required_columns=None, allow_nan=False):
         return False, "Data contains NaN values"
     
     return True, "Data validation passed"
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
