@@ -606,4 +606,107 @@ if __name__ == "__main__":
         print("\nData Summary:")
         for key, value in summary.items():
             if key != 'numeric_stats':
-                print(f"{key}: {value}")
+                print(f"{key}: {value}")import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        factor: multiplier for IQR (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling to [0, 1] range.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val - min_val == 0:
+        return data
+    
+    data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    return data
+
+def clean_dataset(df, numeric_columns):
+    """
+    Main cleaning function that applies outlier removal and normalization.
+    
+    Args:
+        df: input DataFrame
+        numeric_columns: list of numeric column names to process
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df = normalize_minmax(cleaned_df, col)
+    
+    return cleaned_df
+
+def calculate_statistics(df, columns):
+    """
+    Calculate basic statistics for specified columns.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names
+    
+    Returns:
+        Dictionary with statistics
+    """
+    stats = {}
+    for col in columns:
+        if col in df.columns:
+            stats[col] = {
+                'mean': df[col].mean(),
+                'std': df[col].std(),
+                'min': df[col].min(),
+                'max': df[col].max(),
+                'median': df[col].median()
+            }
+    return stats
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'temperature': [22.5, 23.1, 24.8, 21.9, 100.5, 22.3, 23.7, -10.2, 22.9, 23.4],
+        'humidity': [45, 48, 52, 43, 47, 49, 51, 44, 46, 50],
+        'pressure': [1013, 1015, 1012, 1014, 1013, 1016, 1011, 1014, 1013, 1015]
+    })
+    
+    print("Original data:")
+    print(sample_data)
+    print("\nStatistics before cleaning:")
+    print(calculate_statistics(sample_data, ['temperature', 'humidity', 'pressure']))
+    
+    cleaned_data = clean_dataset(sample_data, ['temperature', 'humidity', 'pressure'])
+    
+    print("\nCleaned data:")
+    print(cleaned_data)
+    print("\nStatistics after cleaning:")
+    print(calculate_statistics(cleaned_data, ['temperature', 'humidity', 'pressure']))
