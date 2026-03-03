@@ -514,3 +514,76 @@ def validate_dataframe(df):
         except Exception:
             results.append(False)
     return all(results)
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, subset_for_duplicates=None, missing_strategy='drop'):
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
+    """
+    cleaned_df = df.copy()
+
+    # Handle duplicates
+    if subset_for_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates(subset=subset_for_duplicates, keep='first')
+    else:
+        cleaned_df = cleaned_df.drop_duplicates(keep='first')
+
+    # Handle missing values
+    if missing_strategy == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif missing_strategy == 'fill_mean':
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+    elif missing_strategy == 'fill_median':
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].median())
+    elif missing_strategy == 'fill_mode':
+        for col in cleaned_df.columns:
+            if cleaned_df[col].dtype == 'object':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'Unknown')
+    else:
+        raise ValueError(f"Unsupported missing_strategy: {missing_strategy}")
+
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Perform basic validation on a DataFrame.
+    """
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', 'David', None],
+        'age': [25, 30, 30, None, 35, 40],
+        'score': [85.5, 92.0, 92.0, 78.5, None, 88.0]
+    }
+
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nDataFrame info:")
+    print(df.info())
+
+    try:
+        validate_dataframe(df, required_columns=['id', 'name', 'age'])
+        cleaned_df = clean_dataframe(df, subset_for_duplicates=['id', 'name'], missing_strategy='fill_mean')
+        print("\nCleaned DataFrame:")
+        print(cleaned_df)
+        print(f"\nOriginal shape: {df.shape}, Cleaned shape: {cleaned_df.shape}")
+    except ValueError as e:
+        print(f"Validation error: {e}")
