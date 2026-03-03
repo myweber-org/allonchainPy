@@ -1178,3 +1178,30 @@ def remove_duplicates(seq):
             seen.add(item)
             result.append(item)
     return result
+import re
+
+def clean_data(entries, required_keys=None, email_key='email'):
+    """
+    Filter a list of dictionaries to remove entries with missing required keys
+    or invalid email format for a specified key.
+    """
+    if required_keys is None:
+        required_keys = ['id', 'name', email_key]
+
+    def is_valid(entry):
+        # Check for all required keys
+        for key in required_keys:
+            if key not in entry or entry[key] is None or entry[key] == '':
+                return False
+
+        # Validate email format if email_key is present and in required_keys
+        if email_key in required_keys and email_key in entry:
+            email = entry[email_key]
+            # Simple regex for basic email validation
+            email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(email_regex, email):
+                return False
+
+        return True
+
+    return [entry for entry in entries if is_valid(entry)]
