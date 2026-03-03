@@ -225,3 +225,48 @@ def clean_dataset(file_path):
 if __name__ == "__main__":
     cleaned_df = clean_dataset('raw_data.csv')
     print(f"Data cleaned. Shape: {cleaned_df.shape}")
+def remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    
+    Args:
+        data_list: A list of elements that may contain duplicates.
+    
+    Returns:
+        A new list with duplicates removed.
+    """
+    seen = set()
+    result = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_numeric_strings(data_list):
+    """
+    Clean a list of strings by converting numeric strings to integers.
+    
+    Args:
+        data_list: A list of strings that may contain numeric values.
+    
+    Returns:
+        A list with numeric strings converted to integers.
+    """
+    cleaned = []
+    for item in data_list:
+        if isinstance(item, str) and item.isdigit():
+            cleaned.append(int(item))
+        else:
+            cleaned.append(item)
+    return cleaned
+
+if __name__ == "__main__":
+    sample_data = [1, 2, 2, 3, 4, 4, 5, "5", "6", "seven"]
+    print("Original:", sample_data)
+    
+    unique_data = remove_duplicates(sample_data)
+    print("After removing duplicates:", unique_data)
+    
+    cleaned_data = clean_numeric_strings(unique_data)
+    print("After cleaning numeric strings:", cleaned_data)
