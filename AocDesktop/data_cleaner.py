@@ -565,3 +565,77 @@ if __name__ == "__main__":
     
     print("\nFirst 5 rows of cleaned data:")
     print(cleaned_df.head())
+import pandas as pd
+
+def remove_duplicates(dataframe, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a pandas DataFrame.
+    
+    Args:
+        dataframe: Input pandas DataFrame
+        subset: Column label or sequence of labels to consider for identifying duplicates
+        keep: Determines which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    if subset is None:
+        subset = dataframe.columns.tolist()
+    
+    cleaned_df = dataframe.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(dataframe) - len(cleaned_df)
+    print(f"Removed {removed_count} duplicate rows")
+    
+    return cleaned_df
+
+def clean_numeric_columns(dataframe, columns=None):
+    """
+    Clean numeric columns by converting to appropriate types and handling errors.
+    
+    Args:
+        dataframe: Input pandas DataFrame
+        columns: List of column names to clean (defaults to all numeric columns)
+    
+    Returns:
+        DataFrame with cleaned numeric columns
+    """
+    if columns is None:
+        columns = dataframe.select_dtypes(include=['object']).columns.tolist()
+    
+    for column in columns:
+        if column in dataframe.columns:
+            try:
+                dataframe[column] = pd.to_numeric(dataframe[column], errors='coerce')
+            except Exception as e:
+                print(f"Error cleaning column {column}: {e}")
+    
+    return dataframe
+
+def validate_dataframe(dataframe, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        dataframe: Input pandas DataFrame
+        required_columns: List of required column names
+    
+    Returns:
+        Tuple of (is_valid, validation_message)
+    """
+    if required_columns is None:
+        required_columns = []
+    
+    missing_columns = [col for col in required_columns if col not in dataframe.columns]
+    
+    if missing_columns:
+        return False, f"Missing required columns: {missing_columns}"
+    
+    if dataframe.empty:
+        return False, "DataFrame is empty"
+    
+    null_counts = dataframe.isnull().sum()
+    if null_counts.sum() > 0:
+        print(f"Warning: DataFrame contains {null_counts.sum()} null values")
+    
+    return True, "DataFrame validation passed"
