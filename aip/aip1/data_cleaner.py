@@ -397,3 +397,67 @@ if __name__ == "__main__":
     
     print("\nFirst 5 rows of cleaned data:")
     print(cleaned_df.head())
+import json
+
+def filter_invalid_entries(data, required_keys):
+    """
+    Filters out entries from a list of dictionaries that do not contain all required keys.
+    
+    Args:
+        data: List of dictionaries to filter.
+        required_keys: List of keys that each dictionary must contain.
+    
+    Returns:
+        A new list containing only dictionaries with all required keys.
+    """
+    if not isinstance(data, list):
+        raise TypeError("Input data must be a list")
+    
+    if not isinstance(required_keys, list):
+        raise TypeError("required_keys must be a list")
+    
+    filtered_data = []
+    for entry in data:
+        if isinstance(entry, dict) and all(key in entry for key in required_keys):
+            filtered_data.append(entry)
+    
+    return filtered_data
+
+def load_and_filter_json(filepath, required_keys):
+    """
+    Loads data from a JSON file and filters out entries missing required keys.
+    
+    Args:
+        filepath: Path to the JSON file.
+        required_keys: List of required keys for filtering.
+    
+    Returns:
+        Filtered list of dictionaries.
+    """
+    try:
+        with open(filepath, 'r') as file:
+            data = json.load(file)
+    except FileNotFoundError:
+        print(f"Error: File '{filepath}' not found.")
+        return []
+    except json.JSONDecodeError:
+        print(f"Error: File '{filepath}' contains invalid JSON.")
+        return []
+    
+    return filter_invalid_entries(data, required_keys)
+
+if __name__ == "__main__":
+    sample_data = [
+        {"id": 1, "name": "Alice", "email": "alice@example.com"},
+        {"id": 2, "name": "Bob"},
+        {"id": 3, "email": "charlie@example.com"},
+        {"id": 4, "name": "Diana", "email": "diana@example.com"},
+        {"not_id": 5, "name": "Eve", "email": "eve@example.com"}
+    ]
+    
+    required = ["id", "name", "email"]
+    result = filter_invalid_entries(sample_data, required)
+    print(f"Filtered {len(result)} valid entries out of {len(sample_data)}")
+    
+    for entry in result:
+        print(entry)
