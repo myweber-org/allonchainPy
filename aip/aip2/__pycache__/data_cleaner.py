@@ -67,3 +67,84 @@ if __name__ == "__main__":
         validate_data(cleaned, required_columns=['A', 'B'], min_rows=3)
     except ValueError as e:
         print(f"Validation error: {e}")
+import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    fill_missing (bool): Whether to fill missing values. Default is True.
+    fill_value: Value to use for filling missing values. Default is 0.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate that the DataFrame meets certain criteria.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
+    
+    Returns:
+    bool: True if validation passes, False otherwise.
+    """
+    if required_columns is not None:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    if df.empty:
+        print("DataFrame is empty")
+        return False
+    
+    return True
+
+def process_data(file_path, output_path=None):
+    """
+    Load, clean, and optionally save a dataset.
+    
+    Parameters:
+    file_path (str): Path to the input CSV file.
+    output_path (str): Path to save the cleaned CSV file. If None, file is not saved.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return None
+    
+    if not validate_data(df):
+        return None
+    
+    cleaned_df = clean_dataset(df)
+    
+    if output_path is not None:
+        try:
+            cleaned_df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        except Exception as e:
+            print(f"Error saving file: {e}")
+    
+    return cleaned_df
