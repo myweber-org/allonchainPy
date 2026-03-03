@@ -641,4 +641,11 @@ if __name__ == "__main__":
     print(cleaned_df)
     
     import os
-    os.remove('sample_data.csv')
+    os.remove('sample_data.csv')def remove_duplicates(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
