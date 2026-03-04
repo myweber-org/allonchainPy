@@ -175,3 +175,96 @@ def main():
 
 if __name__ == "__main__":
     main()
+import requests
+import json
+from datetime import datetime
+import sys
+
+class WeatherFetcher:
+    def __init__(self, api_key):
+        self.api_key = api_key
+        self.base_url = "http://api.openweathermap.org/data/2.5/weather"
+        self.session = requests.Session()
+    
+    def get_weather(self, city_name):
+        params = {
+            'q': city_name,
+            'appid': self.api_key,
+            'units': 'metric'
+        }
+        
+        try:
+            response = self.session.get(self.base_url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            if data.get('cod') != 200:
+                raise ValueError(f"API Error: {data.get('message', 'Unknown error')}")
+            
+            return self._parse_weather_data(data)
+            
+        except requests.exceptions.RequestException as e:
+            raise ConnectionError(f"Network error occurred: {str(e)}")
+        except json.JSONDecodeError:
+            raise ValueError("Invalid response from API")
+    
+    def _parse_weather_data(self, data):
+        weather_info = {
+            'city': data['name'],
+            'country': data['sys']['country'],
+            'temperature': data['main']['temp'],
+            'feels_like': data['main']['feels_like'],
+            'humidity': data['main']['humidity'],
+            'pressure': data['main']['pressure'],
+            'weather': data['weather'][0]['description'],
+            'wind_speed': data['wind']['speed'],
+            'wind_direction': data['wind'].get('deg', 'N/A'),
+            'visibility': data.get('visibility', 'N/A'),
+            'cloudiness': data['clouds']['all'],
+            'timestamp': datetime.fromtimestamp(data['dt']).isoformat(),
+            'sunrise': datetime.fromtimestamp(data['sys']['sunrise']).isoformat(),
+            'sunset': datetime.fromtimestamp(data['sys']['sunset']).isoformat()
+        }
+        return weather_info
+    
+    def display_weather(self, weather_data):
+        print(f"Weather in {weather_data['city']}, {weather_data['country']}:")
+        print(f"  Temperature: {weather_data['temperature']}°C (feels like {weather_data['feels_like']}°C)")
+        print(f"  Conditions: {weather_data['weather'].title()}")
+        print(f"  Humidity: {weather_data['humidity']}%")
+        print(f"  Pressure: {weather_data['pressure']} hPa")
+        print(f"  Wind: {weather_data['wind_speed']} m/s at {weather_data['wind_direction']}°")
+        print(f"  Cloudiness: {weather_data['cloudiness']}%")
+        print(f"  Visibility: {weather_data['visibility']} meters")
+        print(f"  Sunrise: {weather_data['sunrise']}")
+        print(f"  Sunset: {weather_data['sunset']}")
+        print(f"  Last updated: {weather_data['timestamp']}")
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python fetch_weather.py <city_name>")
+        print("Example: python fetch_weather.py London")
+        sys.exit(1)
+    
+    city_name = ' '.join(sys.argv[1:])
+    
+    api_key = "your_api_key_here"
+    
+    if api_key == "your_api_key_here":
+        print("Error: Please replace 'your_api_key_here' with your actual OpenWeatherMap API key")
+        print("Get a free API key at: https://openweathermap.org/api")
+        sys.exit(1)
+    
+    fetcher = WeatherFetcher(api_key)
+    
+    try:
+        print(f"Fetching weather data for {city_name}...")
+        weather_data = fetcher.get_weather(city_name)
+        fetcher.display_weather(weather_data)
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
