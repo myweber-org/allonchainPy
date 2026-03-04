@@ -433,4 +433,60 @@ def clean_dataset(file_path, numeric_columns):
 if __name__ == "__main__":
     cleaned_data = clean_dataset('raw_data.csv', ['age', 'income', 'score'])
     cleaned_data.to_csv('cleaned_data.csv', index=False)
-    print(f"Data cleaning complete. Remaining records: {len(cleaned_data)}")
+    print(f"Data cleaning complete. Remaining records: {len(cleaned_data)}")import pandas as pd
+import numpy as np
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing numeric values with column median
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].median())
+    
+    # Fill missing categorical values with mode
+    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if df_cleaned[col].isnull().any():
+            mode_value = df_cleaned[col].mode()[0]
+            df_cleaned[col] = df_cleaned[col].fillna(mode_value)
+    
+    return df_cleaned
+
+def validate_data(df, required_columns):
+    """
+    Validate that the DataFrame contains all required columns.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    return True
+
+def main():
+    # Example usage
+    data = {
+        'id': [1, 2, 3, 3, 4],
+        'name': ['Alice', 'Bob', 'Charlie', 'Charlie', None],
+        'age': [25, 30, None, 35, 40],
+        'score': [85.5, 92.0, 78.5, 78.5, None]
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned_df = clean_dataset(df)
+    print(cleaned_df)
+    
+    # Validate required columns
+    try:
+        validate_data(cleaned_df, ['id', 'name', 'age'])
+        print("\nData validation passed.")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
+
+if __name__ == "__main__":
+    main()
