@@ -131,3 +131,33 @@ if __name__ == "__main__":
     print(f"Original shape: {sample_df.shape}")
     print(f"Cleaned shape: {cleaned_data.shape}")
     print(cleaned_data.describe())
+import pandas as pd
+
+def filter_and_clean_dataframe(df, filter_column, filter_value, clean_column, clean_value=None):
+    """
+    Filters a DataFrame based on a column's value and cleans another column
+    by replacing its values.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        filter_column (str): Column name to apply the filter on.
+        filter_value: The value to filter by in the filter_column.
+        clean_column (str): Column name to clean/modify.
+        clean_value: The value to set in the clean_column for filtered rows.
+                     If None, rows are dropped instead of cleaned.
+
+    Returns:
+        pd.DataFrame: The processed DataFrame.
+    """
+    if filter_column not in df.columns or clean_column not in df.columns:
+        raise ValueError("Specified columns not found in DataFrame")
+
+    filtered_df = df[df[filter_column] == filter_value].copy()
+
+    if clean_value is not None:
+        filtered_df.loc[:, clean_column] = clean_value
+        result_df = pd.concat([df[df[filter_column] != filter_value], filtered_df], ignore_index=True)
+    else:
+        result_df = df[df[filter_column] != filter_value].reset_index(drop=True)
+
+    return result_df
