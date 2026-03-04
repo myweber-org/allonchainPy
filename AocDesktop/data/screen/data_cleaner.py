@@ -835,3 +835,71 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataframe(cleaned)
     print(f"\nValidation: {message}")
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def normalize_column(df: pd.DataFrame, column_name: str) -> pd.DataFrame:
+    """
+    Normalize specified column to range [0, 1].
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    col_min = df[column_name].min()
+    col_max = df[column_name].max()
+    
+    if col_max == col_min:
+        df[column_name] = 0.5
+    else:
+        df[column_name] = (df[column_name] - col_min) / (col_max - col_min)
+    
+    return df
+
+def handle_missing_values(df: pd.DataFrame, strategy: str = 'mean') -> pd.DataFrame:
+    """
+    Handle missing values using specified strategy.
+    """
+    df_copy = df.copy()
+    
+    numeric_cols = df_copy.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        for col in numeric_cols:
+            df_copy[col].fillna(df_copy[col].mean(), inplace=True)
+    elif strategy == 'median':
+        for col in numeric_cols:
+            df_copy[col].fillna(df_copy[col].median(), inplace=True)
+    elif strategy == 'drop':
+        df_copy.dropna(subset=numeric_cols, inplace=True)
+    else:
+        raise ValueError("Strategy must be 'mean', 'median', or 'drop'")
+    
+    return df_copy
+
+def clean_dataset(df: pd.DataFrame, 
+                  deduplicate: bool = True,
+                  normalize_cols: Optional[List[str]] = None,
+                  missing_strategy: str = 'mean') -> pd.DataFrame:
+    """
+    Comprehensive data cleaning pipeline.
+    """
+    cleaned_df = df.copy()
+    
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
+    
+    if normalize_cols:
+        for col in normalize_cols:
+            if col in cleaned_df.columns:
+                cleaned_df = normalize_column(cleaned_df, col)
+    
+    return cleaned_df
