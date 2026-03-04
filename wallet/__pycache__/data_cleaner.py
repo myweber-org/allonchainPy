@@ -406,4 +406,66 @@ if __name__ == "__main__":
         print(f"{key}: {value}")
     
     cleaned_df = clean_numeric_data(df, ['A', 'B'])
-    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)import pandas as pd
+import numpy as np
+
+def clean_dataset(df, column_mapping=None, drop_duplicates=True, fill_missing=True):
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
+    """
+    df_clean = df.copy()
+    
+    if column_mapping:
+        df_clean = df_clean.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        initial_rows = len(df_clean)
+        df_clean = df_clean.drop_duplicates()
+        removed = initial_rows - len(df_clean)
+        print(f"Removed {removed} duplicate rows.")
+    
+    if fill_missing:
+        for col in df_clean.columns:
+            if df_clean[col].dtype in ['int64', 'float64']:
+                df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+            elif df_clean[col].dtype == 'object':
+                df_clean[col] = df_clean[col].fillna('Unknown')
+    
+    df_clean = df_clean.reset_index(drop=True)
+    return df_clean
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate the cleaned dataset structure.
+    """
+    if len(df) < min_rows:
+        raise ValueError(f"Dataset must have at least {min_rows} rows.")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'Name': ['Alice', 'Bob', 'Alice', None, 'Charlie'],
+        'Age': [25, 30, 25, None, 35],
+        'Score': [85.5, 92.0, 85.5, 78.0, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original dataset:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataset(df)
+    print("Cleaned dataset:")
+    print(cleaned_df)
+    
+    try:
+        validate_data(cleaned_df, required_columns=['Name', 'Age', 'Score'])
+        print("\nData validation passed.")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
