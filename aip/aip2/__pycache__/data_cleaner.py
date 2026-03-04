@@ -1,73 +1,63 @@
-
 import pandas as pd
-import re
+import numpy as np
 
-def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+def clean_csv_data(file_path, fill_strategy='mean', drop_threshold=0.5):
     """
-    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    Load and clean CSV data by handling missing values.
     
-    Args:
-        df: Input pandas DataFrame
-        column_mapping: Dictionary to rename columns (optional)
-        drop_duplicates: Boolean to remove duplicate rows
-        normalize_text: Boolean to normalize text columns
+    Parameters:
+    file_path (str): Path to the CSV file.
+    fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', 'zero').
+    drop_threshold (float): Drop columns if missing value ratio exceeds this threshold.
     
     Returns:
-        Cleaned pandas DataFrame
+    pd.DataFrame: Cleaned DataFrame.
     """
-    cleaned_df = df.copy()
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {file_path}")
     
-    if column_mapping:
-        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    missing_ratio = df.isnull().sum() / len(df)
+    columns_to_drop = missing_ratio[missing_ratio > drop_threshold].index
+    df = df.drop(columns=columns_to_drop)
     
-    if drop_duplicates:
-        initial_rows = len(cleaned_df)
-        cleaned_df = cleaned_df.drop_duplicates().reset_index(drop=True)
-        removed = initial_rows - len(cleaned_df)
-        print(f"Removed {removed} duplicate rows")
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    categorical_cols = df.select_dtypes(exclude=[np.number]).columns
     
-    if normalize_text:
-        text_columns = cleaned_df.select_dtypes(include=['object']).columns
-        for col in text_columns:
-            cleaned_df[col] = cleaned_df[col].apply(_normalize_string)
+    if fill_strategy == 'mean':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    elif fill_strategy == 'median':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+    elif fill_strategy == 'zero':
+        df[numeric_cols] = df[numeric_cols].fillna(0)
+    elif fill_strategy == 'mode':
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 0)
     
-    return cleaned_df
+    for col in categorical_cols:
+        df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+    
+    df = df.reset_index(drop=True)
+    return df
 
-def _normalize_string(text):
+def export_cleaned_data(df, output_path):
     """
-    Normalize a string by converting to lowercase, removing extra whitespace,
-    and stripping special characters.
+    Export cleaned DataFrame to CSV.
+    
+    Parameters:
+    df (pd.DataFrame): Cleaned DataFrame.
+    output_path (str): Path for the output CSV file.
     """
-    if pd.isna(text):
-        return text
-    
-    normalized = str(text).lower().strip()
-    normalized = re.sub(r'\s+', ' ', normalized)
-    normalized = re.sub(r'[^\w\s]', '', normalized)
-    
-    return normalized
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data exported to: {output_path}")
 
-def validate_email_column(df, email_column):
-    """
-    Validate email addresses in a specified column.
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
     
-    Args:
-        df: Input pandas DataFrame
-        email_column: Name of the column containing email addresses
-    
-    Returns:
-        DataFrame with validation results
-    """
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    
-    validation_results = df.copy()
-    validation_results['is_valid_email'] = validation_results[email_column].apply(
-        lambda x: bool(re.match(email_pattern, str(x))) if pd.notna(x) else False
-    )
-    
-    valid_count = validation_results['is_valid_email'].sum()
-    total_count = len(validation_results)
-    
-    print(f"Valid emails: {valid_count}/{total_count} ({valid_count/total_count*100:.1f}%)")
-    
-    return validation_results
+    try:
+        cleaned_df = clean_csv_data(input_file, fill_strategy='median', drop_threshold=0.3)
+        export_cleaned_data(cleaned_df, output_file)
+    except Exception as e:
+        print(f"Error during data cleaning: {e}")
