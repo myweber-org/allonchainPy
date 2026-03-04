@@ -164,3 +164,94 @@ def remove_duplicates_preserve_order(sequence):
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+
+def remove_duplicates(dataframe, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        dataframe: pandas DataFrame to clean
+        subset: column label or sequence of labels to consider for duplicates
+        keep: determines which duplicates to keep ('first', 'last', or False)
+    
+    Returns:
+        Cleaned DataFrame with duplicates removed
+    """
+    if dataframe.empty:
+        return dataframe
+    
+    cleaned_df = dataframe.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(dataframe) - len(cleaned_df)
+    print(f"Removed {removed_count} duplicate rows")
+    
+    return cleaned_df
+
+def clean_numeric_columns(dataframe, columns):
+    """
+    Clean numeric columns by converting to appropriate types and handling errors.
+    
+    Args:
+        dataframe: pandas DataFrame
+        columns: list of column names to clean
+    
+    Returns:
+        DataFrame with cleaned numeric columns
+    """
+    for column in columns:
+        if column in dataframe.columns:
+            dataframe[column] = pd.to_numeric(dataframe[column], errors='coerce')
+    
+    return dataframe
+
+def validate_dataframe(dataframe, required_columns):
+    """
+    Validate that DataFrame contains required columns.
+    
+    Args:
+        dataframe: pandas DataFrame to validate
+        required_columns: list of required column names
+    
+    Returns:
+        Boolean indicating if validation passed
+    """
+    missing_columns = [col for col in required_columns if col not in dataframe.columns]
+    
+    if missing_columns:
+        print(f"Missing required columns: {missing_columns}")
+        return False
+    
+    return True
+
+def main():
+    """
+    Example usage of data cleaning functions.
+    """
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', 'David', 'David', 'Eve'],
+        'age': ['25', '30', '30', '35', '40', '40', '45'],
+        'score': ['85.5', '90.0', '90.0', '78.5', '92.0', '92.0', '88.5']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print()
+    
+    cleaned_df = remove_duplicates(df, subset=['id', 'name'], keep='first')
+    print("After removing duplicates:")
+    print(cleaned_df)
+    print()
+    
+    cleaned_df = clean_numeric_columns(cleaned_df, ['age', 'score'])
+    print("After cleaning numeric columns:")
+    print(cleaned_df)
+    print()
+    
+    is_valid = validate_dataframe(cleaned_df, ['id', 'name', 'age'])
+    print(f"DataFrame validation: {is_valid}")
+
+if __name__ == "__main__":
+    main()
