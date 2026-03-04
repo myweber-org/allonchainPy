@@ -781,3 +781,11 @@ if __name__ == "__main__":
     print("Cleaned data shape:", cleaned_df.shape)
     summary = cleaner.get_summary()
     print("Cleaning summary:", summary)
+def remove_duplicates_preserve_order(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
