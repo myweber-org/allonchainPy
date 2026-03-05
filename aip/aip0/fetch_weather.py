@@ -82,3 +82,78 @@ if __name__ == "__main__":
     city_name = "London"
     weather_info = get_weather(API_KEY, city_name)
     print(weather_info)
+import requests
+import json
+import os
+from datetime import datetime
+
+class WeatherFetcher:
+    def __init__(self, api_key=None):
+        self.api_key = api_key or os.getenv('OPENWEATHER_API_KEY')
+        self.base_url = "http://api.openweathermap.org/data/2.5/weather"
+    
+    def get_weather(self, city_name, country_code=''):
+        if not self.api_key:
+            raise ValueError("API key not provided")
+        
+        query = f"{city_name},{country_code}" if country_code else city_name
+        params = {
+            'q': query,
+            'appid': self.api_key,
+            'units': 'metric'
+        }
+        
+        try:
+            response = requests.get(self.base_url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            return {
+                'city': data['name'],
+                'country': data['sys']['country'],
+                'temperature': data['main']['temp'],
+                'feels_like': data['main']['feels_like'],
+                'humidity': data['main']['humidity'],
+                'pressure': data['main']['pressure'],
+                'description': data['weather'][0]['description'],
+                'wind_speed': data['wind']['speed'],
+                'timestamp': datetime.fromtimestamp(data['dt']).isoformat()
+            }
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching weather data: {e}")
+            return None
+        except KeyError as e:
+            print(f"Unexpected API response format: {e}")
+            return None
+    
+    def display_weather(self, weather_data):
+        if not weather_data:
+            print("No weather data available")
+            return
+        
+        print(f"Weather in {weather_data['city']}, {weather_data['country']}:")
+        print(f"Temperature: {weather_data['temperature']}°C")
+        print(f"Feels like: {weather_data['feels_like']}°C")
+        print(f"Conditions: {weather_data['description'].title()}")
+        print(f"Humidity: {weather_data['humidity']}%")
+        print(f"Pressure: {weather_data['pressure']} hPa")
+        print(f"Wind Speed: {weather_data['wind_speed']} m/s")
+        print(f"Last Updated: {weather_data['timestamp']}")
+
+def main():
+    fetcher = WeatherFetcher()
+    
+    cities = [
+        ('London', 'UK'),
+        ('New York', 'US'),
+        ('Tokyo', 'JP'),
+        ('Paris', 'FR')
+    ]
+    
+    for city, country in cities:
+        print(f"\n{'='*40}")
+        weather = fetcher.get_weather(city, country)
+        fetcher.display_weather(weather)
+
+if __name__ == "__main__":
+    main()
