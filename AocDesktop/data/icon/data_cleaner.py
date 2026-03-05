@@ -661,3 +661,95 @@ def clean_dataframe(df: pd.DataFrame,
                 cleaned_df = normalize_column(cleaned_df, col)
     
     return cleaned_df
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def detect_outliers_iqr(self, column, threshold=1.5):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        outliers = self.df[(self.df[column] < lower_bound) | (self.df[column] > upper_bound)]
+        return outliers
+    
+    def remove_outliers_zscore(self, column, threshold=3):
+        z_scores = np.abs(stats.zscore(self.df[column].dropna()))
+        mask = z_scores < threshold
+        self.df = self.df[mask]
+        return self.df
+    
+    def normalize_column(self, column, method='minmax'):
+        if method == 'minmax':
+            min_val = self.df[column].min()
+            max_val = self.df[column].max()
+            self.df[f'{column}_normalized'] = (self.df[column] - min_val) / (max_val - min_val)
+        elif method == 'zscore':
+            mean_val = self.df[column].mean()
+            std_val = self.df[column].std()
+            self.df[f'{column}_normalized'] = (self.df[column] - mean_val) / std_val
+        return self.df
+    
+    def fill_missing(self, column, strategy='mean'):
+        if strategy == 'mean':
+            fill_value = self.df[column].mean()
+        elif strategy == 'median':
+            fill_value = self.df[column].median()
+        elif strategy == 'mode':
+            fill_value = self.df[column].mode()[0]
+        else:
+            fill_value = strategy
+            
+        self.df[column] = self.df[column].fillna(fill_value)
+        return self.df
+    
+    def get_cleaning_report(self):
+        removed_rows = self.original_shape[0] - self.df.shape[0]
+        removed_columns = self.original_shape[1] - self.df.shape[1]
+        
+        report = {
+            'original_shape': self.original_shape,
+            'cleaned_shape': self.df.shape,
+            'rows_removed': removed_rows,
+            'columns_removed': removed_columns,
+            'missing_values': self.df.isnull().sum().to_dict(),
+            'data_types': self.df.dtypes.to_dict()
+        }
+        return report
+    
+    def save_cleaned_data(self, filepath):
+        self.df.to_csv(filepath, index=False)
+        return filepath
+
+def example_usage():
+    data = {
+        'temperature': [22, 25, 28, 31, 34, 100, 23, 26, None, 29],
+        'humidity': [45, 50, 55, 60, 65, 200, 48, 52, None, 58],
+        'pressure': [1013, 1015, 1012, 1014, 1016, 500, 1013, 1014, None, 1015]
+    }
+    
+    df = pd.DataFrame(data)
+    cleaner = DataCleaner(df)
+    
+    print("Original data:")
+    print(df)
+    print("\nDetecting outliers in temperature:")
+    print(cleaner.detect_outliers_iqr('temperature'))
+    
+    cleaner.fill_missing('temperature')
+    cleaner.remove_outliers_zscore('temperature')
+    cleaner.normalize_column('temperature')
+    
+    print("\nCleaned data:")
+    print(cleaner.df)
+    print("\nCleaning report:")
+    print(cleaner.get_cleaning_report())
+
+if __name__ == "__main__":
+    example_usage()
