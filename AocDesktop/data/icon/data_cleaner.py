@@ -540,3 +540,17 @@ if __name__ == "__main__":
     validation = validate_dataframe(cleaned, required_columns=['name', 'age'])
     print("\nValidation Results:")
     print(validation)
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_data(data_list):
+    if not isinstance(data_list, list):
+        raise TypeError("Input must be a list")
+    cleaned = remove_duplicates_preserve_order(data_list)
+    return cleaned
