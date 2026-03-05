@@ -320,3 +320,119 @@ def remove_outliers_iqr(data, column):
     
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
     return filtered_data
+import pandas as pd
+import numpy as np
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns
+        self.categorical_columns = df.select_dtypes(exclude=[np.number]).columns
+    
+    def handle_missing_values(self, strategy='mean', fill_value=None):
+        if strategy == 'mean':
+            self.df[self.numeric_columns] = self.df[self.numeric_columns].fillna(
+                self.df[self.numeric_columns].mean()
+            )
+        elif strategy == 'median':
+            self.df[self.numeric_columns] = self.df[self.numeric_columns].fillna(
+                self.df[self.numeric_columns].median()
+            )
+        elif strategy == 'mode':
+            self.df[self.numeric_columns] = self.df[self.numeric_columns].fillna(
+                self.df[self.numeric_columns].mode().iloc[0]
+            )
+        elif strategy == 'custom' and fill_value is not None:
+            self.df[self.numeric_columns] = self.df[self.numeric_columns].fillna(fill_value)
+        
+        self.df[self.categorical_columns] = self.df[self.categorical_columns].fillna('Unknown')
+        return self
+    
+    def remove_outliers_iqr(self, columns=None, multiplier=1.5):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        for column in columns:
+            if column in self.numeric_columns:
+                Q1 = self.df[column].quantile(0.25)
+                Q3 = self.df[column].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - multiplier * IQR
+                upper_bound = Q3 + multiplier * IQR
+                
+                self.df = self.df[
+                    (self.df[column] >= lower_bound) & 
+                    (self.df[column] <= upper_bound)
+                ]
+        return self
+    
+    def standardize_data(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        for column in columns:
+            if column in self.numeric_columns:
+                mean = self.df[column].mean()
+                std = self.df[column].std()
+                if std > 0:
+                    self.df[column] = (self.df[column] - mean) / std
+        return self
+    
+    def normalize_data(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        for column in columns:
+            if column in self.numeric_columns:
+                min_val = self.df[column].min()
+                max_val = self.df[column].max()
+                if max_val > min_val:
+                    self.df[column] = (self.df[column] - min_val) / (max_val - min_val)
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df.copy()
+    
+    def summary(self):
+        missing_counts = self.df.isnull().sum()
+        numeric_stats = self.df[self.numeric_columns].describe() if len(self.numeric_columns) > 0 else pd.DataFrame()
+        
+        return {
+            'shape': self.df.shape,
+            'missing_values': missing_counts[missing_counts > 0].to_dict(),
+            'numeric_stats': numeric_stats.to_dict() if not numeric_stats.empty else {}
+        }
+
+def create_sample_data():
+    np.random.seed(42)
+    data = {
+        'age': np.random.randint(18, 70, 100),
+        'salary': np.random.normal(50000, 15000, 100),
+        'department': np.random.choice(['Sales', 'IT', 'HR', 'Finance', None], 100),
+        'experience': np.random.randint(0, 30, 100)
+    }
+    
+    data['salary'][np.random.choice(100, 10)] = np.nan
+    data['age'][np.random.choice(100, 5)] = np.nan
+    
+    return pd.DataFrame(data)
+
+if __name__ == "__main__":
+    df = create_sample_data()
+    print("Original data shape:", df.shape)
+    print("Missing values:\n", df.isnull().sum())
+    
+    cleaner = DataCleaner(df)
+    cleaned_df = (cleaner
+                 .handle_missing_values(strategy='mean')
+                 .remove_outliers_iqr(multiplier=1.5)
+                 .standardize_data()
+                 .get_cleaned_data())
+    
+    print("\nCleaned data shape:", cleaned_df.shape)
+    print("Missing values after cleaning:\n", cleaned_df.isnull().sum())
+    
+    summary = cleaner.summary()
+    print("\nData Summary:")
+    print(f"Shape: {summary['shape']}")
+    print(f"Missing values: {summary['missing_values']}")
