@@ -237,3 +237,63 @@ def clean_dataset(input_file, output_file, outlier_method='iqr', normalize_metho
 
 if __name__ == "__main__":
     cleaned_df = clean_dataset('raw_data.csv', 'cleaned_data.csv')
+import pandas as pd
+
+def clean_dataset(df):
+    """
+    Remove null values and duplicate rows from a pandas DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to be cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Remove duplicate rows
+    df_cleaned = df_cleaned.drop_duplicates()
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def filter_by_column(df, column_name, threshold):
+    """
+    Filter DataFrame rows where column value is greater than threshold.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column_name (str): Name of column to filter by.
+        threshold (float): Threshold value for filtering.
+    
+    Returns:
+        pd.DataFrame: Filtered DataFrame.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    filtered_df = df[df[column_name] > threshold]
+    return filtered_df
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, None, 4, 5, 5],
+        'B': [10, 20, 30, None, 50, 50],
+        'C': [100, 200, 300, 400, 500, 500]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataset(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    filtered_df = filter_by_column(cleaned_df, 'A', 2)
+    print("\nFiltered DataFrame (A > 2):")
+    print(filtered_df)
