@@ -108,3 +108,57 @@ def validate_data(df, required_columns):
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
     return True
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def remove_outliers_iqr(df, columns):
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean
+
+def normalize_minmax(df, columns):
+    df_norm = df.copy()
+    for col in columns:
+        if col in df.columns:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val > min_val:
+                df_norm[col] = (df[col] - min_val) / (max_val - min_val)
+    return df_norm
+
+def clean_dataset(file_path, output_path=None):
+    try:
+        df = pd.read_csv(file_path)
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        
+        if len(numeric_cols) == 0:
+            print("No numeric columns found for cleaning")
+            return df
+        
+        print(f"Original shape: {df.shape}")
+        df = remove_outliers_iqr(df, numeric_cols)
+        print(f"After outlier removal: {df.shape}")
+        df = normalize_minmax(df, numeric_cols)
+        
+        if output_path:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to {output_path}")
+        
+        return df
+    except Exception as e:
+        print(f"Error cleaning dataset: {e}")
+        return None
+
+if __name__ == "__main__":
+    cleaned_df = clean_dataset("raw_data.csv", "cleaned_data.csv")
+    if cleaned_df is not None:
+        print(f"Data cleaning completed. Final shape: {cleaned_df.shape}")
+        print(cleaned_df.describe())
