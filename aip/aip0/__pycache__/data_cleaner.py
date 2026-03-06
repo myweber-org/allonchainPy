@@ -124,3 +124,116 @@ if __name__ == "__main__":
     import os
     if os.path.exists('test_data.csv'):
         os.remove('test_data.csv')
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, strategy='mean', outlier_threshold=3):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): Strategy for missing values: 'mean', 'median', 'mode', or 'drop'
+    outlier_threshold (float): Number of standard deviations for outlier detection
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    for column in cleaned_df.columns:
+        if cleaned_df[column].dtype in ['float64', 'int64']:
+            if strategy == 'mean':
+                cleaned_df[column].fillna(cleaned_df[column].mean(), inplace=True)
+            elif strategy == 'median':
+                cleaned_df[column].fillna(cleaned_df[column].median(), inplace=True)
+            elif strategy == 'mode':
+                cleaned_df[column].fillna(cleaned_df[column].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                cleaned_df.dropna(subset=[column], inplace=True)
+    
+    # Handle outliers using z-score method
+    numeric_columns = cleaned_df.select_dtypes(include=[np.number]).columns
+    for column in numeric_columns:
+        z_scores = np.abs((cleaned_df[column] - cleaned_df[column].mean()) / cleaned_df[column].std())
+        cleaned_df = cleaned_df[z_scores < outlier_threshold]
+    
+    # Reset index after cleaning
+    cleaned_df.reset_index(drop=True, inplace=True)
+    
+    return cleaned_df
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    subset (list): Columns to consider for duplicates
+    keep (str): Which duplicates to keep: 'first', 'last', or False
+    
+    Returns:
+    pd.DataFrame: DataFrame without duplicates
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def normalize_columns(df, columns=None, method='minmax'):
+    """
+    Normalize specified columns in DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): Columns to normalize, None for all numeric columns
+    method (str): Normalization method: 'minmax' or 'zscore'
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns
+    """
+    normalized_df = df.copy()
+    
+    if columns is None:
+        columns = normalized_df.select_dtypes(include=[np.number]).columns
+    
+    for column in columns:
+        if column in normalized_df.columns and normalized_df[column].dtype in ['float64', 'int64']:
+            if method == 'minmax':
+                col_min = normalized_df[column].min()
+                col_max = normalized_df[column].max()
+                if col_max != col_min:
+                    normalized_df[column] = (normalized_df[column] - col_min) / (col_max - col_min)
+            elif method == 'zscore':
+                col_mean = normalized_df[column].mean()
+                col_std = normalized_df[column].std()
+                if col_std != 0:
+                    normalized_df[column] = (normalized_df[column] - col_mean) / col_std
+    
+    return normalized_df
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data with missing values and outliers
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5, 100],
+        'B': [10, 20, 30, np.nan, 50, 60],
+        'C': ['x', 'y', 'z', 'x', 'y', 'z']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    # Clean the data
+    cleaned = clean_dataset(df, strategy='mean', outlier_threshold=2)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    # Remove duplicates
+    no_duplicates = remove_duplicates(cleaned)
+    print("\nDataFrame without duplicates:")
+    print(no_duplicates)
+    
+    # Normalize numeric columns
+    normalized = normalize_columns(no_duplicates, method='minmax')
+    print("\nNormalized DataFrame:")
+    print(normalized)
