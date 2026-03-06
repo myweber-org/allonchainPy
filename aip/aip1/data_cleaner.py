@@ -334,3 +334,11 @@ if __name__ == "__main__":
     print(f"Cleaned data shape: {clean_df.shape}")
     print(f"Normalized data shape: {norm_df.shape}")
     print(f"Filled data shape: {filled_df.shape}")
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
