@@ -226,3 +226,111 @@ if __name__ == "__main__":
         print("Data cleaning completed successfully")
         print("\nFirst 5 rows of cleaned data:")
         print(cleaned_df.head())
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns
+        
+    def remove_outliers_iqr(self, columns=None, factor=1.5):
+        if columns is None:
+            columns = self.numeric_columns
+            
+        df_clean = self.df.copy()
+        for col in columns:
+            if col in self.numeric_columns:
+                Q1 = df_clean[col].quantile(0.25)
+                Q3 = df_clean[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - factor * IQR
+                upper_bound = Q3 + factor * IQR
+                df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+        return df_clean
+    
+    def remove_outliers_zscore(self, columns=None, threshold=3):
+        if columns is None:
+            columns = self.numeric_columns
+            
+        df_clean = self.df.copy()
+        for col in columns:
+            if col in self.numeric_columns:
+                z_scores = np.abs(stats.zscore(df_clean[col].dropna()))
+                df_clean = df_clean[z_scores < threshold]
+        return df_clean
+    
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+            
+        df_normalized = self.df.copy()
+        for col in columns:
+            if col in self.numeric_columns:
+                min_val = df_normalized[col].min()
+                max_val = df_normalized[col].max()
+                if max_val != min_val:
+                    df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+        return df_normalized
+    
+    def normalize_zscore(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+            
+        df_normalized = self.df.copy()
+        for col in columns:
+            if col in self.numeric_columns:
+                mean_val = df_normalized[col].mean()
+                std_val = df_normalized[col].std()
+                if std_val > 0:
+                    df_normalized[col] = (df_normalized[col] - mean_val) / std_val
+        return df_normalized
+    
+    def fill_missing_mean(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+            
+        df_filled = self.df.copy()
+        for col in columns:
+            if col in self.numeric_columns:
+                df_filled[col] = df_filled[col].fillna(df_filled[col].mean())
+        return df_filled
+    
+    def get_summary(self):
+        summary = {}
+        for col in self.numeric_columns:
+            summary[col] = {
+                'mean': self.df[col].mean(),
+                'std': self.df[col].std(),
+                'min': self.df[col].min(),
+                'max': self.df[col].max(),
+                'missing': self.df[col].isnull().sum()
+            }
+        return pd.DataFrame(summary).T
+
+def example_usage():
+    np.random.seed(42)
+    data = {
+        'feature1': np.random.normal(100, 15, 100),
+        'feature2': np.random.exponential(50, 100),
+        'feature3': np.random.uniform(0, 1, 100)
+    }
+    df = pd.DataFrame(data)
+    df.loc[10:15, 'feature1'] = np.nan
+    
+    cleaner = DataCleaner(df)
+    print("Original data summary:")
+    print(cleaner.get_summary())
+    
+    df_clean = cleaner.remove_outliers_iqr(['feature1', 'feature2'])
+    df_normalized = cleaner.normalize_minmax()
+    df_filled = cleaner.fill_missing_mean()
+    
+    return df_clean, df_normalized, df_filled
+
+if __name__ == "__main__":
+    clean_df, norm_df, filled_df = example_usage()
+    print(f"Cleaned data shape: {clean_df.shape}")
+    print(f"Normalized data shape: {norm_df.shape}")
+    print(f"Filled data shape: {filled_df.shape}")
