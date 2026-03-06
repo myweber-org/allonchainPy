@@ -48,3 +48,39 @@ def validate_email_column(df, email_column):
     
     email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return df[email_column].apply(lambda x: bool(re.match(email_pattern, str(x))) if pd.notnull(x) else False)
+def remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    unique_list = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            unique_list.append(item)
+    return unique_list
+
+def clean_numeric_data(values, default=0):
+    """
+    Clean numeric data by converting strings to floats.
+    Non-numeric values are replaced with the default value.
+    """
+    cleaned = []
+    for val in values:
+        try:
+            cleaned.append(float(val))
+        except (ValueError, TypeError):
+            cleaned.append(default)
+    return cleaned
+
+def filter_by_threshold(data, threshold, keep_above=True):
+    """
+    Filter data based on a threshold value.
+    If keep_above is True, keep values above threshold.
+    If keep_above is False, keep values below or equal to threshold.
+    """
+    if keep_above:
+        return [x for x in data if x > threshold]
+    else:
+        return [x for x in data if x <= threshold]
