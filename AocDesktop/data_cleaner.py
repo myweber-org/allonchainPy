@@ -1,114 +1,33 @@
-
-import pandas as pd
-
-def clean_dataset(df, drop_duplicates=True, fill_method='drop'):
-    """
-    Clean a pandas DataFrame by handling missing values and duplicates.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    drop_duplicates (bool): Whether to drop duplicate rows
-    fill_method (str): Method for handling nulls - 'drop', 'ffill', or 'mean'
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    """
-    cleaned_df = df.copy()
-    
-    # Handle missing values
-    if fill_method == 'drop':
-        cleaned_df = cleaned_df.dropna()
-    elif fill_method == 'ffill':
-        cleaned_df = cleaned_df.ffill().bfill()
-    elif fill_method == 'mean':
-        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
-        for col in numeric_cols:
-            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
-    
-    # Remove duplicates
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-    
-    # Reset index
-    cleaned_df = cleaned_df.reset_index(drop=True)
-    
-    return cleaned_df
-
-def validate_dataset(df, required_columns=None):
-    """
-    Validate dataset structure and content.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate
-    required_columns (list): List of required column names
-    
-    Returns:
-    dict: Validation results
-    """
-    validation_results = {
-        'row_count': len(df),
-        'column_count': len(df.columns),
-        'null_count': df.isnull().sum().sum(),
-        'duplicate_count': df.duplicated().sum()
-    }
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        validation_results['missing_columns'] = missing_columns
-        validation_results['has_required_columns'] = len(missing_columns) == 0
-    
-    return validation_results
-
-if __name__ == "__main__":
-    # Example usage
-    sample_data = {
-        'A': [1, 2, None, 4, 1],
-        'B': [5, None, 7, 8, 5],
-        'C': [9, 10, 11, 12, 9]
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    
-    cleaned = clean_dataset(df, fill_method='mean')
-    print("\nCleaned DataFrame:")
-    print(cleaned)
-    
-    validation = validate_dataset(cleaned, required_columns=['A', 'B', 'C'])
-    print("\nValidation Results:")
-    for key, value in validation.items():
-        print(f"{key}: {value}")
 import pandas as pd
 import numpy as np
-from scipy import stats
 
-def load_and_clean_data(filepath):
-    df = pd.read_csv(filepath)
-    
-    # Remove duplicates
-    df = df.drop_duplicates()
-    
-    # Handle missing values
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
-    
-    # Remove outliers using z-score
-    z_scores = np.abs(stats.zscore(df[numeric_cols]))
-    df = df[(z_scores < 3).all(axis=1)]
-    
-    # Normalize numeric columns
-    df[numeric_cols] = (df[numeric_cols] - df[numeric_cols].min()) / (df[numeric_cols].max() - df[numeric_cols].min())
-    
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
     return df
 
-def save_cleaned_data(df, output_path):
+def clean_dataset(file_path, output_path):
+    df = pd.read_csv(file_path)
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        df = remove_outliers_iqr(df, col)
+        df = normalize_minmax(df, col)
+    
     df.to_csv(output_path, index=False)
     print(f"Cleaned data saved to {output_path}")
+    print(f"Original shape: {pd.read_csv(file_path).shape}")
+    print(f"Cleaned shape: {df.shape}")
 
 if __name__ == "__main__":
-    input_file = "raw_data.csv"
-    output_file = "cleaned_data.csv"
-    
-    cleaned_df = load_and_clean_data(input_file)
-    save_cleaned_data(cleaned_df, output_file)
+    clean_dataset('raw_data.csv', 'cleaned_data.csv')
