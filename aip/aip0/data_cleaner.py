@@ -217,4 +217,88 @@ if __name__ == "__main__":
     print(f"Cleaned data shape: {cleaned_df.shape}")
     
     is_valid = validate_dataframe(cleaned_df, required_columns=['id', 'value', 'category'])
-    print(f"Data validation passed: {is_valid}")
+    print(f"Data validation passed: {is_valid}")import pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, missing_strategy='mean', columns_to_drop=None):
+    """
+    Load and clean CSV data by handling missing values and dropping specified columns.
+    
+    Parameters:
+    filepath (str): Path to the CSV file.
+    missing_strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop').
+    columns_to_drop (list): List of column names to drop.
+    
+    Returns:
+    pandas.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(filepath)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {filepath}")
+    except Exception as e:
+        raise Exception(f"Error reading CSV: {e}")
+
+    original_shape = df.shape
+    print(f"Original data shape: {original_shape}")
+
+    if columns_to_drop:
+        df = df.drop(columns=columns_to_drop, errors='ignore')
+        print(f"Dropped columns: {columns_to_drop}")
+
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    categorical_cols = df.select_dtypes(exclude=[np.number]).columns
+
+    if missing_strategy == 'drop':
+        df = df.dropna()
+        print("Dropped rows with missing values.")
+    elif missing_strategy in ['mean', 'median']:
+        if missing_strategy == 'mean':
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+        else:
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+        print(f"Filled numeric missing values with {missing_strategy}.")
+        
+        if not categorical_cols.empty:
+            df[categorical_cols] = df[categorical_cols].fillna(df[categorical_cols].mode().iloc[0])
+            print("Filled categorical missing values with mode.")
+    elif missing_strategy == 'mode':
+        for col in df.columns:
+            if col in numeric_cols:
+                df[col] = df[col].fillna(df[col].mode().iloc[0] if not df[col].mode().empty else 0)
+            else:
+                df[col] = df[col].fillna(df[col].mode().iloc[0] if not df[col].mode().empty else 'Unknown')
+        print("Filled missing values with mode.")
+    else:
+        raise ValueError("Invalid missing_strategy. Choose from 'mean', 'median', 'mode', 'drop'.")
+
+    cleaned_shape = df.shape
+    print(f"Cleaned data shape: {cleaned_shape}")
+    print(f"Rows removed: {original_shape[0] - cleaned_shape[0]}")
+    print(f"Columns removed: {original_shape[1] - cleaned_shape[1]}")
+
+    return df
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to a CSV file.
+    
+    Parameters:
+    df (pandas.DataFrame): DataFrame to save.
+    output_path (str): Path for the output CSV file.
+    """
+    try:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+    except Exception as e:
+        raise Exception(f"Error saving CSV: {e}")
+
+if __name__ == "__main__":
+    input_file = "sample_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    try:
+        cleaned_df = clean_csv_data(input_file, missing_strategy='median', columns_to_drop=['id', 'unused_column'])
+        save_cleaned_data(cleaned_df, output_file)
+    except Exception as e:
+        print(f"Error during cleaning: {e}")
