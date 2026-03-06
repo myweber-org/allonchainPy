@@ -1,169 +1,50 @@
 
 import pandas as pd
+import re
 
-def clean_dataset(df, drop_na=True, rename_columns=True):
+def clean_dataframe(df, columns_to_clean=None, remove_duplicates=True):
     """
-    Clean a pandas DataFrame by handling missing values and standardizing column names.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_na (bool): If True, drop rows with any missing values.
-    rename_columns (bool): If True, rename columns to lowercase with underscores.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
+    Clean a pandas DataFrame by removing duplicates and normalizing string columns.
     """
-    cleaned_df = df.copy()
+    df_clean = df.copy()
     
-    if drop_na:
-        cleaned_df = cleaned_df.dropna()
+    if remove_duplicates:
+        initial_rows = len(df_clean)
+        df_clean = df_clean.drop_duplicates().reset_index(drop=True)
+        removed = initial_rows - len(df_clean)
+        print(f"Removed {removed} duplicate rows.")
     
-    if rename_columns:
-        cleaned_df.columns = (
-            cleaned_df.columns
-            .str.lower()
-            .str.replace(' ', '_')
-            .str.replace(r'[^\w_]', '', regex=True)
-        )
+    if columns_to_clean is None:
+        columns_to_clean = df_clean.select_dtypes(include=['object']).columns
     
-    return cleaned_df
+    for col in columns_to_clean:
+        if col in df_clean.columns and df_clean[col].dtype == 'object':
+            df_clean[col] = df_clean[col].apply(lambda x: normalize_string(x) if pd.notnull(x) else x)
+            print(f"Normalized column: {col}")
+    
+    return df_clean
 
-def validate_dataset(df, required_columns=None):
+def normalize_string(s):
     """
-    Validate a DataFrame for required columns and data types.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of required column names.
-    
-    Returns:
-    bool: True if validation passes, False otherwise.
+    Normalize a string by converting to lowercase, removing extra whitespace,
+    and stripping special characters (except basic punctuation).
     """
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            print(f"Missing required columns: {missing_columns}")
-            return False
+    if not isinstance(s, str):
+        return s
     
-    if df.empty:
-        print("DataFrame is empty")
-        return False
+    s = s.lower().strip()
+    s = re.sub(r'\s+', ' ', s)
+    s = re.sub(r'[^\w\s.,!?-]', '', s)
     
-    return True
+    return s
 
-if __name__ == "__main__":
-    sample_data = {
-        'First Name': ['Alice', 'Bob', None],
-        'Last Name': ['Smith', 'Johnson', 'Williams'],
-        'Age': [25, 30, 35],
-        'Email Address': ['alice@test.com', 'bob@test.com', 'charlie@test.com']
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\nCleaned DataFrame:")
-    cleaned = clean_dataset(df)
-    print(cleaned)
-    
-    is_valid = validate_dataset(cleaned, ['first_name', 'last_name', 'age'])
-    print(f"\nDataset validation: {is_valid}")
-import numpy as np
-
-def remove_outliers_iqr(data, column):
+def validate_email_column(df, email_column):
     """
-    Remove outliers from a specified column using the Interquartile Range method.
-    
-    Parameters:
-    data (list or np.array): The dataset containing the column to clean.
-    column (int): Index of the column to process.
-    
-    Returns:
-    np.array: Data with outliers removed from the specified column.
+    Validate email addresses in a specified column.
+    Returns a Series with boolean values indicating valid emails.
     """
-    data_array = np.array(data)
-    column_data = data_array[:, column].astype(float)
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame.")
     
-    Q1 = np.percentile(column_data, 25)
-    Q3 = np.percentile(column_data, 75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    mask = (column_data >= lower_bound) & (column_data <= upper_bound)
-    cleaned_data = data_array[mask]
-    
-    return cleaned_data
-
-def calculate_statistics(data, column):
-    """
-    Calculate basic statistics for a column after outlier removal.
-    
-    Parameters:
-    data (list or np.array): The dataset.
-    column (int): Index of the column to analyze.
-    
-    Returns:
-    dict: Dictionary containing mean, median, and standard deviation.
-    """
-    if len(data) == 0:
-        return {"mean": 0, "median": 0, "std": 0}
-    
-    column_data = data[:, column].astype(float)
-    
-    stats = {
-        "mean": np.mean(column_data),
-        "median": np.median(column_data),
-        "std": np.std(column_data)
-    }
-    
-    return stats
-
-def process_dataset(data, column_index):
-    """
-    Complete pipeline to clean data and calculate statistics.
-    
-    Parameters:
-    data (list): Input dataset as list of lists.
-    column_index (int): Column to process.
-    
-    Returns:
-    tuple: (cleaned_data, statistics)
-    """
-    cleaned = remove_outliers_iqr(data, column_index)
-    stats = calculate_statistics(cleaned, column_index)
-    
-    return cleaned, stats
-import pandas as pd
-import numpy as np
-from scipy import stats
-
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
-    return df
-
-def clean_dataset(file_path, columns_to_clean):
-    df = pd.read_csv(file_path)
-    
-    for column in columns_to_clean:
-        if column in df.columns:
-            df = remove_outliers_iqr(df, column)
-            df = normalize_minmax(df, column)
-    
-    return df
-
-if __name__ == "__main__":
-    cleaned_data = clean_dataset('raw_data.csv', ['age', 'income', 'score'])
-    cleaned_data.to_csv('cleaned_data.csv', index=False)
-    print(f"Data cleaning completed. Original shape: {pd.read_csv('raw_data.csv').shape}, Cleaned shape: {cleaned_data.shape}")
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return df[email_column].apply(lambda x: bool(re.match(email_pattern, str(x))) if pd.notnull(x) else False)
