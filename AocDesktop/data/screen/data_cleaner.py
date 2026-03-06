@@ -212,3 +212,139 @@ class DataCleaner:
             'missing_values': self.df.isnull().sum().sum()
         }
         return summary
+import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    subset (list, optional): Column labels to consider for duplicates.
+    keep (str, optional): Which duplicates to keep ('first', 'last', False).
+    
+    Returns:
+    pd.DataFrame: DataFrame with duplicates removed.
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    removed_count = len(df) - len(cleaned_df)
+    
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate row(s)")
+    
+    return cleaned_df
+
+def fill_missing_values(df, strategy='mean', columns=None):
+    """
+    Fill missing values in DataFrame columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    strategy (str): Imputation strategy ('mean', 'median', 'mode', 'constant').
+    columns (list, optional): Specific columns to fill.
+    
+    Returns:
+    pd.DataFrame: DataFrame with filled missing values.
+    """
+    if df.empty:
+        return df
+    
+    df_filled = df.copy()
+    columns_to_fill = columns if columns else df.columns
+    
+    for col in columns_to_fill:
+        if col in df.columns and df[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0] if not df[col].mode().empty else np.nan
+            elif strategy == 'constant':
+                fill_value = 0
+            else:
+                fill_value = np.nan
+            
+            df_filled[col] = df[col].fillna(fill_value)
+            print(f"Filled missing values in column '{col}' using {strategy} strategy")
+    
+    return df_filled
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize values in a specified column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to normalize.
+    method (str): Normalization method ('minmax', 'zscore').
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column.
+    """
+    if column not in df.columns:
+        print(f"Column '{column}' not found in DataFrame")
+        return df
+    
+    df_normalized = df.copy()
+    
+    if method == 'minmax':
+        col_min = df[column].min()
+        col_max = df[column].max()
+        if col_max != col_min:
+            df_normalized[column] = (df[column] - col_min) / (col_max - col_min)
+        else:
+            df_normalized[column] = 0
+    elif method == 'zscore':
+        col_mean = df[column].mean()
+        col_std = df[column].std()
+        if col_std != 0:
+            df_normalized[column] = (df[column] - col_mean) / col_std
+        else:
+            df_normalized[column] = 0
+    
+    print(f"Normalized column '{column}' using {method} method")
+    return df_normalized
+
+def clean_dataframe(df, operations=None):
+    """
+    Apply multiple cleaning operations to DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    operations (list): List of cleaning operations to apply.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    if operations is None:
+        operations = ['remove_duplicates', 'fill_missing']
+    
+    cleaned_df = df.copy()
+    
+    for operation in operations:
+        if operation == 'remove_duplicates':
+            cleaned_df = remove_duplicates(cleaned_df)
+        elif operation == 'fill_missing':
+            cleaned_df = fill_missing_values(cleaned_df)
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 3, 3, 4, 5],
+        'value': [10, 20, np.nan, 30, 40, 50],
+        'category': ['A', 'B', 'A', 'A', 'B', 'C']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
