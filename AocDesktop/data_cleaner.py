@@ -169,4 +169,58 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid = validate_dataframe(cleaned)
-    print(f"\nDataFrame validation: {is_valid}")
+    print(f"\nDataFrame validation: {is_valid}")import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(dataframe, column):
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
+    return filtered_df
+
+def normalize_minmax(dataframe, column):
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    if max_val == min_val:
+        return dataframe[column].apply(lambda x: 0.0)
+    normalized = (dataframe[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(dataframe, column):
+    mean_val = dataframe[column].mean()
+    std_val = dataframe[column].std()
+    if std_val == 0:
+        return dataframe[column].apply(lambda x: 0.0)
+    standardized = (dataframe[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_mean(dataframe, column):
+    mean_val = dataframe[column].mean()
+    filled_series = dataframe[column].fillna(mean_val)
+    return filled_series
+
+def clean_dataset(dataframe, numeric_columns):
+    cleaned_df = dataframe.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df[col] = handle_missing_mean(cleaned_df, col)
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'feature_a': [1, 2, 3, 4, 5, 100, 7, 8, 9, 10],
+        'feature_b': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+        'feature_c': [5, 15, 25, 35, 45, 55, 65, 75, 85, 95]
+    }
+    df = pd.DataFrame(sample_data)
+    numeric_cols = ['feature_a', 'feature_b', 'feature_c']
+    result_df = clean_dataset(df, numeric_cols)
+    print("Original dataset shape:", df.shape)
+    print("Cleaned dataset shape:", result_df.shape)
+    print("Cleaned dataset head:")
+    print(result_df.head())
