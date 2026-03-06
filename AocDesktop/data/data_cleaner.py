@@ -139,3 +139,11 @@ def clean_dataset(dataframe, missing_strategy='mean', outlier_method='zscore'):
     cleaner.handle_missing_values(strategy=missing_strategy)
     cleaner.remove_outliers(method=outlier_method)
     return cleaner.get_cleaned_data()
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
