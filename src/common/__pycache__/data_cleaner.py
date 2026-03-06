@@ -1,54 +1,70 @@
+
 import pandas as pd
 
-def remove_duplicates(df, subset=None, keep='first'):
+def clean_dataset(df, drop_na=True, rename_columns=True):
     """
-    Remove duplicate rows from a DataFrame.
+    Clean a pandas DataFrame by handling missing values and standardizing column names.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-        subset (list, optional): Column labels to consider for duplicates.
-        keep (str, optional): Which duplicates to keep.
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_na (bool): If True, drop rows with any missing values.
+    rename_columns (bool): If True, rename columns to lowercase with underscores.
     
     Returns:
-        pd.DataFrame: DataFrame with duplicates removed.
+    pd.DataFrame: Cleaned DataFrame.
     """
-    if df.empty:
-        return df
+    cleaned_df = df.copy()
     
-    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    if drop_na:
+        cleaned_df = cleaned_df.dropna()
+    
+    if rename_columns:
+        cleaned_df.columns = (
+            cleaned_df.columns
+            .str.lower()
+            .str.replace(' ', '_')
+            .str.replace(r'[^\w_]', '', regex=True)
+        )
+    
     return cleaned_df
 
-def clean_numeric_column(df, column_name):
+def validate_dataset(df, required_columns=None):
     """
-    Clean a numeric column by converting to float and handling errors.
+    Validate a DataFrame for required columns and data types.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-        column_name (str): Name of column to clean.
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
     
     Returns:
-        pd.DataFrame: DataFrame with cleaned column.
+    bool: True if validation passes, False otherwise.
     """
-    if column_name not in df.columns:
-        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
     
-    df[column_name] = pd.to_numeric(df[column_name], errors='coerce')
-    return df
-
-def validate_dataframe(df, required_columns):
-    """
-    Validate that DataFrame contains required columns.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_columns (list): List of required column names.
-    
-    Returns:
-        bool: True if all required columns are present.
-    """
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    
-    if missing_columns:
-        raise ValueError(f"Missing required columns: {missing_columns}")
+    if df.empty:
+        print("DataFrame is empty")
+        return False
     
     return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'First Name': ['Alice', 'Bob', None],
+        'Last Name': ['Smith', 'Johnson', 'Williams'],
+        'Age': [25, 30, 35],
+        'Email Address': ['alice@test.com', 'bob@test.com', 'charlie@test.com']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned = clean_dataset(df)
+    print(cleaned)
+    
+    is_valid = validate_dataset(cleaned, ['first_name', 'last_name', 'age'])
+    print(f"\nDataset validation: {is_valid}")
