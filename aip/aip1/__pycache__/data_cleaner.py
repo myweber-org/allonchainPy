@@ -536,4 +536,68 @@ if __name__ == "__main__":
     # Validate structure
     is_valid, message = validate_csv_structure('sample_data_cleaned.csv', 
                                                required_columns=['id', 'value', 'category'])
-    print(f"Validation: {is_valid} - {message}")
+    print(f"Validation: {is_valid} - {message}")import pandas as pd
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing null values and duplicate rows.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to be cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Remove duplicate rows
+    df_cleaned = df_cleaned.drop_duplicates()
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def filter_by_threshold(df, column, threshold):
+    """
+    Filter DataFrame rows where column values exceed a threshold.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column (str): Column name to filter on.
+        threshold (float): Threshold value.
+    
+    Returns:
+        pd.DataFrame: Filtered DataFrame.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    filtered_df = df[df[column] > threshold].copy()
+    return filtered_df
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, None, 4, 2],
+        'B': [5, 6, 7, None, 6],
+        'C': [10, 20, 30, 40, 50]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned_df = clean_dataset(df)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print("\n")
+    
+    filtered_df = filter_by_threshold(cleaned_df, 'C', 25)
+    print("Filtered DataFrame (C > 25):")
+    print(filtered_df)
