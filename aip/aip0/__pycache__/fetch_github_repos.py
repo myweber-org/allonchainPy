@@ -38,4 +38,32 @@ if __name__ == "__main__":
 
     repos = fetch_github_repos(username, page, per_page)
     if repos is not None:
-        display_repos(repos)
+        display_repos(repos)import requests
+import sys
+
+def fetch_public_repos(username):
+    """Fetch and return a list of public repository names for a given GitHub username."""
+    url = f"https://api.github.com/users/{username}/repos"
+    response = requests.get(url)
+    
+    if response.status_code == 200:
+        repos = response.json()
+        return [repo['name'] for repo in repos]
+    else:
+        print(f"Error: Unable to fetch repositories. Status code: {response.status_code}")
+        return []
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python fetch_github_repos.py <github_username>")
+        sys.exit(1)
+    
+    username = sys.argv[1]
+    repo_list = fetch_public_repos(username)
+    
+    if repo_list:
+        print(f"Public repositories for user '{username}':")
+        for repo in repo_list:
+            print(f"  - {repo}")
+    else:
+        print(f"No public repositories found for user '{username}'.")
