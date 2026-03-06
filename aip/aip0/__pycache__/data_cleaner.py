@@ -59,4 +59,120 @@ def validate_dataframe(df, required_columns=None, min_rows=1):
         if missing_cols:
             return False, f"Missing required columns: {missing_cols}"
     
-    return True, "DataFrame is valid"
+    return True, "DataFrame is valid"import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns=None, threshold=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to process (default: all numeric columns)
+        threshold: IQR multiplier for outlier detection
+        
+    Returns:
+        DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            
+            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+            df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def normalize_minmax(df, columns=None, feature_range=(0, 1)):
+    """
+    Normalize data using min-max scaling.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to normalize (default: all numeric columns)
+        feature_range: tuple of (min, max) for scaled values
+        
+    Returns:
+        DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_normalized = df.copy()
+    min_val, max_val = feature_range
+    
+    for col in columns:
+        if col in df.columns:
+            col_min = df[col].min()
+            col_max = df[col].max()
+            
+            if col_max != col_min:
+                df_normalized[col] = (df[col] - col_min) / (col_max - col_min)
+                df_normalized[col] = df_normalized[col] * (max_val - min_val) + min_val
+    
+    return df_normalized
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        strategy: 'mean', 'median', 'mode', or 'drop'
+        columns: list of column names to process (default: all columns)
+        
+    Returns:
+        DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = df.columns
+    
+    df_processed = df.copy()
+    
+    for col in columns:
+        if col in df.columns and df[col].isnull().any():
+            if strategy == 'drop':
+                df_processed = df_processed.dropna(subset=[col])
+            elif strategy == 'mean' and pd.api.types.is_numeric_dtype(df[col]):
+                df_processed[col] = df[col].fillna(df[col].mean())
+            elif strategy == 'median' and pd.api.types.is_numeric_dtype(df[col]):
+                df_processed[col] = df[col].fillna(df[col].median())
+            elif strategy == 'mode':
+                df_processed[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else None)
+    
+    return df_processed.reset_index(drop=True) if strategy == 'drop' else df_processed
+
+def clean_dataset(df, outlier_params=None, missing_params=None, normalize_params=None):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        df: pandas DataFrame
+        outlier_params: dict of parameters for remove_outliers_iqr
+        missing_params: dict of parameters for handle_missing_values
+        normalize_params: dict of parameters for normalize_minmax
+        
+    Returns:
+        Cleaned DataFrame
+    """
+    df_clean = df.copy()
+    
+    if missing_params:
+        df_clean = handle_missing_values(df_clean, **missing_params)
+    
+    if outlier_params:
+        df_clean = remove_outliers_iqr(df_clean, **outlier_params)
+    
+    if normalize_params:
+        df_clean = normalize_minmax(df_clean, **normalize_params)
+    
+    return df_clean
