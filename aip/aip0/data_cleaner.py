@@ -1,99 +1,44 @@
 
-import numpy as np
-import pandas as pd
-from scipy import stats
+import csv
+import sys
 
-def remove_outliers_iqr(data, column, threshold=1.5):
-    """
-    Remove outliers using IQR method
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    q1 = data[column].quantile(0.25)
-    q3 = data[column].quantile(0.75)
-    iqr = q3 - q1
-    lower_bound = q1 - threshold * iqr
-    upper_bound = q3 + threshold * iqr
-    
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data.copy()
+def clean_csv(input_file, output_file):
+    seen = set()
+    cleaned_rows = []
 
-def normalize_minmax(data, column):
-    """
-    Normalize data using min-max scaling
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    min_val = data[column].min()
-    max_val = data[column].max()
-    
-    if max_val == min_val:
-        return data[column].copy()
-    
-    normalized = (data[column] - min_val) / (max_val - min_val)
-    return normalized
+    try:
+        with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+            reader = csv.reader(infile)
+            headers = next(reader)
+            for row in reader:
+                if not row:
+                    continue
+                row_tuple = tuple(row)
+                if row_tuple in seen:
+                    continue
+                seen.add(row_tuple)
+                cleaned_rows.append(row)
 
-def standardize_zscore(data, column):
-    """
-    Standardize data using z-score normalization
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    
-    if std_val == 0:
-        return data[column].copy()
-    
-    standardized = (data[column] - mean_val) / std_val
-    return standardized
+        with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+            writer = csv.writer(outfile)
+            writer.writerow(headers)
+            writer.writerows(cleaned_rows)
 
-def handle_missing_values(data, strategy='mean', columns=None):
-    """
-    Handle missing values with specified strategy
-    """
-    if columns is None:
-        columns = data.columns
-    
-    data_copy = data.copy()
-    
-    for col in columns:
-        if col not in data.columns:
-            continue
-            
-        if data[col].isnull().any():
-            if strategy == 'mean':
-                fill_value = data[col].mean()
-            elif strategy == 'median':
-                fill_value = data[col].median()
-            elif strategy == 'mode':
-                fill_value = data[col].mode()[0]
-            elif strategy == 'drop':
-                data_copy = data_copy.dropna(subset=[col])
-                continue
-            else:
-                raise ValueError(f"Unknown strategy: {strategy}")
-            
-            data_copy[col] = data_copy[col].fillna(fill_value)
-    
-    return data_copy
+        print(f"Cleaned data saved to {output_file}")
+        print(f"Removed {len(seen) - len(cleaned_rows)} duplicate rows")
 
-def validate_dataframe(data, required_columns=None):
-    """
-    Validate DataFrame structure and content
-    """
-    if not isinstance(data, pd.DataFrame):
-        raise TypeError("Input must be a pandas DataFrame")
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: python data_cleaner.py <input_file> <output_file>")
+        sys.exit(1)
     
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in data.columns]
-        if missing_cols:
-            raise ValueError(f"Missing required columns: {missing_cols}")
-    
-    if data.empty:
-        raise ValueError("DataFrame is empty")
-    
-    return True
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    clean_csv(input_file, output_file)
