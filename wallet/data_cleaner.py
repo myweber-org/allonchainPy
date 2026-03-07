@@ -94,3 +94,66 @@ if __name__ == "__main__":
     print("\nCleaning Report:")
     for key, value in report.items():
         print(f"{key}: {value:.2f}" if isinstance(value, float) else f"{key}: {value}")
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Args:
+        data (np.ndarray): Input data array
+        column (int): Index of column to clean
+    
+    Returns:
+        np.ndarray: Data with outliers removed
+    """
+    if data.size == 0:
+        return data
+    
+    col_data = data[:, column]
+    q1 = np.percentile(col_data, 25)
+    q3 = np.percentile(col_data, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    mask = (col_data >= lower_bound) & (col_data <= upper_bound)
+    return data[mask]
+
+def calculate_statistics(data):
+    """
+    Calculate basic statistics for the data.
+    
+    Args:
+        data (np.ndarray): Input data array
+    
+    Returns:
+        dict: Dictionary containing mean, median, and std
+    """
+    if data.size == 0:
+        return {'mean': 0, 'median': 0, 'std': 0}
+    
+    return {
+        'mean': np.mean(data, axis=0),
+        'median': np.median(data, axis=0),
+        'std': np.std(data, axis=0)
+    }
+
+def validate_data(data):
+    """
+    Validate data for NaN values and infinite values.
+    
+    Args:
+        data (np.ndarray): Input data array
+    
+    Returns:
+        bool: True if data is valid, False otherwise
+    """
+    if data.size == 0:
+        return False
+    
+    has_nan = np.any(np.isnan(data))
+    has_inf = np.any(np.isinf(data))
+    
+    return not (has_nan or has_inf)
