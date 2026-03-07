@@ -1,213 +1,109 @@
 
 import pandas as pd
-import numpy as np
-from typing import List, Optional
 
-def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+def remove_duplicates(dataframe, subset=None, keep='first'):
     """
-    Remove duplicate rows from DataFrame.
+    Remove duplicate rows from a pandas DataFrame.
     
     Args:
-        df: Input DataFrame
-        subset: Columns to consider for identifying duplicates
+        dataframe (pd.DataFrame): Input DataFrame
+        subset (list, optional): Column labels to consider for duplicates
+        keep (str, optional): Which duplicates to keep ('first', 'last', False)
     
     Returns:
-        DataFrame with duplicates removed
+        pd.DataFrame: DataFrame with duplicates removed
     """
-    return df.drop_duplicates(subset=subset, keep='first')
+    if dataframe.empty:
+        return dataframe
+    
+    cleaned_df = dataframe.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(dataframe) - len(cleaned_df)
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate row(s)")
+    
+    return cleaned_df
 
-def handle_missing_values(df: pd.DataFrame, strategy: str = 'drop', fill_value: any = None) -> pd.DataFrame:
+def clean_numeric_columns(dataframe, columns):
     """
-    Handle missing values in DataFrame.
+    Clean numeric columns by converting to appropriate types and handling errors.
     
     Args:
-        df: Input DataFrame
-        strategy: 'drop' to remove rows, 'fill' to fill values
-        fill_value: Value to use when strategy is 'fill'
+        dataframe (pd.DataFrame): Input DataFrame
+        columns (list): List of column names to clean
     
     Returns:
-        DataFrame with handled missing values
+        pd.DataFrame: DataFrame with cleaned numeric columns
     """
-    if strategy == 'drop':
-        return df.dropna()
-    elif strategy == 'fill':
-        return df.fillna(fill_value)
-    else:
-        raise ValueError("Strategy must be 'drop' or 'fill'")
+    for col in columns:
+        if col in dataframe.columns:
+            dataframe[col] = pd.to_numeric(dataframe[col], errors='coerce')
+    
+    return dataframe
 
-def validate_dataframe(df: pd.DataFrame, required_columns: List[str]) -> bool:
+def validate_dataframe(dataframe, required_columns):
     """
-    Validate DataFrame structure and content.
+    Validate that DataFrame contains required columns.
     
     Args:
-        df: DataFrame to validate
-        required_columns: List of columns that must be present
+        dataframe (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
     
     Returns:
-        True if validation passes, False otherwise
+        bool: True if all required columns are present
     """
-    if not isinstance(df, pd.DataFrame):
+    missing_columns = [col for col in required_columns if col not in dataframe.columns]
+    
+    if missing_columns:
+        print(f"Missing required columns: {missing_columns}")
         return False
     
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    return len(missing_columns) == 0
+    return True
 
-def clean_column_names(df: pd.DataFrame) -> pd.DataFrame:
+def process_dataset(file_path, output_path=None):
     """
-    Standardize column names by converting to lowercase and replacing spaces.
+    Main function to process a dataset file.
     
     Args:
-        df: Input DataFrame
+        file_path (str): Path to input file
+        output_path (str, optional): Path to save cleaned data
     
     Returns:
-        DataFrame with cleaned column names
+        pd.DataFrame: Cleaned DataFrame
     """
-    df.columns = df.columns.str.lower().str.replace(' ', '_')
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return None
+    
+    required_cols = ['id', 'value', 'timestamp']
+    if not validate_dataframe(df, required_cols):
+        return None
+    
+    df = remove_duplicates(df, subset=['id'])
+    df = clean_numeric_columns(df, ['value'])
+    
+    if output_path:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to {output_path}")
+    
     return df
 
-def filter_outliers(df: pd.DataFrame, column: str, threshold: float = 3.0) -> pd.DataFrame:
-    """
-    Remove outliers using z-score method.
-    
-    Args:
-        df: Input DataFrame
-        column: Column to check for outliers
-        threshold: Z-score threshold
-    
-    Returns:
-        DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        return df
-    
-    z_scores = np.abs((df[column] - df[column].mean()) / df[column].std())
-    return df[z_scores < threshold]
-import pandas as pd
-import numpy as np
-from scipy import stats
-
-class DataCleaner:
-    def __init__(self, df):
-        self.df = df.copy()
-        self.numeric_columns = df.select_dtypes(include=[np.number]).columns
-        self.categorical_columns = df.select_dtypes(exclude=[np.number]).columns
-    
-    def handle_missing_values(self, strategy='mean', fill_value=None):
-        if strategy == 'mean':
-            for col in self.numeric_columns:
-                self.df[col] = self.df[col].fillna(self.df[col].mean())
-        elif strategy == 'median':
-            for col in self.numeric_columns:
-                self.df[col] = self.df[col].fillna(self.df[col].median())
-        elif strategy == 'mode':
-            for col in self.df.columns:
-                self.df[col] = self.df[col].fillna(self.df[col].mode()[0])
-        elif strategy == 'constant' and fill_value is not None:
-            self.df = self.df.fillna(fill_value)
-        return self
-    
-    def remove_outliers(self, method='zscore', threshold=3):
-        if method == 'zscore':
-            z_scores = np.abs(stats.zscore(self.df[self.numeric_columns]))
-            mask = (z_scores < threshold).all(axis=1)
-            self.df = self.df[mask]
-        elif method == 'iqr':
-            for col in self.numeric_columns:
-                Q1 = self.df[col].quantile(0.25)
-                Q3 = self.df[col].quantile(0.75)
-                IQR = Q3 - Q1
-                lower_bound = Q1 - 1.5 * IQR
-                upper_bound = Q3 + 1.5 * IQR
-                mask = (self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)
-                self.df = self.df[mask]
-        return self
-    
-    def get_cleaned_data(self):
-        return self.df
-    
-    def summary(self):
-        print("Data Summary:")
-        print(f"Original shape: {self.df.shape}")
-        print(f"Numeric columns: {list(self.numeric_columns)}")
-        print(f"Categorical columns: {list(self.categorical_columns)}")
-        print(f"Missing values per column:")
-        print(self.df.isnull().sum())
-
-def clean_dataset(dataframe, missing_strategy='mean', outlier_method='zscore'):
-    cleaner = DataCleaner(dataframe)
-    cleaner.summary()
-    cleaner.handle_missing_values(strategy=missing_strategy)
-    cleaner.remove_outliers(method=outlier_method)
-    return cleaner.get_cleaned_data()
-def remove_duplicates_preserve_order(sequence):
-    seen = set()
-    result = []
-    for item in sequence:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
-import numpy as np
-
-def remove_outliers_iqr(data, column):
-    """
-    Remove outliers from a pandas DataFrame column using the IQR method.
-    
-    Parameters:
-    data (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
-    """
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
-
-def calculate_statistics(data, column):
-    """
-    Calculate basic statistics for a DataFrame column.
-    
-    Parameters:
-    data (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
-    
-    Returns:
-    dict: Dictionary containing statistics
-    """
-    stats = {
-        'mean': np.mean(data[column]),
-        'median': np.median(data[column]),
-        'std': np.std(data[column]),
-        'min': np.min(data[column]),
-        'max': np.max(data[column]),
-        'count': len(data[column])
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 4],
+        'value': ['100', '200', '200', '300', '400', 'abc'],
+        'timestamp': ['2023-01-01', '2023-01-02', '2023-01-02', '2023-01-03', '2023-01-04', '2023-01-04']
     }
-    return stats
-
-def normalize_column(data, column):
-    """
-    Normalize a column using min-max scaling.
     
-    Parameters:
-    data (pd.DataFrame): Input DataFrame
-    column (str): Column name to normalize
-    
-    Returns:
-    pd.DataFrame: DataFrame with normalized column
-    """
-    min_val = data[column].min()
-    max_val = data[column].max()
-    
-    if max_val - min_val != 0:
-        data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
-    else:
-        data[column + '_normalized'] = 0
-    
-    return data
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned = remove_duplicates(df, subset=['id', 'timestamp'])
+    cleaned = clean_numeric_columns(cleaned, ['value'])
+    print(cleaned)
