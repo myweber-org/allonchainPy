@@ -84,3 +84,95 @@ def filter_by_threshold(data, threshold, keep_above=True):
         return [x for x in data if x > threshold]
     else:
         return [x for x in data if x <= threshold]
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def standardize_zscore(df, column):
+    mean_val = df[column].mean()
+    std_val = df[column].std()
+    df[column + '_standardized'] = (df[column] - mean_val) / std_val
+    return df
+
+def handle_missing_values(df, strategy='mean'):
+    if strategy == 'mean':
+        return df.fillna(df.mean())
+    elif strategy == 'median':
+        return df.fillna(df.median())
+    elif strategy == 'mode':
+        return df.fillna(df.mode().iloc[0])
+    elif strategy == 'drop':
+        return df.dropna()
+    else:
+        raise ValueError("Invalid strategy. Choose from 'mean', 'median', 'mode', or 'drop'")
+
+def clean_dataset(df, numeric_columns, outlier_removal=True, normalization='minmax', missing_strategy='mean'):
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col not in cleaned_df.columns:
+            continue
+            
+        if missing_strategy:
+            cleaned_df = handle_missing_values(cleaned_df[[col]], strategy=missing_strategy)
+        
+        if outlier_removal:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+        
+        if normalization == 'minmax':
+            cleaned_df = normalize_minmax(cleaned_df, col)
+        elif normalization == 'zscore':
+            cleaned_df = standardize_zscore(cleaned_df, col)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns, numeric_threshold=0.8):
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        return False, f"Missing required columns: {missing_columns}"
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) / len(df.columns) < numeric_threshold:
+        return False, f"Less than {numeric_threshold*100}% of columns are numeric"
+    
+    return True, "Data validation passed"
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': np.random.normal(100, 15, 100),
+        'B': np.random.exponential(50, 100),
+        'C': np.random.randint(1, 1000, 100)
+    })
+    
+    sample_data.iloc[5, 0] = np.nan
+    sample_data.iloc[10, 1] = np.nan
+    
+    print("Original data shape:", sample_data.shape)
+    print("Original data head:\n", sample_data.head())
+    
+    is_valid, message = validate_data(sample_data, ['A', 'B', 'C'])
+    print(f"Validation: {is_valid} - {message}")
+    
+    cleaned_data = clean_dataset(
+        sample_data, 
+        numeric_columns=['A', 'B', 'C'],
+        outlier_removal=True,
+        normalization='minmax',
+        missing_strategy='mean'
+    )
+    
+    print("\nCleaned data shape:", cleaned_data.shape)
+    print("Cleaned data head:\n", cleaned_data.head())
