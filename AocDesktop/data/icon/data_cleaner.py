@@ -310,3 +310,37 @@ if __name__ == "__main__":
     filtered = remove_outliers_iqr(cleaned, columns=['A', 'B'])
     print("\nDataFrame after outlier removal:")
     print(filtered)
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def clean_dataset(filepath, numeric_columns):
+    df = pd.read_csv(filepath)
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            df = remove_outliers_iqr(df, col)
+            df = normalize_minmax(df, col)
+    
+    df.to_csv('cleaned_data.csv', index=False)
+    return df
+
+if __name__ == "__main__":
+    numeric_cols = ['age', 'income', 'score']
+    cleaned_df = clean_dataset('raw_data.csv', numeric_cols)
+    print(f"Cleaned dataset shape: {cleaned_df.shape}")
+    print("Data cleaning completed successfully.")
