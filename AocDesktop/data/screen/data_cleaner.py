@@ -141,4 +141,144 @@ def validate_data(df, required_columns, allow_nan=False):
         if df.isnull().any().any():
             raise ValueError("Dataset contains NaN values")
     
-    return True
+    return Trueimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns=None, factor=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to process (default: all numeric columns)
+        factor: multiplier for IQR (default: 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    for col in columns:
+        Q1 = df_clean[col].quantile(0.25)
+        Q3 = df_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - factor * IQR
+        upper_bound = Q3 + factor * IQR
+        
+        mask = (df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)
+        df_clean = df_clean[mask]
+    
+    return df_clean
+
+def normalize_minmax(df, columns=None, feature_range=(0, 1)):
+    """
+    Normalize data using min-max scaling.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to normalize (default: all numeric columns)
+        feature_range: tuple of (min, max) for scaled features
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_norm = df.copy()
+    min_val, max_val = feature_range
+    
+    for col in columns:
+        col_min = df_norm[col].min()
+        col_max = df_norm[col].max()
+        
+        if col_max - col_min == 0:
+            df_norm[col] = min_val
+        else:
+            df_norm[col] = min_val + (df_norm[col] - col_min) * (max_val - min_val) / (col_max - col_min)
+    
+    return df_norm
+
+def standardize_zscore(df, columns=None):
+    """
+    Standardize data using z-score normalization.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to standardize (default: all numeric columns)
+    
+    Returns:
+        DataFrame with standardized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_std = df.copy()
+    
+    for col in columns:
+        mean_val = df_std[col].mean()
+        std_val = df_std[col].std()
+        
+        if std_val == 0:
+            df_std[col] = 0
+        else:
+            df_std[col] = (df_std[col] - mean_val) / std_val
+    
+    return df_std
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        strategy: 'mean', 'median', 'mode', or 'drop'
+        columns: list of column names to process (default: all columns)
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = df.columns
+    
+    df_handled = df.copy()
+    
+    for col in columns:
+        if strategy == 'drop':
+            df_handled = df_handled.dropna(subset=[col])
+        elif strategy == 'mean' and pd.api.types.is_numeric_dtype(df_handled[col]):
+            df_handled[col] = df_handled[col].fillna(df_handled[col].mean())
+        elif strategy == 'median' and pd.api.types.is_numeric_dtype(df_handled[col]):
+            df_handled[col] = df_handled[col].fillna(df_handled[col].median())
+        elif strategy == 'mode':
+            df_handled[col] = df_handled[col].fillna(df_handled[col].mode()[0])
+    
+    return df_handled
+
+def create_data_pipeline(df, steps):
+    """
+    Create a data cleaning pipeline with multiple steps.
+    
+    Args:
+        df: pandas DataFrame
+        steps: list of tuples (function_name, kwargs)
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    for step_func, kwargs in steps:
+        if step_func == 'remove_outliers':
+            cleaned_df = remove_outliers_iqr(cleaned_df, **kwargs)
+        elif step_func == 'normalize':
+            cleaned_df = normalize_minmax(cleaned_df, **kwargs)
+        elif step_func == 'standardize':
+            cleaned_df = standardize_zscore(cleaned_df, **kwargs)
+        elif step_func == 'handle_missing':
+            cleaned_df = handle_missing_values(cleaned_df, **kwargs)
+    
+    return cleaned_df
