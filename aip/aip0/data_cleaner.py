@@ -1,47 +1,29 @@
-def remove_duplicates_preserve_order(sequence):
-    seen = set()
-    result = []
-    for item in sequence:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return resultimport numpy as np
 import pandas as pd
+import numpy as np
 
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+def load_data(filepath):
+    """Load data from a CSV file."""
+    return pd.read_csv(filepath)
 
-def normalize_minmax(df, column):
+def remove_outliers(df, column, threshold=3):
+    """Remove outliers using the Z-score method."""
+    z_scores = np.abs((df[column] - df[column].mean()) / df[column].std())
+    return df[z_scores < threshold]
+
+def normalize_column(df, column):
+    """Normalize a column using Min-Max scaling."""
     min_val = df[column].min()
     max_val = df[column].max()
-    if max_val == min_val:
-        return df[column].apply(lambda x: 0.0)
-    return df[column].apply(lambda x: (x - min_val) / (max_val - min_val))
+    df[column] = (df[column] - min_val) / (max_val - min_val)
+    return df
 
-def clean_dataset(df, numeric_columns):
-    cleaned_df = df.copy()
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-            cleaned_df[col] = normalize_minmax(cleaned_df, col)
-    return cleaned_df.reset_index(drop=True)
+def clean_data(input_file, output_file, column_to_clean):
+    """Main function to load, clean, and save data."""
+    df = load_data(input_file)
+    df = remove_outliers(df, column_to_clean)
+    df = normalize_column(df, column_to_clean)
+    df.to_csv(output_file, index=False)
+    print(f"Cleaned data saved to {output_file}")
 
-def validate_cleaning(df_before, df_after, column):
-    stats_before = {
-        'mean': df_before[column].mean(),
-        'std': df_before[column].std(),
-        'min': df_before[column].min(),
-        'max': df_before[column].max()
-    }
-    stats_after = {
-        'mean': df_after[column].mean(),
-        'std': df_after[column].std(),
-        'min': df_after[column].min(),
-        'max': df_after[column].max()
-    }
-    return {'before': stats_before, 'after': stats_after}
+if __name__ == "__main__":
+    clean_data('raw_data.csv', 'cleaned_data.csv', 'value')
