@@ -1,55 +1,56 @@
 
-import pandas as pd
-import numpy as np
-
-def remove_outliers_iqr(df, column):
+def remove_duplicates(data_list):
     """
-    Remove outliers from a specified column in a DataFrame using the IQR method.
+    Remove duplicate entries from a list while preserving order.
     
-    Parameters:
-    df (pd.DataFrame): The input DataFrame.
-    column (str): The column name to clean.
+    Args:
+        data_list: List containing potentially duplicate items.
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed from the specified column.
+        List with duplicates removed.
     """
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    seen = set()
+    result = []
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    return filtered_df
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    
+    return result
 
-def clean_dataset(df, numeric_columns):
+def clean_numeric_data(values, remove_negative=False):
     """
-    Clean a dataset by removing outliers from multiple numeric columns.
+    Clean numeric data by removing non-numeric values and optionally negative values.
     
-    Parameters:
-    df (pd.DataFrame): The input DataFrame.
-    numeric_columns (list): List of column names to clean.
+    Args:
+        values: List of values to clean.
+        remove_negative: Boolean flag to remove negative values.
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame.
+        List of cleaned numeric values.
     """
-    cleaned_df = df.copy()
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-    return cleaned_df.reset_index(drop=True)
+    cleaned = []
+    
+    for value in values:
+        try:
+            num = float(value)
+            if remove_negative and num < 0:
+                continue
+            cleaned.append(num)
+        except (ValueError, TypeError):
+            continue
+    
+    return cleaned
 
 if __name__ == "__main__":
-    sample_data = {
-        'A': np.random.randn(100),
-        'B': np.random.exponential(2, 100),
-        'C': np.random.uniform(0, 10, 100)
-    }
-    sample_df = pd.DataFrame(sample_data)
-    sample_df.loc[0, 'A'] = 100
-    sample_df.loc[1, 'B'] = 50
+    # Example usage
+    sample_data = [1, 2, 2, 3, 4, 4, 5, 1, 6]
+    cleaned_data = remove_duplicates(sample_data)
+    print(f"Original: {sample_data}")
+    print(f"Cleaned: {cleaned_data}")
     
-    print("Original shape:", sample_df.shape)
-    cleaned = clean_dataset(sample_df, ['A', 'B', 'C'])
-    print("Cleaned shape:", cleaned.shape)
-    print("Outliers removed:", sample_df.shape[0] - cleaned.shape[0])
+    mixed_data = [1, "2", "abc", 3.5, -2, None, 7]
+    numeric_data = clean_numeric_data(mixed_data, remove_negative=True)
+    print(f"Mixed data: {mixed_data}")
+    print(f"Numeric only: {numeric_data}")
