@@ -753,4 +753,207 @@ def remove_outliers_iqr(df, column, multiplier=1.5):
     
     filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
-    return filtered_df
+    return filtered_dfimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns=None, factor=1.5):
+    """
+    Remove outliers using IQR method.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to process (None for all numeric columns)
+        factor: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - factor * IQR
+            upper_bound = Q3 + factor * IQR
+            
+            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+            df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def normalize_minmax(df, columns=None, feature_range=(0, 1)):
+    """
+    Normalize data using min-max scaling.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to normalize (None for all numeric columns)
+        feature_range: tuple of (min, max) for output range
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_norm = df.copy()
+    min_val, max_val = feature_range
+    
+    for col in columns:
+        if col in df.columns:
+            col_min = df[col].min()
+            col_max = df[col].max()
+            
+            if col_max != col_min:
+                df_norm[col] = (df[col] - col_min) / (col_max - col_min)
+                df_norm[col] = df_norm[col] * (max_val - min_val) + min_val
+    
+    return df_norm
+
+def zscore_normalize(df, columns=None):
+    """
+    Normalize data using z-score standardization.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to normalize (None for all numeric columns)
+    
+    Returns:
+        DataFrame with z-score normalized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_z = df.copy()
+    
+    for col in columns:
+        if col in df.columns:
+            mean_val = df[col].mean()
+            std_val = df[col].std()
+            
+            if std_val > 0:
+                df_z[col] = (df[col] - mean_val) / std_val
+    
+    return df_z
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        strategy: 'mean', 'median', 'mode', or 'drop'
+        columns: list of column names to process (None for all columns)
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = df.columns
+    
+    df_processed = df.copy()
+    
+    for col in columns:
+        if col in df.columns and df[col].isnull().any():
+            if strategy == 'mean' and pd.api.types.is_numeric_dtype(df[col]):
+                df_processed[col].fillna(df[col].mean(), inplace=True)
+            elif strategy == 'median' and pd.api.types.is_numeric_dtype(df[col]):
+                df_processed[col].fillna(df[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df_processed[col].fillna(df[col].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                df_processed = df_processed.dropna(subset=[col])
+    
+    return df_processed
+
+def create_data_summary(df):
+    """
+    Create a comprehensive summary of the DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+    
+    Returns:
+        Dictionary containing data summary
+    """
+    summary = {
+        'shape': df.shape,
+        'dtypes': df.dtypes.to_dict(),
+        'missing_values': df.isnull().sum().to_dict(),
+        'numeric_stats': {},
+        'categorical_stats': {}
+    }
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        summary['numeric_stats'][col] = {
+            'mean': df[col].mean(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            '25%': df[col].quantile(0.25),
+            '50%': df[col].median(),
+            '75%': df[col].quantile(0.75),
+            'max': df[col].max(),
+            'skewness': df[col].skew(),
+            'kurtosis': df[col].kurtosis()
+        }
+    
+    categorical_cols = df.select_dtypes(include=['object', 'category']).columns
+    for col in categorical_cols:
+        summary['categorical_stats'][col] = {
+            'unique_count': df[col].nunique(),
+            'top_value': df[col].mode()[0] if not df[col].mode().empty else None,
+            'top_frequency': df[col].value_counts().iloc[0] if not df[col].value_counts().empty else 0
+        }
+    
+    return summary
+
+def detect_skewed_columns(df, threshold=0.5):
+    """
+    Detect columns with significant skewness.
+    
+    Args:
+        df: pandas DataFrame
+        threshold: absolute skewness threshold
+    
+    Returns:
+        List of column names with skewness above threshold
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    skewed_cols = []
+    
+    for col in numeric_cols:
+        skewness = df[col].skew()
+        if abs(skewness) > threshold:
+            skewed_cols.append((col, skewness))
+    
+    return sorted(skewed_cols, key=lambda x: abs(x[1]), reverse=True)
+
+def log_transform(df, columns):
+    """
+    Apply log transformation to specified columns.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to transform
+    
+    Returns:
+        DataFrame with log-transformed columns
+    """
+    df_transformed = df.copy()
+    
+    for col in columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            min_val = df[col].min()
+            if min_val <= 0:
+                shift = abs(min_val) + 1
+                df_transformed[col] = np.log(df[col] + shift)
+            else:
+                df_transformed[col] = np.log(df[col])
+    
+    return df_transformed
