@@ -133,3 +133,69 @@ if __name__ == "__main__":
     city = ' '.join(sys.argv[2:])
     weather_data = get_weather(api_key, city)
     display_weather(weather_data)
+import requests
+import logging
+from datetime import datetime
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+class WeatherFetcher:
+    def __init__(self, api_key):
+        self.api_key = api_key
+        self.base_url = "http://api.openweathermap.org/data/2.5/weather"
+    
+    def get_weather(self, city):
+        try:
+            params = {
+                'q': city,
+                'appid': self.api_key,
+                'units': 'metric'
+            }
+            response = requests.get(self.base_url, params=params, timeout=10)
+            response.raise_for_status()
+            
+            data = response.json()
+            weather_info = {
+                'city': data['name'],
+                'temperature': data['main']['temp'],
+                'humidity': data['main']['humidity'],
+                'description': data['weather'][0]['description'],
+                'timestamp': datetime.now().isoformat()
+            }
+            logging.info(f"Weather data fetched successfully for {city}")
+            return weather_info
+            
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Failed to fetch weather data: {e}")
+            return None
+        except KeyError as e:
+            logging.error(f"Unexpected API response format: {e}")
+            return None
+    
+    def format_weather_report(self, weather_data):
+        if not weather_data:
+            return "Unable to retrieve weather information."
+        
+        report = f"""
+        Weather Report for {weather_data['city']}:
+        Temperature: {weather_data['temperature']}°C
+        Humidity: {weather_data['humidity']}%
+        Conditions: {weather_data['description'].title()}
+        Last Updated: {weather_data['timestamp']}
+        """
+        return report
+
+def main():
+    api_key = "your_api_key_here"
+    fetcher = WeatherFetcher(api_key)
+    
+    cities = ["London", "New York", "Tokyo", "Paris"]
+    
+    for city in cities:
+        weather = fetcher.get_weather(city)
+        if weather:
+            print(fetcher.format_weather_report(weather))
+            print("-" * 40)
+
+if __name__ == "__main__":
+    main()
