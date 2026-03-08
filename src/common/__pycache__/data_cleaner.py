@@ -419,3 +419,79 @@ def validate_data(data, required_columns=None, allow_nan=False):
         return False, "Dataset contains NaN values"
     
     return True, "Dataset is valid"
+import pandas as pd
+import re
+
+def clean_text_column(df, column_name):
+    """
+    Standardize text by converting to lowercase, removing extra spaces,
+    and stripping special characters (except alphanumeric and spaces).
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    df[column_name] = df[column_name].astype(str)
+    df[column_name] = df[column_name].str.lower()
+    df[column_name] = df[column_name].str.strip()
+    df[column_name] = df[column_name].apply(lambda x: re.sub(r'[^a-z0-9\s]', '', x))
+    df[column_name] = df[column_name].apply(lambda x: re.sub(r'\s+', ' ', x))
+    
+    return df
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def validate_email_column(df, column_name):
+    """
+    Validate email format in a column and return a boolean series.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return df[column_name].astype(str).str.match(email_pattern)
+
+def clean_dataset(df, text_columns=None, deduplicate=True, email_columns=None):
+    """
+    Main function to clean dataset with multiple operations.
+    """
+    df_clean = df.copy()
+    
+    if text_columns:
+        for col in text_columns:
+            df_clean = clean_text_column(df_clean, col)
+    
+    if deduplicate:
+        df_clean = remove_duplicates(df_clean)
+    
+    if email_columns:
+        for col in email_columns:
+            validation_result = validate_email_column(df_clean, col)
+            df_clean[f'{col}_valid'] = validation_result
+    
+    return df_clean
+
+if __name__ == "__main__":
+    sample_data = {
+        'name': ['John Doe', 'Jane Smith  ', 'ALICE WONDER', 'John Doe'],
+        'email': ['john@example.com', 'invalid-email', 'alice@company.co', 'john@example.com'],
+        'notes': ['Important client!', 'Needs follow-up.', '  Regular customer  ', 'Important client!']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned_df = clean_dataset(
+        df, 
+        text_columns=['name', 'notes'],
+        deduplicate=True,
+        email_columns=['email']
+    )
+    
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
