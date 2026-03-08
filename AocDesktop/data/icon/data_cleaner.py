@@ -453,4 +453,129 @@ if __name__ == "__main__":
     print("\nCleaned DataFrame:")
     print(cleaned_df)
     print("\nCleaned Statistics:")
-    print(calculate_basic_stats(cleaned_df, 'values'))
+    print(calculate_basic_stats(cleaned_df, 'values'))import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas Series using the IQR method.
+    Returns cleaned Series and outlier indices.
+    """
+    if not isinstance(data, pd.Series):
+        raise TypeError("Input data must be a pandas Series")
+    
+    Q1 = data.quantile(0.25)
+    Q3 = data.quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    outlier_mask = (data < lower_bound) | (data > upper_bound)
+    cleaned_data = data[~outlier_mask]
+    outlier_indices = data[outlier_mask].index.tolist()
+    
+    return cleaned_data, outlier_indices
+
+def normalize_minmax(data):
+    """
+    Normalize data to [0, 1] range using min-max scaling.
+    """
+    if not isinstance(data, (pd.Series, np.ndarray, list)):
+        raise TypeError("Input must be array-like")
+    
+    data_array = np.array(data)
+    if len(data_array) == 0:
+        return data_array
+    
+    min_val = np.min(data_array)
+    max_val = np.max(data_array)
+    
+    if max_val == min_val:
+        return np.zeros_like(data_array)
+    
+    normalized = (data_array - min_val) / (max_val - min_val)
+    return normalized
+
+def z_score_normalize(data):
+    """
+    Normalize data using z-score standardization.
+    """
+    if not isinstance(data, (pd.Series, np.ndarray, list)):
+        raise TypeError("Input must be array-like")
+    
+    data_array = np.array(data)
+    if len(data_array) == 0:
+        return data_array
+    
+    mean_val = np.mean(data_array)
+    std_val = np.std(data_array)
+    
+    if std_val == 0:
+        return np.zeros_like(data_array)
+    
+    z_scores = (data_array - mean_val) / std_val
+    return z_scores
+
+def clean_dataframe(df, numeric_columns=None, method='iqr'):
+    """
+    Clean a DataFrame by removing outliers from numeric columns.
+    Supports 'iqr' and 'zscore' methods.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    removed_indices = {}
+    
+    for col in numeric_columns:
+        if col not in df.columns:
+            continue
+            
+        if method == 'iqr':
+            cleaned_series, outliers = remove_outliers_iqr(df[col], col)
+            cleaned_df = cleaned_df[~cleaned_df.index.isin(outliers)]
+            removed_indices[col] = outliers
+            
+        elif method == 'zscore':
+            z_scores = np.abs(stats.zscore(df[col].dropna()))
+            outlier_mask = z_scores > 3
+            outliers = df[col].index[outlier_mask].tolist()
+            cleaned_df = cleaned_df[~cleaned_df.index.isin(outliers)]
+            removed_indices[col] = outliers
+    
+    return cleaned_df, removed_indices
+
+def process_dataset(filepath, output_path=None):
+    """
+    Complete data processing pipeline: load, clean, normalize, and save.
+    """
+    try:
+        df = pd.read_csv(filepath)
+    except Exception as e:
+        raise ValueError(f"Failed to load dataset: {e}")
+    
+    original_shape = df.shape
+    cleaned_df, removed = clean_dataframe(df)
+    cleaned_shape = cleaned_df.shape
+    
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        cleaned_df[col] = normalize_minmax(cleaned_df[col])
+    
+    if output_path:
+        cleaned_df.to_csv(output_path, index=False)
+    
+    stats_report = {
+        'original_samples': original_shape[0],
+        'cleaned_samples': cleaned_shape[0],
+        'removed_samples': original_shape[0] - cleaned_shape[0],
+        'outliers_per_column': {k: len(v) for k, v in removed.items()},
+        'normalized_columns': numeric_cols.tolist()
+    }
+    
+    return cleaned_df, stats_report
