@@ -350,3 +350,108 @@ def remove_duplicates_preserve_order(input_list):
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a specified column in a DataFrame using the IQR method.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to process.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def clean_missing_data(df, strategy='mean'):
+    """
+    Handle missing values in numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    strategy (str): Strategy for imputation ('mean', 'median', 'mode', 'drop').
+    
+    Returns:
+    pd.DataFrame: DataFrame with missing values handled.
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'drop':
+        return df.dropna(subset=numeric_cols)
+    
+    for col in numeric_cols:
+        if df[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0]
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            df[col] = df[col].fillna(fill_value)
+    
+    return df
+
+def normalize_column(df, column):
+    """
+    Normalize a column to range [0, 1] using min-max scaling.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to normalize.
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = df[column].min()
+    max_val = df[column].max()
+    
+    if max_val == min_val:
+        df[column] = 0.5
+    else:
+        df[column] = (df[column] - min_val) / (max_val - min_val)
+    
+    return df
+
+def get_data_summary(df):
+    """
+    Generate a summary statistics DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    
+    Returns:
+    pd.DataFrame: Summary statistics for numeric columns.
+    """
+    summary = pd.DataFrame({
+        'count': df.count(),
+        'mean': df.mean(numeric_only=True),
+        'std': df.std(numeric_only=True),
+        'min': df.min(numeric_only=True),
+        '25%': df.quantile(0.25, numeric_only=True),
+        '50%': df.quantile(0.50, numeric_only=True),
+        '75%': df.quantile(0.75, numeric_only=True),
+        'max': df.max(numeric_only=True)
+    })
+    
+    return summary.transpose()
