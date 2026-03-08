@@ -183,3 +183,108 @@ def process_dataframe(df, operations=None):
                 )
     
     return result_df
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    outliers_removed = len(data) - len(filtered_data)
+    
+    return filtered_data, outliers_removed
+
+def z_score_normalize(data, column):
+    """
+    Normalize data using z-score method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column]
+    
+    normalized = (data[column] - mean_val) / std_val
+    return normalized
+
+def min_max_normalize(data, column, feature_range=(0, 1)):
+    """
+    Normalize data using min-max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column]
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    
+    if feature_range != (0, 1):
+        min_target, max_target = feature_range
+        normalized = normalized * (max_target - min_target) + min_target
+    
+    return normalized
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns
+    """
+    if columns is None:
+        columns = data.columns
+    
+    data_copy = data.copy()
+    
+    for col in columns:
+        if col not in data_copy.columns:
+            continue
+            
+        missing_count = data_copy[col].isnull().sum()
+        if missing_count == 0:
+            continue
+            
+        if strategy == 'mean':
+            fill_value = data_copy[col].mean()
+        elif strategy == 'median':
+            fill_value = data_copy[col].median()
+        elif strategy == 'mode':
+            fill_value = data_copy[col].mode()[0]
+        elif strategy == 'drop':
+            data_copy = data_copy.dropna(subset=[col])
+            continue
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+        
+        data_copy[col] = data_copy[col].fillna(fill_value)
+    
+    return data_copy
+
+def detect_skewed_columns(data, threshold=0.5):
+    """
+    Detect columns with skewed distributions
+    """
+    skewed_columns = []
+    
+    for col in data.select_dtypes(include=[np.number]).columns:
+        skewness = stats.skew(data[col].dropna())
+        if abs(skewness) > threshold:
+            skewed_columns.append((col, skewness))
+    
+    return sorted(skewed_columns, key=lambda x: abs(x[1]), reverse=True)
