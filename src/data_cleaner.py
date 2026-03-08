@@ -1065,4 +1065,124 @@ if __name__ == "__main__":
     filtered_data['feature_b_standardized'] = standardize_zscore(filtered_data, 'feature_b')
     
     print("\nFirst 5 rows of processed data:")
-    print(filtered_data.head())
+    print(filtered_data.head())import pandas as pd
+import numpy as np
+from typing import Union, List, Dict, Any
+
+def remove_duplicates(df: pd.DataFrame, subset: Union[List[str], None] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        subset: Columns to consider for identifying duplicates
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def convert_column_types(df: pd.DataFrame, 
+                         type_mapping: Dict[str, str]) -> pd.DataFrame:
+    """
+    Convert columns to specified data types.
+    
+    Args:
+        df: Input DataFrame
+        type_mapping: Dictionary mapping column names to target types
+    
+    Returns:
+        DataFrame with converted column types
+    """
+    df_copy = df.copy()
+    
+    for column, dtype in type_mapping.items():
+        if column in df_copy.columns:
+            try:
+                if dtype == 'datetime':
+                    df_copy[column] = pd.to_datetime(df_copy[column])
+                elif dtype == 'numeric':
+                    df_copy[column] = pd.to_numeric(df_copy[column], errors='coerce')
+                elif dtype == 'category':
+                    df_copy[column] = df_copy[column].astype('category')
+                else:
+                    df_copy[column] = df_copy[column].astype(dtype)
+            except (ValueError, TypeError) as e:
+                print(f"Warning: Could not convert column '{column}' to {dtype}: {e}")
+    
+    return df_copy
+
+def handle_missing_values(df: pd.DataFrame, 
+                          strategy: str = 'drop',
+                          fill_value: Any = None) -> pd.DataFrame:
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        strategy: One of 'drop', 'fill', or 'ignore'
+        fill_value: Value to use when strategy is 'fill'
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill':
+        if fill_value is not None:
+            return df.fillna(fill_value)
+        else:
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            df_filled = df.copy()
+            df_filled[numeric_cols] = df_filled[numeric_cols].fillna(df_filled[numeric_cols].mean())
+            return df_filled
+    else:
+        return df
+
+def clean_dataframe(df: pd.DataFrame,
+                    deduplicate: bool = True,
+                    type_conversions: Union[Dict[str, str], None] = None,
+                    missing_strategy: str = 'drop') -> pd.DataFrame:
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        df: Input DataFrame
+        deduplicate: Whether to remove duplicates
+        type_conversions: Dictionary for type conversions
+        missing_strategy: Strategy for handling missing values
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if type_conversions:
+        cleaned_df = convert_column_types(cleaned_df, type_conversions)
+    
+    cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
+    
+    return cleaned_df
+
+def validate_dataframe(df: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: DataFrame to validate
+    
+    Returns:
+        Dictionary with validation results
+    """
+    validation_results = {
+        'row_count': len(df),
+        'column_count': len(df.columns),
+        'missing_values': df.isnull().sum().to_dict(),
+        'duplicate_rows': df.duplicated().sum(),
+        'data_types': df.dtypes.astype(str).to_dict()
+    }
+    
+    return validation_results
