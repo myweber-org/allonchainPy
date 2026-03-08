@@ -59,3 +59,74 @@ def validate_dataframe(dataframe, required_columns):
         return False
     
     return True
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
+def clean_dataset(input_file, output_file):
+    """
+    Load a dataset, perform cleaning operations, and save the cleaned version.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original shape: {df.shape}")
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        print(f"After removing duplicates: {df.shape}")
+        
+        # Standardize column names
+        df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+        
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].median())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'unknown')
+        
+        # Remove outliers using IQR method for numeric columns
+        for col in numeric_cols:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df = df[(df[col] >= lower_bound) & (df[col] <= upper_bound)]
+        
+        print(f"After outlier removal: {df.shape}")
+        
+        # Convert date columns if present
+        date_columns = [col for col in df.columns if 'date' in col]
+        for col in date_columns:
+            try:
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+            except:
+                pass
+        
+        # Save cleaned dataset
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned dataset saved to: {output_file}")
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return None
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    # Example usage
+    input_path = "raw_data.csv"
+    output_path = "cleaned_data.csv"
+    cleaned_df = clean_dataset(input_path, output_path)
+    
+    if cleaned_df is not None:
+        print("Data cleaning completed successfully.")
+        print(f"Final dataset shape: {cleaned_df.shape}")
+        print("Sample of cleaned data:")
+        print(cleaned_df.head())
