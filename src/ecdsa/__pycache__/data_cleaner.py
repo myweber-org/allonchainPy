@@ -752,4 +752,69 @@ def validate_data(df, required_columns=None, min_rows=1):
         if missing_cols:
             return False, f"Missing required columns: {missing_cols}"
     
-    return True, "Data validation passed"
+    return True, "Data validation passed"import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def z_score_normalize(data, column):
+    """
+    Normalize data using Z-score normalization.
+    """
+    mean = data[column].mean()
+    std = data[column].std()
+    data[column + '_normalized'] = (data[column] - mean) / std
+    return data
+
+def min_max_normalize(data, column):
+    """
+    Normalize data using Min-Max scaling to range [0, 1].
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    data[column + '_scaled'] = (data[column] - min_val) / (max_val - min_val)
+    return data
+
+def detect_missing_values(data):
+    """
+    Detect and return summary of missing values in the dataset.
+    """
+    missing_summary = data.isnull().sum()
+    missing_percentage = (missing_summary / len(data)) * 100
+    missing_df = pd.DataFrame({
+        'missing_count': missing_summary,
+        'missing_percentage': missing_percentage
+    })
+    return missing_df[missing_df['missing_count'] > 0]
+
+def fill_missing_with_median(data, column):
+    """
+    Fill missing values in a column with the median value.
+    """
+    median_value = data[column].median()
+    data[column].fillna(median_value, inplace=True)
+    return data
+
+def clean_dataset(data, numeric_columns, outlier_factor=1.5):
+    """
+    Perform comprehensive cleaning on numeric columns.
+    """
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            cleaned_data = remove_outliers_iqr(cleaned_data, column, outlier_factor)
+            cleaned_data = z_score_normalize(cleaned_data, column)
+    
+    return cleaned_data
