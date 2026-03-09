@@ -215,4 +215,93 @@ def remove_outliers_iqr(data, column):
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    return filtered_dataimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, threshold=1.5):
+    """
+    Detect outliers using Interquartile Range method.
+    Returns boolean mask where True indicates an outlier.
+    """
+    q1 = np.percentile(data, 25)
+    q3 = np.percentile(data, 75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    return (data < lower_bound) | (data > upper_bound)
+
+def remove_outliers(df, columns, method='iqr', **kwargs):
+    """
+    Remove outliers from specified columns in DataFrame.
+    Supports 'iqr' and 'zscore' methods.
+    """
+    df_clean = df.copy()
+    
+    for col in columns:
+        if method == 'iqr':
+            outlier_mask = detect_outliers_iqr(df[col], **kwargs)
+        elif method == 'zscore':
+            z_scores = np.abs(stats.zscore(df[col].dropna()))
+            outlier_mask = z_scores > kwargs.get('threshold', 3)
+        else:
+            raise ValueError(f"Unsupported method: {method}")
+        
+        df_clean = df_clean[~outlier_mask]
+    
+    return df_clean
+
+def normalize_data(df, columns, method='minmax'):
+    """
+    Normalize specified columns in DataFrame.
+    Supports 'minmax' and 'standard' normalization.
+    """
+    df_normalized = df.copy()
+    
+    for col in columns:
+        if method == 'minmax':
+            min_val = df[col].min()
+            max_val = df[col].max()
+            df_normalized[col] = (df[col] - min_val) / (max_val - min_val)
+        elif method == 'standard':
+            mean_val = df[col].mean()
+            std_val = df[col].std()
+            df_normalized[col] = (df[col] - mean_val) / std_val
+        else:
+            raise ValueError(f"Unsupported method: {method}")
+    
+    return df_normalized
+
+def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize_method='standard'):
+    """
+    Comprehensive data cleaning pipeline.
+    Removes outliers and normalizes numeric columns.
+    """
+    # Remove outliers
+    df_clean = remove_outliers(df, numeric_columns, method=outlier_method)
+    
+    # Normalize data
+    df_normalized = normalize_data(df_clean, numeric_columns, method=normalize_method)
+    
+    # Reset index after cleaning
+    df_normalized = df_normalized.reset_index(drop=True)
+    
+    return df_normalized
+
+def validate_data(df, required_columns, min_rows=10):
+    """
+    Validate dataset meets minimum requirements.
+    Returns tuple of (is_valid, error_message).
+    """
+    if len(df) < min_rows:
+        return False, f"Dataset has fewer than {min_rows} rows"
+    
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        return False, f"Missing required columns: {missing_columns}"
+    
+    null_counts = df[required_columns].isnull().sum()
+    if null_counts.any():
+        return False, f"Columns with null values: {null_counts[null_counts > 0].to_dict()}"
+    
+    return True, "Dataset validation passed"
