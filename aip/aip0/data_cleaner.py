@@ -332,4 +332,96 @@ def get_data_summary(dataframe):
         'memory_usage': dataframe.memory_usage(deep=True).sum()
     }
     
+    return summaryimport re
+import pandas as pd
+from typing import Optional, List, Dict, Any
+
+def clean_string(text: str) -> str:
+    """
+    Clean a string by removing extra whitespace and converting to lowercase.
+    """
+    if not isinstance(text, str):
+        return ''
+    cleaned = re.sub(r'\s+', ' ', text.strip())
+    return cleaned.lower()
+
+def validate_email(email: str) -> bool:
+    """
+    Validate an email address format.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def remove_outliers_iqr(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def normalize_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """
+    Normalize a column to have values between 0 and 1.
+    """
+    min_val = df[column].min()
+    max_val = df[column].max()
+    if max_val - min_val == 0:
+        df[column + '_normalized'] = 0.0
+    else:
+        df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def check_missing_values(df: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Check for missing values in a DataFrame and return a summary.
+    """
+    missing_counts = df.isnull().sum()
+    missing_percentage = (missing_counts / len(df)) * 100
+    summary = {
+        'total_rows': len(df),
+        'missing_counts': missing_counts.to_dict(),
+        'missing_percentage': missing_percentage.to_dict()
+    }
     return summary
+
+def drop_duplicates_with_threshold(df: pd.DataFrame, subset: Optional[List[str]] = None, keep: str = 'first') -> pd.DataFrame:
+    """
+    Drop duplicate rows with an option to specify columns.
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def convert_to_datetime(df: pd.DataFrame, column: str, format: Optional[str] = None) -> pd.DataFrame:
+    """
+    Convert a column to datetime format.
+    """
+    if format:
+        df[column] = pd.to_datetime(df[column], format=format, errors='coerce')
+    else:
+        df[column] = pd.to_datetime(df[column], errors='coerce')
+    return df
+
+def fill_missing_with_mean(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """
+    Fill missing values in a column with the mean of the column.
+    """
+    mean_value = df[column].mean()
+    df[column] = df[column].fillna(mean_value)
+    return df
+
+def categorize_age(age: int) -> str:
+    """
+    Categorize age into groups.
+    """
+    if age < 18:
+        return 'minor'
+    elif age < 35:
+        return 'young_adult'
+    elif age < 60:
+        return 'adult'
+    else:
+        return 'senior'
