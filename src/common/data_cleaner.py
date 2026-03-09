@@ -171,4 +171,92 @@ def get_summary_statistics(df, numeric_columns):
             'count': df[col].count(),
             'missing': df[col].isnull().sum()
         }
-    return pd.DataFrame(summary).T
+    return pd.DataFrame(summary).Timport pandas as pd
+import numpy as np
+
+def clean_dataset(df, strategy='mean', outlier_threshold=3):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    strategy (str): Strategy for missing value imputation ('mean', 'median', 'mode', 'drop').
+    outlier_threshold (float): Number of standard deviations to consider as outlier.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if strategy == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif strategy in ['mean', 'median', 'mode']:
+        for column in cleaned_df.select_dtypes(include=[np.number]).columns:
+            if cleaned_df[column].isnull().any():
+                if strategy == 'mean':
+                    fill_value = cleaned_df[column].mean()
+                elif strategy == 'median':
+                    fill_value = cleaned_df[column].median()
+                elif strategy == 'mode':
+                    fill_value = cleaned_df[column].mode()[0]
+                cleaned_df[column] = cleaned_df[column].fillna(fill_value)
+    
+    # Handle outliers for numerical columns
+    numeric_columns = cleaned_df.select_dtypes(include=[np.number]).columns
+    for column in numeric_columns:
+        mean = cleaned_df[column].mean()
+        std = cleaned_df[column].std()
+        lower_bound = mean - outlier_threshold * std
+        upper_bound = mean + outlier_threshold * std
+        
+        # Cap outliers to bounds
+        cleaned_df[column] = cleaned_df[column].clip(lower=lower_bound, upper=upper_bound)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data with missing values and outliers
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 100],  # Contains NaN and outlier
+        'B': [5, 6, 7, np.nan, 9],
+        'C': ['x', 'y', 'z', 'x', 'y']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    # Clean the data
+    cleaned = clean_dataset(df, strategy='mean', outlier_threshold=2)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    # Validate the cleaned data
+    is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
+    print(f"\nValidation: {message}")
