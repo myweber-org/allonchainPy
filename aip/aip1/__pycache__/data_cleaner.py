@@ -749,3 +749,132 @@ def clean_dataset(df, outlier_method='iqr', normalize_method=None, fill_missing=
         cleaner.normalize_zscore()
     
     return cleaner.get_cleaned_data(), cleaner.get_summary()
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        subset: Columns to consider for identifying duplicates
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def handle_missing_values(df: pd.DataFrame, strategy: str = 'drop', fill_value: Optional[float] = None) -> pd.DataFrame:
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        strategy: 'drop' to remove rows, 'fill' to fill values
+        fill_value: Value to fill when strategy is 'fill'
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill':
+        if fill_value is None:
+            fill_value = 0
+        return df.fillna(fill_value)
+    else:
+        raise ValueError("Strategy must be 'drop' or 'fill'")
+
+def normalize_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """
+    Normalize a column to range [0, 1].
+    
+    Args:
+        df: Input DataFrame
+        column: Column name to normalize
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    col_min = df[column].min()
+    col_max = df[column].max()
+    
+    if col_max == col_min:
+        df[column] = 0.5
+    else:
+        df[column] = (df[column] - col_min) / (col_max - col_min)
+    
+    return df
+
+def clean_dataframe(df: pd.DataFrame, 
+                   remove_dups: bool = True,
+                   handle_nulls: bool = True,
+                   normalize_cols: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        df: Input DataFrame
+        remove_dups: Whether to remove duplicates
+        handle_nulls: Whether to handle missing values
+        normalize_cols: List of columns to normalize
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if remove_dups:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if handle_nulls:
+        cleaned_df = handle_missing_values(cleaned_df, strategy='fill', fill_value=0)
+    
+    if normalize_cols:
+        for col in normalize_cols:
+            if col in cleaned_df.columns:
+                cleaned_df = normalize_column(cleaned_df, col)
+    
+    return cleaned_df
+
+def validate_dataframe(df: pd.DataFrame) -> bool:
+    """
+    Validate DataFrame for common issues.
+    
+    Args:
+        df: DataFrame to validate
+    
+    Returns:
+        True if DataFrame passes validation
+    """
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if df.isnull().all().any():
+        raise ValueError("DataFrame contains columns with all null values")
+    
+    if len(df.columns) == 0:
+        raise ValueError("DataFrame has no columns")
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4],
+        'value': [10.5, None, 20.3, 15.7, 30.1],
+        'score': [85, 92, 92, 78, 95]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataframe(df, normalize_cols=['score'])
+    print("\nCleaned DataFrame:")
+    print(cleaned)
