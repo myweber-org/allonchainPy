@@ -290,4 +290,125 @@ def main():
     print(cleaned)
 
 if __name__ == "__main__":
-    main()
+    main()import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_method=None):
+    """
+    Clean a pandas DataFrame by handling missing values and duplicates.
+    
+    Args:
+        df: pandas DataFrame to clean
+        drop_duplicates: If True, remove duplicate rows
+        fill_method: Method to fill missing values ('mean', 'median', 'mode', or None)
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if fill_method:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        
+        if fill_method == 'mean':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(
+                cleaned_df[numeric_cols].mean()
+            )
+        elif fill_method == 'median':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(
+                cleaned_df[numeric_cols].median()
+            )
+        elif fill_method == 'mode':
+            for col in cleaned_df.columns:
+                if cleaned_df[col].dtype == 'object':
+                    cleaned_df[col] = cleaned_df[col].fillna(
+                        cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else ''
+                    )
+        else:
+            cleaned_df = cleaned_df.dropna()
+    else:
+        cleaned_df = cleaned_df.dropna()
+    
+    # Remove duplicates
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Reset index
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: List of required column names
+    
+    Returns:
+        Dictionary with validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    # Check if DataFrame is empty
+    if df.empty:
+        validation_results['is_valid'] = False
+        validation_results['errors'].append('DataFrame is empty')
+        return validation_results
+    
+    # Check required columns
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(
+                f'Missing required columns: {missing_columns}'
+            )
+    
+    # Check for all-null columns
+    null_columns = df.columns[df.isnull().all()].tolist()
+    if null_columns:
+        validation_results['warnings'].append(
+            f'Columns with all null values: {null_columns}'
+        )
+    
+    # Check data types
+    for col in df.columns:
+        if df[col].dtype == 'object' and df[col].str.contains('^\s*$').any():
+            validation_results['warnings'].append(
+                f'Column "{col}" contains empty strings or whitespace'
+            )
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 3, 4, 5, 5],
+        'name': ['Alice', 'Bob', None, 'David', 'Eve', 'Eve'],
+        'age': [25, 30, 35, None, 28, 28],
+        'score': [85.5, 92.0, 78.5, 88.0, 95.5, 95.5]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned = clean_dataset(df, fill_method='mean')
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print("\n" + "="*50 + "\n")
+    
+    # Validate the cleaned data
+    validation = validate_dataframe(cleaned, required_columns=['id', 'name', 'age', 'score'])
+    print("Validation Results:")
+    print(f"Is valid: {validation['is_valid']}")
+    print(f"Errors: {validation['errors']}")
+    print(f"Warnings: {validation['warnings']}")
