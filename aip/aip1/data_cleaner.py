@@ -107,3 +107,11 @@ if __name__ == "__main__":
     validation = validate_dataframe(cleaned_df)
     print(f"Cleaned data shape: {cleaned_df.shape}")
     print(f"Validation results: {validation}")
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
