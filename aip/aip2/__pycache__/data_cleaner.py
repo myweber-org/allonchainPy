@@ -214,3 +214,112 @@ class DataCleaner:
             'categorical_columns': list(self.df.select_dtypes(include=['object']).columns)
         }
         return summary
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by removing duplicates,
+    standardizing column names, and handling missing values.
+    """
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Standardize column names
+    cleaned_df.columns = cleaned_df.columns.str.strip().str.lower().str.replace(' ', '_')
+    
+    # Remove duplicate rows
+    cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Fill missing numeric values with column median
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    
+    # Fill missing categorical values with mode
+    categorical_cols = cleaned_df.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        mode_value = cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'unknown'
+        cleaned_df[col] = cleaned_df[col].fillna(mode_value)
+    
+    # Convert date columns to datetime format
+    date_patterns = ['date', 'time', 'timestamp']
+    for col in cleaned_df.columns:
+        if any(pattern in col for pattern in date_patterns):
+            try:
+                cleaned_df[col] = pd.to_datetime(cleaned_df[col], errors='coerce')
+            except:
+                pass
+    
+    # Remove outliers using IQR method for numeric columns
+    for col in numeric_cols:
+        Q1 = cleaned_df[col].quantile(0.25)
+        Q3 = cleaned_df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    """
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    # Check for any remaining NaN values
+    nan_count = df.isna().sum().sum()
+    if nan_count > 0:
+        print(f"Warning: {nan_count} NaN values remain in the DataFrame")
+    
+    return True
+
+def export_cleaned_data(df, output_path, format='csv'):
+    """
+    Export cleaned DataFrame to specified format.
+    """
+    if format == 'csv':
+        df.to_csv(output_path, index=False)
+    elif format == 'excel':
+        df.to_excel(output_path, index=False)
+    elif format == 'parquet':
+        df.to_parquet(output_path, index=False)
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+    
+    print(f"Data exported successfully to {output_path}")
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'Name': ['Alice', 'Bob', 'Alice', 'Charlie', None],
+        'Age': [25, 30, 25, 35, 40],
+        'Salary': [50000, 60000, 50000, 70000, 80000],
+        'Join Date': ['2020-01-15', '2019-03-20', '2020-01-15', '2018-06-10', '2021-02-28']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataframe(df)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    
+    try:
+        validate_dataframe(cleaned_df, required_columns=['name', 'age', 'salary'])
+        print("\nData validation passed!")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
