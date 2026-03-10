@@ -815,3 +815,112 @@ class DataCleaner:
             'current_columns': final_shape[1],
             'columns_removed': cols_removed
         }
+import pandas as pd
+import re
+
+def clean_dataset(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df: Input pandas DataFrame
+        column_mapping: Dictionary mapping old column names to new ones
+        drop_duplicates: Whether to remove duplicate rows
+        normalize_text: Whether to normalize text columns (lowercase, strip whitespace)
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Rename columns if mapping provided
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    # Remove duplicate rows
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    # Normalize text columns
+    if normalize_text:
+        text_columns = cleaned_df.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            cleaned_df[col] = cleaned_df[col].astype(str).str.lower().str.strip()
+            # Remove extra whitespace
+            cleaned_df[col] = cleaned_df[col].apply(lambda x: re.sub(r'\s+', ' ', x))
+    
+    # Convert date columns if detected
+    date_columns = [col for col in cleaned_df.columns if 'date' in col.lower()]
+    for col in date_columns:
+        try:
+            cleaned_df[col] = pd.to_datetime(cleaned_df[col], errors='coerce')
+        except:
+            pass
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None, check_missing=True):
+    """
+    Validate the DataFrame for required columns and missing values.
+    
+    Args:
+        df: Input pandas DataFrame
+        required_columns: List of column names that must be present
+        check_missing: Whether to check for missing values
+    
+    Returns:
+        Dictionary with validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'missing_columns': [],
+        'missing_values': {},
+        'total_rows': len(df),
+        'total_columns': len(df.columns)
+    }
+    
+    # Check required columns
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            validation_results['missing_columns'] = missing_cols
+            validation_results['is_valid'] = False
+    
+    # Check for missing values
+    if check_missing:
+        missing_counts = df.isnull().sum()
+        columns_with_missing = missing_counts[missing_counts > 0]
+        if not columns_with_missing.empty:
+            validation_results['missing_values'] = columns_with_missing.to_dict()
+            validation_results['is_valid'] = False
+    
+    return validation_results
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'Name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson', 'Alice Brown '],
+        'Email': ['john@example.com', 'jane@example.com', 'john@example.com', 'bob@example.com', 'alice@example.com'],
+        'Join_Date': ['2023-01-15', '2023-02-20', '2023-01-15', '2023-03-10', '2023-04-05'],
+        'Age': [25, 30, 25, 35, 28],
+        'Notes': ['  Regular customer  ', 'VIP member', 'Regular customer', 'New signup', 'Premium user']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned = clean_dataset(df, column_mapping={'Join_Date': 'join_date'})
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    
+    # Validate the cleaned data
+    validation = validate_data(cleaned, required_columns=['Name', 'Email', 'Age'])
+    print("\nValidation Results:")
+    print(validation)
