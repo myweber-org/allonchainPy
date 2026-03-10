@@ -543,3 +543,84 @@ if __name__ == "__main__":
     cleaned_df = clean_dataset(df, missing_strategy='mean', outlier_method='iqr')
     print("\nCleaned DataFrame:")
     print(cleaned_df)
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    return filtered_df
+
+def normalize_minmax(dataframe, columns):
+    """
+    Normalize specified columns using min-max scaling
+    """
+    df_normalized = dataframe.copy()
+    for col in columns:
+        if col in df_normalized.columns:
+            min_val = df_normalized[col].min()
+            max_val = df_normalized[col].max()
+            if max_val != min_val:
+                df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+    return df_normalized
+
+def standardize_zscore(dataframe, columns):
+    """
+    Standardize specified columns using z-score normalization
+    """
+    df_standardized = dataframe.copy()
+    for col in columns:
+        if col in df_standardized.columns:
+            mean_val = df_standardized[col].mean()
+            std_val = df_standardized[col].std()
+            if std_val > 0:
+                df_standardized[col] = (df_standardized[col] - mean_val) / std_val
+    return df_standardized
+
+def handle_missing_values(dataframe, strategy='mean', columns=None):
+    """
+    Handle missing values with specified strategy
+    """
+    df_processed = dataframe.copy()
+    
+    if columns is None:
+        columns = df_processed.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in df_processed.columns and df_processed[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df_processed[col].mean()
+            elif strategy == 'median':
+                fill_value = df_processed[col].median()
+            elif strategy == 'mode':
+                fill_value = df_processed[col].mode()[0]
+            elif strategy == 'zero':
+                fill_value = 0
+            else:
+                continue
+            
+            df_processed[col].fillna(fill_value, inplace=True)
+    
+    return df_processed
+
+def get_data_summary(dataframe):
+    """
+    Generate statistical summary of the dataframe
+    """
+    summary = {
+        'shape': dataframe.shape,
+        'missing_values': dataframe.isnull().sum().to_dict(),
+        'data_types': dataframe.dtypes.to_dict(),
+        'numeric_stats': dataframe.describe().to_dict() if not dataframe.select_dtypes(include=[np.number]).empty else {}
+    }
+    return summary
