@@ -1,51 +1,36 @@
-
+import numpy as np
 import pandas as pd
 
-def clean_dataset(df, remove_duplicates=True):
-    """
-    Clean a pandas DataFrame by removing null values and optionally duplicates.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    remove_duplicates (bool): If True, remove duplicate rows.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
-    """
-    cleaned_df = df.dropna()
-    
-    if remove_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-    
-    return cleaned_df
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
 
-def validate_data(df, required_columns):
-    """
-    Validate that DataFrame contains all required columns.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of required column names.
-    
-    Returns:
-    bool: True if all required columns are present.
-    """
-    return all(col in df.columns for col in required_columns)
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    if max_val == min_val:
+        return df[column].apply(lambda x: 0.0)
+    return df[column].apply(lambda x: (x - min_val) / (max_val - min_val))
 
-if __name__ == "__main__":
-    sample_data = {
-        'A': [1, 2, None, 4, 4],
-        'B': [5, None, 7, 8, 8],
-        'C': ['x', 'y', 'z', 'x', 'x']
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    
-    cleaned = clean_dataset(df)
-    print("\nCleaned DataFrame:")
-    print(cleaned)
-    
-    validation_result = validate_data(cleaned, ['A', 'B', 'C'])
-    print(f"\nData validation passed: {validation_result}")
+def clean_dataset(df, numeric_columns):
+    cleaned_df = df.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+    return cleaned_df.reset_index(drop=True)
+
+def validate_dataframe(df):
+    required_checks = [
+        (lambda d: isinstance(d, pd.DataFrame), "Input must be a pandas DataFrame"),
+        (lambda d: not d.empty, "DataFrame cannot be empty"),
+        (lambda d: d.isnull().sum().sum() == 0, "DataFrame contains null values")
+    ]
+    for check, message in required_checks:
+        if not check(df):
+            raise ValueError(message)
+    return True
