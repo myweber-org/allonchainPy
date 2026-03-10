@@ -411,4 +411,112 @@ if __name__ == "__main__":
     print("Validation Results:")
     print(f"Is valid: {validation['is_valid']}")
     print(f"Errors: {validation['errors']}")
-    print(f"Warnings: {validation['warnings']}")
+    print(f"Warnings: {validation['warnings']}")import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, columns=None, factor=1.5):
+    """
+    Remove outliers from specified columns using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    columns (list): List of column names to process. If None, processes all numeric columns.
+    factor (float): Multiplier for IQR to determine outlier bounds.
+    
+    Returns:
+    pd.DataFrame: Dataframe with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_clean = df.copy()
+    for col in columns:
+        if col not in df_clean.columns:
+            continue
+            
+        Q1 = df_clean[col].quantile(0.25)
+        Q3 = df_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        lower_bound = Q1 - factor * IQR
+        upper_bound = Q3 + factor * IQR
+        
+        mask = (df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)
+        df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def normalize_data(df, columns=None, method='minmax'):
+    """
+    Normalize specified columns in dataframe.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    columns (list): List of column names to normalize
+    method (str): Normalization method - 'minmax' or 'zscore'
+    
+    Returns:
+    pd.DataFrame: Dataframe with normalized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_norm = df.copy()
+    
+    for col in columns:
+        if col not in df_norm.columns:
+            continue
+            
+        if method == 'minmax':
+            min_val = df_norm[col].min()
+            max_val = df_norm[col].max()
+            if max_val != min_val:
+                df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+        
+        elif method == 'zscore':
+            mean_val = df_norm[col].mean()
+            std_val = df_norm[col].std()
+            if std_val != 0:
+                df_norm[col] = (df_norm[col] - mean_val) / std_val
+    
+    return df_norm
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in dataframe.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    strategy (str): Strategy for handling missing values - 'mean', 'median', 'mode', or 'drop'
+    columns (list): List of column names to process
+    
+    Returns:
+    pd.DataFrame: Dataframe with handled missing values
+    """
+    df_processed = df.copy()
+    
+    if columns is None:
+        columns = df_processed.columns.tolist()
+    
+    for col in columns:
+        if col not in df_processed.columns:
+            continue
+            
+        if strategy == 'drop':
+            df_processed = df_processed.dropna(subset=[col])
+        
+        elif strategy == 'mean':
+            if pd.api.types.is_numeric_dtype(df_processed[col]):
+                df_processed[col] = df_processed[col].fillna(df_processed[col].mean())
+        
+        elif strategy == 'median':
+            if pd.api.types.is_numeric_dtype(df_processed[col]):
+                df_processed[col] = df_processed[col].fillna(df_processed[col].median())
+        
+        elif strategy == 'mode':
+            if not df_processed[col].empty:
+                mode_val = df_processed[col].mode()
+                if not mode_val.empty:
+                    df_processed[col] = df_processed[col].fillna(mode_val.iloc[0])
+    
+    return df_processed.reset_index(drop=True)
