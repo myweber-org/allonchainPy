@@ -110,4 +110,195 @@ def validate_dataframe(df, required_columns=None):
         if missing_columns:
             return False, f"Missing required columns: {missing_columns}"
     
-    return True, "DataFrame is valid"
+    return True, "DataFrame is valid"import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns=None, factor=1.5):
+    """
+    Remove outliers using Interquartile Range method.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to process (default: all numeric columns)
+        factor: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - factor * IQR
+            upper_bound = Q3 + factor * IQR
+            
+            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+            df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def normalize_minmax(df, columns=None, feature_range=(0, 1)):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to normalize (default: all numeric columns)
+        feature_range: tuple of (min, max) for output range
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_normalized = df.copy()
+    min_val, max_val = feature_range
+    
+    for col in columns:
+        if col in df.columns:
+            col_min = df[col].min()
+            col_max = df[col].max()
+            
+            if col_max - col_min != 0:
+                df_normalized[col] = (df[col] - col_min) / (col_max - col_min)
+                df_normalized[col] = df_normalized[col] * (max_val - min_val) + min_val
+    
+    return df_normalized
+
+def standardize_zscore(df, columns=None):
+    """
+    Standardize data using Z-score normalization.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to standardize (default: all numeric columns)
+    
+    Returns:
+        DataFrame with standardized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_standardized = df.copy()
+    
+    for col in columns:
+        if col in df.columns:
+            mean_val = df[col].mean()
+            std_val = df[col].std()
+            
+            if std_val != 0:
+                df_standardized[col] = (df[col] - mean_val) / std_val
+    
+    return df_standardized
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        strategy: 'mean', 'median', 'mode', or 'drop'
+        columns: list of column names to process (default: all columns)
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = df.columns
+    
+    df_handled = df.copy()
+    
+    for col in columns:
+        if col in df.columns and df[col].isnull().any():
+            if strategy == 'drop':
+                df_handled = df_handled.dropna(subset=[col])
+            elif strategy == 'mean':
+                df_handled[col] = df_handled[col].fillna(df[col].mean())
+            elif strategy == 'median':
+                df_handled[col] = df_handled[col].fillna(df[col].median())
+            elif strategy == 'mode':
+                df_handled[col] = df_handled[col].fillna(df[col].mode()[0])
+    
+    return df_handled.reset_index(drop=True)
+
+def create_data_summary(df):
+    """
+    Create a comprehensive summary of the DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+    
+    Returns:
+        Dictionary containing data summary statistics
+    """
+    summary = {
+        'shape': df.shape,
+        'dtypes': df.dtypes.to_dict(),
+        'missing_values': df.isnull().sum().to_dict(),
+        'numeric_stats': {},
+        'categorical_stats': {}
+    }
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        summary['numeric_stats'][col] = {
+            'mean': df[col].mean(),
+            'median': df[col].median(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            'max': df[col].max(),
+            'skewness': df[col].skew(),
+            'kurtosis': df[col].kurtosis()
+        }
+    
+    categorical_cols = df.select_dtypes(include=['object', 'category']).columns
+    for col in categorical_cols:
+        summary['categorical_stats'][col] = {
+            'unique_count': df[col].nunique(),
+            'top_value': df[col].mode()[0] if not df[col].mode().empty else None,
+            'top_count': df[col].value_counts().iloc[0] if not df[col].value_counts().empty else 0
+        }
+    
+    return summary
+
+def detect_anomalies(df, columns=None, method='zscore', threshold=3):
+    """
+    Detect anomalies in data.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to check (default: all numeric columns)
+        method: 'zscore' or 'iqr'
+        threshold: threshold for anomaly detection
+    
+    Returns:
+        DataFrame with anomaly flags
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_anomaly = df.copy()
+    
+    for col in columns:
+        if col in df.columns:
+            if method == 'zscore':
+                z_scores = np.abs(stats.zscore(df[col].dropna()))
+                anomaly_mask = z_scores > threshold
+                df_anomaly[f'{col}_anomaly'] = False
+                df_anomaly.loc[df[col].index[anomaly_mask], f'{col}_anomaly'] = True
+            elif method == 'iqr':
+                Q1 = df[col].quantile(0.25)
+                Q3 = df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - threshold * IQR
+                upper_bound = Q3 + threshold * IQR
+                df_anomaly[f'{col}_anomaly'] = ~df[col].between(lower_bound, upper_bound)
+    
+    return df_anomaly
