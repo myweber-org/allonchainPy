@@ -424,3 +424,85 @@ if __name__ == "__main__":
     print(f"\nClean data shape: {clean_data.shape}")
     print("First 5 rows of clean data:")
     print(clean_data.head())
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df: Input pandas DataFrame
+        column_mapping: Dictionary to rename columns (old_name: new_name)
+        drop_duplicates: Boolean to remove duplicate rows
+        normalize_text: Boolean to normalize text columns (lowercase, strip whitespace)
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates().reset_index(drop=True)
+    
+    if normalize_text:
+        for col in cleaned_df.select_dtypes(include=['object']).columns:
+            cleaned_df[col] = cleaned_df[col].astype(str).apply(
+                lambda x: re.sub(r'\s+', ' ', x.strip().lower())
+            )
+    
+    return cleaned_df
+
+def validate_email(email_string):
+    """
+    Validate email format using regex pattern.
+    
+    Args:
+        email_string: String to validate as email
+    
+    Returns:
+        Boolean indicating if email is valid
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email_string)))
+
+def extract_numeric(text):
+    """
+    Extract numeric values from text string.
+    
+    Args:
+        text: Input text containing numeric values
+    
+    Returns:
+        List of extracted numeric values as floats
+    """
+    numbers = re.findall(r'[-+]?\d*\.\d+|\d+', str(text))
+    return [float(num) for num in numbers]
+
+if __name__ == "__main__":
+    sample_data = {
+        'Name': [' John Doe ', 'Jane Smith', 'John Doe', 'ALICE WONDER'],
+        'Email': ['john@example.com', 'invalid-email', 'JOHN@example.com', 'alice@test.org'],
+        'Age': ['25', '30', '25', '28'],
+        'Notes': ['Height: 5.9 feet', 'Weight 130 lbs', 'Height 5.9', 'Score: 95.5%']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned = clean_dataframe(df, {'Name': 'full_name'}, drop_duplicates=True, normalize_text=True)
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    
+    print("\nEmail Validation:")
+    for email in cleaned['Email']:
+        print(f"{email}: {validate_email(email)}")
+    
+    print("\nExtracted Numerics from Notes:")
+    for note in cleaned['Notes']:
+        print(f"{note}: {extract_numeric(note)}")
