@@ -779,4 +779,51 @@ def calculate_statistics(df, numeric_columns=None):
                     'missing': df[col].isna().sum()
                 })
     
-    return pd.DataFrame(stats)
+    return pd.DataFrame(stats)import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(dataframe, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    """
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
+    return filtered_df
+
+def normalize_column_minmax(dataframe, column):
+    """
+    Normalize a DataFrame column using min-max scaling.
+    """
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    if max_val - min_val == 0:
+        return dataframe[column].apply(lambda x: 0.0)
+    normalized = (dataframe[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def clean_dataset(dataframe, numeric_columns):
+    """
+    Clean dataset by removing outliers and normalizing numeric columns.
+    """
+    cleaned_df = dataframe.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df[col] = normalize_column_minmax(cleaned_df, col)
+    return cleaned_df.reset_index(drop=True)
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.randint(1, 100, 1000)
+    })
+    print("Original shape:", sample_data.shape)
+    cleaned = clean_dataset(sample_data, ['A', 'B'])
+    print("Cleaned shape:", cleaned.shape)
+    print("Cleaned data head:")
+    print(cleaned.head())
