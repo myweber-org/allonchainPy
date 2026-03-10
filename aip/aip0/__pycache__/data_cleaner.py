@@ -676,4 +676,107 @@ def validate_dataframe(df):
         raise TypeError("Input must be a pandas DataFrame")
     if df.empty:
         raise ValueError("DataFrame is empty")
-    return True
+    return Trueimport pandas as pd
+import numpy as np
+
+def clean_dataset(df, numeric_columns=None, method='median', outlier_threshold=3):
+    """
+    Clean dataset by handling missing values and removing outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    numeric_columns (list): List of numeric column names to process
+    method (str): Imputation method ('mean', 'median', 'mode')
+    outlier_threshold (float): Z-score threshold for outlier detection
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    if df.empty:
+        return df
+    
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_clean = df.copy()
+    
+    for col in numeric_columns:
+        if col not in df_clean.columns:
+            continue
+            
+        series = df_clean[col]
+        
+        if method == 'mean':
+            fill_value = series.mean()
+        elif method == 'median':
+            fill_value = series.median()
+        elif method == 'mode':
+            fill_value = series.mode()[0] if not series.mode().empty else series.median()
+        else:
+            fill_value = series.median()
+        
+        df_clean[col] = series.fillna(fill_value)
+        
+        if len(series) > 10:
+            z_scores = np.abs((series - series.mean()) / series.std())
+            df_clean = df_clean[z_scores < outlier_threshold]
+    
+    return df_clean.reset_index(drop=True)
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): Dataframe to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
+
+def calculate_statistics(df, numeric_columns=None):
+    """
+    Calculate basic statistics for numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    numeric_columns (list): List of numeric column names
+    
+    Returns:
+    pd.DataFrame: Statistics dataframe
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    stats = []
+    for col in numeric_columns:
+        if col in df.columns:
+            series = df[col].dropna()
+            if len(series) > 0:
+                stats.append({
+                    'column': col,
+                    'count': len(series),
+                    'mean': series.mean(),
+                    'std': series.std(),
+                    'min': series.min(),
+                    '25%': series.quantile(0.25),
+                    'median': series.median(),
+                    '75%': series.quantile(0.75),
+                    'max': series.max(),
+                    'missing': df[col].isna().sum()
+                })
+    
+    return pd.DataFrame(stats)
