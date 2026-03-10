@@ -624,3 +624,48 @@ def get_data_summary(dataframe):
         'numeric_stats': dataframe.describe().to_dict() if not dataframe.select_dtypes(include=[np.number]).empty else {}
     }
     return summary
+import pandas as pd
+
+def clean_dataset(df, id_column='id'):
+    """
+    Remove duplicate rows based on an ID column and standardize column names.
+    """
+    if df.empty:
+        return df
+
+    df_cleaned = df.copy()
+
+    if id_column in df_cleaned.columns:
+        df_cleaned = df_cleaned.drop_duplicates(subset=[id_column], keep='first')
+    else:
+        df_cleaned = df_cleaned.drop_duplicates()
+
+    df_cleaned.columns = df_cleaned.columns.str.strip().str.lower().str.replace(' ', '_')
+    df_cleaned = df_cleaned.reset_index(drop=True)
+
+    return df_cleaned
+
+def validate_numeric_columns(df, numeric_columns):
+    """
+    Ensure specified columns contain only numeric values, coercing errors to NaN.
+    """
+    df_validated = df.copy()
+    for col in numeric_columns:
+        if col in df_validated.columns:
+            df_validated[col] = pd.to_numeric(df_validated[col], errors='coerce')
+    return df_validated
+
+if __name__ == "__main__":
+    sample_data = {
+        'ID': [1, 2, 2, 3, 4],
+        'Customer Name': ['Alice', 'Bob', 'Bob', 'Charlie', 'David'],
+        'Order Value': ['100', '150', '150', 'two hundred', '300']
+    }
+    df_sample = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df_sample)
+
+    cleaned_df = clean_dataset(df_sample, id_column='ID')
+    cleaned_df = validate_numeric_columns(cleaned_df, ['Order Value'])
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
