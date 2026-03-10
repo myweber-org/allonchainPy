@@ -139,3 +139,125 @@ if __name__ == "__main__":
     print("\nCleaned DataFrame:")
     cleaned = clean_dataset(df, sort_column='score')
     print(cleaned)
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, missing_strategy='mean'):
+    """
+    Load and clean CSV data by handling missing values.
+    
+    Args:
+        file_path (str): Path to the CSV file.
+        missing_strategy (str): Strategy for handling missing values.
+            Options: 'mean', 'median', 'drop', 'zero'.
+    
+    Returns:
+        pandas.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Loaded data with shape: {df.shape}")
+        
+        # Check for missing values
+        missing_count = df.isnull().sum().sum()
+        if missing_count > 0:
+            print(f"Found {missing_count} missing values")
+            
+            if missing_strategy == 'mean':
+                df = df.fillna(df.mean(numeric_only=True))
+            elif missing_strategy == 'median':
+                df = df.fillna(df.median(numeric_only=True))
+            elif missing_strategy == 'drop':
+                df = df.dropna()
+            elif missing_strategy == 'zero':
+                df = df.fillna(0)
+            else:
+                raise ValueError(f"Unknown strategy: {missing_strategy}")
+                
+            print(f"Applied '{missing_strategy}' strategy for missing values")
+        
+        # Remove duplicate rows
+        initial_rows = len(df)
+        df = df.drop_duplicates()
+        removed_duplicates = initial_rows - len(df)
+        if removed_duplicates > 0:
+            print(f"Removed {removed_duplicates} duplicate rows")
+        
+        # Reset index after cleaning
+        df = df.reset_index(drop=True)
+        print(f"Final data shape: {df.shape}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except pd.errors.EmptyDataError:
+        print("Error: The CSV file is empty")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pandas.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        bool: True if validation passes, False otherwise.
+    """
+    if df is None or df.empty:
+        print("Error: DataFrame is empty or None")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Error: Missing required columns: {missing_columns}")
+            return False
+    
+    # Check for infinite values
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if not numeric_cols.empty:
+        inf_count = np.isinf(df[numeric_cols]).sum().sum()
+        if inf_count > 0:
+            print(f"Warning: Found {inf_count} infinite values in numeric columns")
+    
+    print("Data validation passed")
+    return True
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to CSV.
+    
+    Args:
+        df (pandas.DataFrame): Cleaned DataFrame.
+        output_path (str): Path to save the cleaned data.
+    
+    Returns:
+        bool: True if save successful, False otherwise.
+    """
+    try:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+        return True
+    except Exception as e:
+        print(f"Error saving data: {str(e)}")
+        return False
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    # Clean the data
+    cleaned_df = clean_csv_data(input_file, missing_strategy='mean')
+    
+    # Validate the cleaned data
+    if cleaned_df is not None and validate_dataframe(cleaned_df):
+        # Save the cleaned data
+        save_cleaned_data(cleaned_df, output_file)
