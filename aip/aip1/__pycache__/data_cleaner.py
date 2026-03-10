@@ -252,3 +252,42 @@ if __name__ == "__main__":
     # Validate DataFrame
     is_valid, message = validate_dataframe(df, ['feature1', 'feature2', 'category'])
     print(f"\nValidation result: {is_valid}, Message: {message}")
+import pandas as pd
+
+def clean_dataset(df, column_to_sort=None, keep='first'):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and optionally sorting by a column.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        column_to_sort (str, optional): Column name to sort by. Defaults to None.
+        keep (str, optional): Which duplicates to keep. 'first', 'last', or False. Defaults to 'first'.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame with duplicates removed and optionally sorted.
+    """
+    cleaned_df = df.drop_duplicates(keep=keep)
+    
+    if column_to_sort and column_to_sort in cleaned_df.columns:
+        cleaned_df = cleaned_df.sort_values(by=column_to_sort).reset_index(drop=True)
+    
+    return cleaned_df
+
+def main():
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', 'David', 'David', 'Eve'],
+        'score': [85, 90, 90, 78, 92, 92, 88]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print()
+    
+    cleaned = clean_dataset(df, column_to_sort='score', keep='first')
+    print("Cleaned DataFrame (sorted by score):")
+    print(cleaned)
+
+if __name__ == "__main__":
+    main()
