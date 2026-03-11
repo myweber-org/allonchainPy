@@ -336,3 +336,66 @@ if __name__ == "__main__":
     cleaned_list = remove_duplicates_preserve_order(sample_list)
     print(f"Original list: {sample_list}")
     print(f"Cleaned list: {cleaned_list}")
+import pandas as pd
+import numpy as np
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns
+        self.categorical_columns = df.select_dtypes(exclude=[np.number]).columns
+
+    def fill_missing_numeric(self, method='mean'):
+        if method == 'mean':
+            fill_values = self.df[self.numeric_columns].mean()
+        elif method == 'median':
+            fill_values = self.df[self.numeric_columns].median()
+        elif method == 'mode':
+            fill_values = self.df[self.numeric_columns].mode().iloc[0]
+        else:
+            raise ValueError("Method must be 'mean', 'median', or 'mode'")
+        
+        self.df[self.numeric_columns] = self.df[self.numeric_columns].fillna(fill_values)
+        return self
+
+    def fill_missing_categorical(self, fill_value='Unknown'):
+        self.df[self.categorical_columns] = self.df[self.categorical_columns].fillna(fill_value)
+        return self
+
+    def remove_outliers_iqr(self, columns=None, multiplier=1.5):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        for col in columns:
+            if col in self.numeric_columns:
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - multiplier * IQR
+                upper_bound = Q3 + multiplier * IQR
+                
+                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+        
+        return self
+
+    def standardize_numeric(self):
+        for col in self.numeric_columns:
+            mean = self.df[col].mean()
+            std = self.df[col].std()
+            if std > 0:
+                self.df[col] = (self.df[col] - mean) / std
+        return self
+
+    def get_cleaned_data(self):
+        return self.df.copy()
+
+def clean_dataset(df, numeric_method='mean', categorical_fill='Unknown', remove_outliers=True):
+    cleaner = DataCleaner(df)
+    cleaner.fill_missing_numeric(method=numeric_method)
+    cleaner.fill_missing_categorical(fill_value=categorical_fill)
+    
+    if remove_outliers:
+        cleaner.remove_outliers_iqr()
+    
+    cleaner.standardize_numeric()
+    return cleaner.get_cleaned_data()
