@@ -70,3 +70,11 @@ if __name__ == "__main__":
     print("\nBasic Statistics after cleaning:")
     for key, value in stats.items():
         print(f"{key}: {value:.2f}")
+def remove_duplicates(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
