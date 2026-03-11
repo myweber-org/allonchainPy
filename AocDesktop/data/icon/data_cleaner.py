@@ -196,3 +196,16 @@ if __name__ == "__main__":
     
     is_valid = validate_dataframe(cleaned, required_columns=['A', 'B'])
     print(f"\nDataFrame is valid: {is_valid}")
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_data(data_list):
+    if not isinstance(data_list, list):
+        raise TypeError("Input must be a list")
+    return remove_duplicates_preserve_order(data_list)
