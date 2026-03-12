@@ -109,3 +109,64 @@ def clean_dataframe(df: pd.DataFrame,
                 cleaned_df = normalize_column(cleaned_df, col)
     
     return cleaned_df
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Args:
+        data: numpy array or list-like structure containing numerical data
+        column: index or key specifying which column to process
+    
+    Returns:
+        Cleaned data with outliers removed
+    """
+    if not isinstance(data, np.ndarray):
+        data = np.array(data)
+    
+    column_data = data[:, column] if data.ndim > 1 else data
+    
+    Q1 = np.percentile(column_data, 25)
+    Q3 = np.percentile(column_data, 75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    if data.ndim > 1:
+        mask = (column_data >= lower_bound) & (column_data <= upper_bound)
+        return data[mask]
+    else:
+        return column_data[(column_data >= lower_bound) & (column_data <= upper_bound)]
+
+def calculate_statistics(data):
+    """
+    Calculate basic statistics for the cleaned data.
+    
+    Args:
+        data: numpy array of cleaned data
+    
+    Returns:
+        Dictionary containing mean, median, and standard deviation
+    """
+    if len(data) == 0:
+        return {"mean": 0, "median": 0, "std": 0}
+    
+    return {
+        "mean": np.mean(data),
+        "median": np.median(data),
+        "std": np.std(data)
+    }
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = np.random.randn(1000) * 100 + 50
+    sample_data[50] = 10000  # Add an extreme outlier
+    
+    print("Original data shape:", sample_data.shape)
+    print("Original statistics:", calculate_statistics(sample_data))
+    
+    cleaned_data = remove_outliers_iqr(sample_data, 0)
+    print("\nCleaned data shape:", cleaned_data.shape)
+    print("Cleaned statistics:", calculate_statistics(cleaned_data))
