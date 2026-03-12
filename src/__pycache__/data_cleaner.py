@@ -205,4 +205,127 @@ if __name__ == "__main__":
     print(cleaned_df)
     
     is_valid = validate_data(cleaned_df, required_columns=['id', 'value', 'category'])
-    print(f"\nData is valid: {is_valid}")
+    print(f"\nData is valid: {is_valid}")import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, fill_strategy='mean'):
+    """
+    Load a CSV file, handle missing values, and return cleaned DataFrame.
+    
+    Args:
+        file_path (str): Path to the CSV file.
+        fill_strategy (str): Strategy for filling missing values.
+            Options: 'mean', 'median', 'mode', 'zero'.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {file_path}")
+    
+    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    
+    if fill_strategy == 'mean':
+        for col in numeric_columns:
+            df[col].fillna(df[col].mean(), inplace=True)
+    elif fill_strategy == 'median':
+        for col in numeric_columns:
+            df[col].fillna(df[col].median(), inplace=True)
+    elif fill_strategy == 'mode':
+        for col in numeric_columns:
+            df[col].fillna(df[col].mode()[0], inplace=True)
+    elif fill_strategy == 'zero':
+        df.fillna(0, inplace=True)
+    else:
+        raise ValueError(f"Invalid fill strategy: {fill_strategy}")
+    
+    object_columns = df.select_dtypes(include=['object']).columns
+    for col in object_columns:
+        df[col].fillna('Unknown', inplace=True)
+    
+    return df
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers from a column using the IQR method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column (str): Column name to process.
+        multiplier (float): IQR multiplier for outlier detection.
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise KeyError(f"Column '{column}' not found in DataFrame")
+    
+    if not np.issubdtype(df[column].dtype, np.number):
+        raise TypeError(f"Column '{column}' must be numeric")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize specified columns to have zero mean and unit variance.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        columns (list): List of column names to standardize.
+    
+    Returns:
+        pd.DataFrame: DataFrame with standardized columns.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    result_df = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+        
+        if np.issubdtype(df[col].dtype, np.number):
+            mean_val = df[col].mean()
+            std_val = df[col].std()
+            
+            if std_val > 0:
+                result_df[col] = (df[col] - mean_val) / std_val
+            else:
+                result_df[col] = 0
+    
+    return result_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [10, np.nan, 30, 40, 50],
+        'C': ['X', 'Y', np.nan, 'Z', 'W'],
+        'D': [100, 200, 300, 400, 500]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.to_csv('sample_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('sample_data.csv', fill_strategy='mean')
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    
+    filtered_df = remove_outliers_iqr(cleaned_df, 'D')
+    print("\nDataFrame after outlier removal:")
+    print(filtered_df)
+    
+    standardized_df = standardize_columns(filtered_df, ['A', 'B', 'D'])
+    print("\nDataFrame after standardization:")
+    print(standardized_df)
