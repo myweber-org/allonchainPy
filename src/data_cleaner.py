@@ -399,3 +399,100 @@ if __name__ == "__main__":
     print(f"Data cleaning complete. Saved to {output_file}")
     print(f"Original shape: {pd.read_csv(input_file).shape}")
     print(f"Cleaned shape: {cleaned_df.shape}")
+import pandas as pd
+import numpy as np
+
+def clean_missing_data(df, strategy='mean', columns=None):
+    """
+    Clean missing data in a DataFrame using specified strategy.
+    
+    Args:
+        df: pandas DataFrame
+        strategy: 'mean', 'median', 'mode', or 'drop'
+        columns: list of columns to clean, if None cleans all columns
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if columns is None:
+        columns = df.columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if df[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0]
+            elif strategy == 'drop':
+                df_clean = df_clean.dropna(subset=[col])
+                continue
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            df_clean[col] = df_clean[col].fillna(fill_value)
+    
+    return df_clean
+
+def remove_outliers(df, columns=None, threshold=3):
+    """
+    Remove outliers using z-score method.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of numeric columns to check
+        threshold: z-score threshold for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if pd.api.types.is_numeric_dtype(df[col]):
+            z_scores = np.abs((df[col] - df[col].mean()) / df[col].std())
+            df_clean = df_clean[z_scores < threshold]
+    
+    return df_clean.reset_index(drop=True)
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: list of columns that must be present
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
+
+def save_cleaned_data(df, output_path, index=False):
+    """
+    Save cleaned DataFrame to CSV file.
+    
+    Args:
+        df: pandas DataFrame
+        output_path: path to save the cleaned data
+        index: whether to save index
+    """
+    df.to_csv(output_path, index=index)
+    print(f"Cleaned data saved to: {output_path}")
