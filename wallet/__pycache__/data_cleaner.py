@@ -449,4 +449,35 @@ if __name__ == "__main__":
     print("Original shape:", sample_data.shape)
     print("Cleaned shape:", cleaned_data.shape)
     print("\nSummary statistics:")
-    print(summary_stats)
+    print(summary_stats)import pandas as pd
+
+def clean_dataframe(df):
+    """
+    Remove duplicate rows and standardize column names.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Standardize column names: lowercase and replace spaces with underscores
+    df_cleaned.columns = df_cleaned.columns.str.lower().str.replace(' ', '_')
+    
+    return df_cleaned
+
+def process_csv(input_path, output_path):
+    """
+    Read a CSV file, clean the data, and save to a new CSV file.
+    """
+    try:
+        df = pd.read_csv(input_path)
+        df_cleaned = clean_dataframe(df)
+        df_cleaned.to_csv(output_path, index=False)
+        print(f"Data cleaned and saved to {output_path}")
+    except FileNotFoundError:
+        print(f"Error: Input file not found at {input_path}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    process_csv(input_file, output_file)
