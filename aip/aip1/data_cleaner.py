@@ -1075,3 +1075,87 @@ def get_data_summary(df):
         'data_types': df.dtypes.to_dict()
     }
     return summary
+import pandas as pd
+import numpy as np
+from typing import Union, List, Optional
+
+def clean_dataset(
+    df: pd.DataFrame,
+    drop_duplicates: bool = True,
+    handle_missing: str = 'drop',
+    numeric_columns: Optional[List[str]] = None,
+    categorical_columns: Optional[List[str]] = None
+) -> pd.DataFrame:
+    """
+    Clean a pandas DataFrame by removing duplicates, handling missing values,
+    and converting data types.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if handle_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif handle_missing == 'fill':
+        if numeric_columns:
+            for col in numeric_columns:
+                if col in cleaned_df.columns:
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+        if categorical_columns:
+            for col in categorical_columns:
+                if col in cleaned_df.columns:
+                    cleaned_df[col] = cleaned_df[col].fillna('Unknown')
+    
+    if numeric_columns:
+        for col in numeric_columns:
+            if col in cleaned_df.columns:
+                cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
+    
+    if categorical_columns:
+        for col in categorical_columns:
+            if col in cleaned_df.columns:
+                cleaned_df[col] = cleaned_df[col].astype('category')
+    
+    return cleaned_df
+
+def validate_dataframe(df: pd.DataFrame) -> dict:
+    """
+    Validate DataFrame and return summary statistics.
+    """
+    validation_report = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'data_types': df.dtypes.to_dict(),
+        'memory_usage_mb': df.memory_usage(deep=True).sum() / 1024**2
+    }
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) > 0:
+        validation_report['numeric_stats'] = df[numeric_cols].describe().to_dict()
+    
+    return validation_report
+
+def export_cleaned_data(
+    df: pd.DataFrame,
+    output_path: str,
+    format: str = 'csv'
+) -> None:
+    """
+    Export cleaned DataFrame to specified format.
+    """
+    if format == 'csv':
+        df.to_csv(output_path, index=False)
+    elif format == 'excel':
+        df.to_excel(output_path, index=False)
+    elif format == 'parquet':
+        df.to_parquet(output_path, index=False)
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+    
+    print(f"Data exported successfully to {output_path}")
