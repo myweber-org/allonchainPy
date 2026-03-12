@@ -86,4 +86,88 @@ def clean_dataset(file_path):
 if __name__ == "__main__":
     cleaned_df = clean_dataset('sample_data.csv')
     cleaned_df.to_csv('cleaned_data.csv', index=False)
-    print("Data cleaning completed. Cleaned data saved to 'cleaned_data.csv'")
+    print("Data cleaning completed. Cleaned data saved to 'cleaned_data.csv'")import pandas as pd
+import re
+
+def clean_dataframe(df, text_columns=None, drop_duplicates=True, lowercase=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and standardizing text columns.
+    
+    Args:
+        df: pandas DataFrame to clean
+        text_columns: list of column names to standardize (if None, auto-detect string columns)
+        drop_duplicates: whether to remove duplicate rows
+        lowercase: whether to convert text to lowercase
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    df_clean = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(df_clean)
+        df_clean = df_clean.drop_duplicates()
+        removed = initial_rows - len(df_clean)
+        print(f"Removed {removed} duplicate rows")
+    
+    if text_columns is None:
+        text_columns = df_clean.select_dtypes(include=['object']).columns.tolist()
+    
+    for col in text_columns:
+        if col in df_clean.columns:
+            df_clean[col] = df_clean[col].astype(str)
+            
+            if lowercase:
+                df_clean[col] = df_clean[col].str.lower()
+            
+            df_clean[col] = df_clean[col].apply(lambda x: re.sub(r'\s+', ' ', x.strip()))
+    
+    return df_clean
+
+def validate_email(email):
+    """
+    Validate email format using regex.
+    
+    Args:
+        email: string to validate as email
+    
+    Returns:
+        Boolean indicating if email is valid
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email)))
+
+def extract_numeric(text):
+    """
+    Extract numeric values from text.
+    
+    Args:
+        text: string containing numeric values
+    
+    Returns:
+        List of numeric values found in text
+    """
+    numbers = re.findall(r'\d+\.?\d*', str(text))
+    return [float(num) if '.' in num else int(num) for num in numbers]
+
+if __name__ == "__main__":
+    sample_data = {
+        'name': ['John Doe', 'Jane Smith', 'John Doe', 'ALICE JONES'],
+        'email': ['john@example.com', 'jane@test.org', 'invalid-email', 'alice@company.co'],
+        'notes': ['  Multiple   spaces  ', 'MixedCase Text', 'normal text', '123 main st']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned_df = clean_dataframe(df)
+    print(cleaned_df)
+    
+    print("\nEmail validation:")
+    for email in df['email']:
+        print(f"{email}: {validate_email(email)}")
+    
+    print("\nNumeric extraction from notes:")
+    for note in df['notes']:
+        print(f"{note}: {extract_numeric(note)}")
