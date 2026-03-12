@@ -1207,3 +1207,15 @@ if __name__ == "__main__":
     print("\nCleaned dataset shape:", cleaned_data.shape)
     print("\nCleaned summary statistics:")
     print(get_summary_statistics(cleaned_data, ['feature1', 'feature2', 'feature3']))
+def remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    unique_list = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            unique_list.append(item)
+    return unique_list
