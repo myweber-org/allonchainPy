@@ -144,4 +144,40 @@ def remove_duplicates(seq):
         if item not in seen:
             seen.add(item)
             result.append(item)
-    return result
+    return resultimport re
+import pandas as pd
+
+def remove_special_characters(text):
+    """Remove non-alphanumeric characters from a string."""
+    if pd.isna(text):
+        return text
+    return re.sub(r'[^A-Za-z0-9\s]+', '', str(text))
+
+def validate_email(email):
+    """Validate an email address format."""
+    if pd.isna(email):
+        return False
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email)))
+
+def clean_dataframe(df, columns_to_clean=None):
+    """Clean a DataFrame by removing special characters from specified columns."""
+    df_clean = df.copy()
+    if columns_to_clean is None:
+        columns_to_clean = df_clean.select_dtypes(include=['object']).columns
+    
+    for col in columns_to_clean:
+        if col in df_clean.columns:
+            df_clean[col] = df_clean[col].apply(remove_special_characters)
+    
+    return df_clean
+
+def add_valid_email_column(df, email_column):
+    """Add a boolean column indicating if the email in the specified column is valid."""
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+    
+    df_copy = df.copy()
+    new_column_name = f"{email_column}_valid"
+    df_copy[new_column_name] = df_copy[email_column].apply(validate_email)
+    return df_copy
