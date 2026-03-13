@@ -811,3 +811,54 @@ if __name__ == "__main__":
     
     cleaned_df = load_and_clean_data(input_file)
     save_cleaned_data(cleaned_df, output_file)
+import re
+import pandas as pd
+from typing import Union, List, Optional
+
+def remove_duplicates(data: Union[List, pd.Series, pd.DataFrame]) -> Union[List, pd.Series, pd.DataFrame]:
+    """
+    Remove duplicate entries from a list, Series, or DataFrame.
+    """
+    if isinstance(data, list):
+        return list(dict.fromkeys(data))
+    elif isinstance(data, pd.Series):
+        return data.drop_duplicates()
+    elif isinstance(data, pd.DataFrame):
+        return data.drop_duplicates()
+    else:
+        raise TypeError("Input must be a list, pandas Series, or pandas DataFrame")
+
+def validate_email(email: str) -> bool:
+    """
+    Validate an email address format.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def normalize_string(text: str, case: str = 'lower') -> str:
+    """
+    Normalize string by stripping whitespace and adjusting case.
+    """
+    text = text.strip()
+    if case == 'lower':
+        return text.lower()
+    elif case == 'upper':
+        return text.upper()
+    elif case == 'title':
+        return text.title()
+    else:
+        return text
+
+def fill_missing_values(df: pd.DataFrame, column: str, value: Union[str, int, float]) -> pd.DataFrame:
+    """
+    Fill missing values in a specified column of a DataFrame.
+    """
+    df_copy = df.copy()
+    df_copy[column] = df_copy[column].fillna(value)
+    return df_copy
+
+def filter_by_threshold(data: List[float], threshold: float) -> List[float]:
+    """
+    Filter numeric values above a given threshold.
+    """
+    return [x for x in data if x > threshold]
