@@ -852,3 +852,114 @@ if __name__ == "__main__":
     print("\nRemoving outliers from column 'B':")
     no_outliers = remove_outliers(cleaned, 'B', method='iqr')
     print(no_outliers)
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_duplicates(self, subset: Optional[List[str]] = None) -> pd.DataFrame:
+        """Remove duplicate rows from the dataframe."""
+        initial_count = len(self.df)
+        self.df = self.df.drop_duplicates(subset=subset, keep='first')
+        removed = initial_count - len(self.df)
+        print(f"Removed {removed} duplicate rows")
+        return self.df
+    
+    def normalize_column(self, column_name: str) -> pd.DataFrame:
+        """Normalize a numeric column to range [0, 1]."""
+        if column_name not in self.df.columns:
+            raise ValueError(f"Column '{column_name}' not found in dataframe")
+        
+        if not pd.api.types.is_numeric_dtype(self.df[column_name]):
+            raise ValueError(f"Column '{column_name}' is not numeric")
+        
+        col_min = self.df[column_name].min()
+        col_max = self.df[column_name].max()
+        
+        if col_max == col_min:
+            self.df[column_name] = 0.5
+        else:
+            self.df[column_name] = (self.df[column_name] - col_min) / (col_max - col_min)
+        
+        print(f"Normalized column '{column_name}' to range [0, 1]")
+        return self.df
+    
+    def fill_missing_values(self, strategy: str = 'mean', columns: Optional[List[str]] = None) -> pd.DataFrame:
+        """Fill missing values using specified strategy."""
+        if columns is None:
+            columns = self.df.columns
+        
+        for col in columns:
+            if col not in self.df.columns:
+                continue
+                
+            missing_count = self.df[col].isnull().sum()
+            if missing_count == 0:
+                continue
+                
+            if strategy == 'mean' and pd.api.types.is_numeric_dtype(self.df[col]):
+                fill_value = self.df[col].mean()
+            elif strategy == 'median' and pd.api.types.is_numeric_dtype(self.df[col]):
+                fill_value = self.df[col].median()
+            elif strategy == 'mode':
+                fill_value = self.df[col].mode()[0] if not self.df[col].mode().empty else None
+            elif strategy == 'zero':
+                fill_value = 0
+            else:
+                fill_value = None
+                
+            if fill_value is not None:
+                self.df[col].fillna(fill_value, inplace=True)
+                print(f"Filled {missing_count} missing values in column '{col}' using {strategy} strategy")
+        
+        return self.df
+    
+    def get_summary(self) -> dict:
+        """Get cleaning summary statistics."""
+        final_shape = self.df.shape
+        return {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'current_rows': final_shape[0],
+            'current_columns': final_shape[1],
+            'rows_removed': self.original_shape[0] - final_shape[0],
+            'missing_values': self.df.isnull().sum().sum()
+        }
+    
+    def save_cleaned_data(self, filepath: str) -> None:
+        """Save cleaned dataframe to file."""
+        self.df.to_csv(filepath, index=False)
+        print(f"Cleaned data saved to {filepath}")
+
+def example_usage():
+    """Example usage of the DataCleaner class."""
+    data = {
+        'id': [1, 2, 3, 4, 5, 5],
+        'value': [10, 20, None, 40, 50, 50],
+        'score': [0.5, 0.8, 0.3, 0.9, 1.2, 1.2]
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaner = DataCleaner(df)
+    cleaner.remove_duplicates()
+    cleaner.fill_missing_values(strategy='mean')
+    cleaner.normalize_column('score')
+    
+    print("\nCleaned DataFrame:")
+    print(cleaner.df)
+    
+    summary = cleaner.get_summary()
+    print("\nCleaning Summary:")
+    for key, value in summary.items():
+        print(f"{key}: {value}")
+
+if __name__ == "__main__":
+    example_usage()
