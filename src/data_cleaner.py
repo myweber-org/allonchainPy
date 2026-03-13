@@ -897,4 +897,15 @@ def filter_none_values(input_list):
     """
     Return a new list with all None values removed.
     """
-    return [item for item in input_list if item is not None]
+    return [item for item in input_list if item is not None]def remove_duplicates(input_list):
+    """
+    Removes duplicate elements from a list while preserving the original order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    unique_list = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            unique_list.append(item)
+    return unique_list
