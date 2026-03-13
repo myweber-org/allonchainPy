@@ -528,3 +528,147 @@ if __name__ == "__main__":
     # Validate the cleaned data
     is_valid = validate_dataframe(cleaned_df, required_columns=['id', 'name', 'age', 'score'], min_rows=3)
     print(f"\nData validation passed: {is_valid}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, multiplier=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    return filtered_df
+
+def remove_outliers_zscore(dataframe, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    z_scores = np.abs(stats.zscore(dataframe[column]))
+    filtered_df = dataframe[z_scores < threshold]
+    return filtered_df
+
+def normalize_minmax(dataframe, columns):
+    """
+    Normalize specified columns using Min-Max scaling
+    """
+    df_normalized = dataframe.copy()
+    for col in columns:
+        if col in df_normalized.columns:
+            min_val = df_normalized[col].min()
+            max_val = df_normalized[col].max()
+            if max_val != min_val:
+                df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+    return df_normalized
+
+def normalize_zscore(dataframe, columns):
+    """
+    Normalize specified columns using Z-score standardization
+    """
+    df_normalized = dataframe.copy()
+    for col in columns:
+        if col in df_normalized.columns:
+            mean_val = df_normalized[col].mean()
+            std_val = df_normalized[col].std()
+            if std_val > 0:
+                df_normalized[col] = (df_normalized[col] - mean_val) / std_val
+    return df_normalized
+
+def handle_missing_values(dataframe, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns
+    """
+    df_processed = dataframe.copy()
+    
+    if columns is None:
+        columns = df_processed.columns
+    
+    for col in columns:
+        if col in df_processed.columns and df_processed[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df_processed[col].mean()
+            elif strategy == 'median':
+                fill_value = df_processed[col].median()
+            elif strategy == 'mode':
+                fill_value = df_processed[col].mode()[0]
+            elif strategy == 'drop':
+                df_processed = df_processed.dropna(subset=[col])
+                continue
+            else:
+                fill_value = 0
+            
+            df_processed[col] = df_processed[col].fillna(fill_value)
+    
+    return df_processed
+
+def validate_dataframe(dataframe, required_columns=None, min_rows=1):
+    """
+    Validate dataframe structure and content
+    """
+    if dataframe.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if len(dataframe) < min_rows:
+        raise ValueError(f"DataFrame has fewer than {min_rows} rows")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in dataframe.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+def clean_dataset(dataframe, config):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    df_clean = dataframe.copy()
+    
+    # Validate input
+    validate_dataframe(df_clean, config.get('required_columns'))
+    
+    # Handle missing values
+    if 'missing_values' in config:
+        df_clean = handle_missing_values(
+            df_clean,
+            strategy=config['missing_values'].get('strategy', 'mean'),
+            columns=config['missing_values'].get('columns')
+        )
+    
+    # Remove outliers
+    if 'outlier_removal' in config:
+        method = config['outlier_removal'].get('method', 'iqr')
+        columns = config['outlier_removal'].get('columns', [])
+        
+        for col in columns:
+            if col in df_clean.columns:
+                if method == 'iqr':
+                    df_clean = remove_outliers_iqr(
+                        df_clean, 
+                        col,
+                        multiplier=config['outlier_removal'].get('multiplier', 1.5)
+                    )
+                elif method == 'zscore':
+                    df_clean = remove_outliers_zscore(
+                        df_clean,
+                        col,
+                        threshold=config['outlier_removal'].get('threshold', 3)
+                    )
+    
+    # Normalize data
+    if 'normalization' in config:
+        method = config['normalization'].get('method', 'minmax')
+        columns = config['normalization'].get('columns', [])
+        
+        if method == 'minmax':
+            df_clean = normalize_minmax(df_clean, columns)
+        elif method == 'zscore':
+            df_clean = normalize_zscore(df_clean, columns)
+    
+    return df_clean
