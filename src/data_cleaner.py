@@ -893,3 +893,8 @@ if __name__ == "__main__":
         print(cleaned)
     except ValueError as e:
         print(f"Validation error: {e}")
+def filter_none_values(input_list):
+    """
+    Return a new list with all None values removed.
+    """
+    return [item for item in input_list if item is not None]
