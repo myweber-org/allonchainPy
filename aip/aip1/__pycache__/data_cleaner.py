@@ -417,3 +417,102 @@ if __name__ == "__main__":
         print(f"\nStatistics for {col}:")
         for key, value in stats.items():
             print(f"  {key}: {value:.2f}")
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def normalize_column(df, column):
+    """
+    Normalize a column using min-max scaling.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to normalize
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_copy = df.copy()
+    min_val = df_copy[column].min()
+    max_val = df_copy[column].max()
+    
+    if max_val == min_val:
+        df_copy[column + '_normalized'] = 0.5
+    else:
+        df_copy[column + '_normalized'] = (df_copy[column] - min_val) / (max_val - min_val)
+    
+    return df_copy
+
+def handle_missing_values(df, strategy='mean'):
+    """
+    Handle missing values in numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): Imputation strategy ('mean', 'median', 'mode', or 'drop')
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    df_copy = df.copy()
+    numeric_cols = df_copy.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        if df_copy[col].isnull().any():
+            if strategy == 'mean':
+                df_copy[col].fillna(df_copy[col].mean(), inplace=True)
+            elif strategy == 'median':
+                df_copy[col].fillna(df_copy[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df_copy[col].fillna(df_copy[col].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                df_copy = df_copy.dropna(subset=[col])
+            else:
+                raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+    
+    return df_copy
+
+if __name__ == "__main__":
+    sample_data = {
+        'values': [1, 2, 3, 4, 5, 100, 6, 7, 8, 9, 10, 200],
+        'other_values': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = remove_outliers_iqr(df, 'values')
+    print("\nDataFrame after outlier removal:")
+    print(cleaned_df)
+    
+    normalized_df = normalize_column(cleaned_df, 'other_values')
+    print("\nDataFrame after normalization:")
+    print(normalized_df)
