@@ -973,3 +973,64 @@ if __name__ == "__main__":
         validate_dataframe(cleaned_df, required_columns=['id', 'value'])
     except ValueError as e:
         print(f"Validation error: {e}")
+import pandas as pd
+
+def clean_dataset(df, missing_strategy='drop', duplicate_strategy='drop_first'):
+    """
+    Clean a pandas DataFrame by handling missing values and duplicates.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        missing_strategy (str): Strategy for handling missing values.
+                               Options: 'drop', 'fill_mean', 'fill_median', 'fill_mode'
+        duplicate_strategy (str): Strategy for handling duplicates.
+                                 Options: 'drop_first', 'drop_last', 'keep_none'
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if missing_strategy == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif missing_strategy == 'fill_mean':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+    elif missing_strategy == 'fill_median':
+        cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+    elif missing_strategy == 'fill_mode':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
+    
+    # Handle duplicates
+    if duplicate_strategy == 'drop_first':
+        cleaned_df = cleaned_df.drop_duplicates(keep='first')
+    elif duplicate_strategy == 'drop_last':
+        cleaned_df = cleaned_df.drop_duplicates(keep='last')
+    elif duplicate_strategy == 'keep_none':
+        cleaned_df = cleaned_df.drop_duplicates(keep=False)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate that a DataFrame meets basic requirements.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of column names that must be present
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
