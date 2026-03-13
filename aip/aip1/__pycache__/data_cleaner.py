@@ -177,4 +177,149 @@ if __name__ == "__main__":
     print("\nCleaned DataFrame:")
     print(cleaned_df)
     print("\nCleaned Statistics:")
-    print(calculate_basic_stats(cleaned_df, 'values'))
+    print(calculate_basic_stats(cleaned_df, 'values'))import numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using IQR method
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers, lower_bound, upper_bound
+
+def remove_outliers(data, column, threshold=1.5):
+    """
+    Remove outliers from dataset
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values with different strategies
+    """
+    if columns is None:
+        columns = data.columns
+    
+    data_filled = data.copy()
+    
+    for col in columns:
+        if data[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = data[col].mean()
+            elif strategy == 'median':
+                fill_value = data[col].median()
+            elif strategy == 'mode':
+                fill_value = data[col].mode()[0]
+            elif strategy == 'ffill':
+                data_filled[col] = data[col].fillna(method='ffill')
+                continue
+            elif strategy == 'bfill':
+                data_filled[col] = data[col].fillna(method='bfill')
+                continue
+            else:
+                fill_value = 0
+            
+            data_filled[col] = data[col].fillna(fill_value)
+    
+    return data_filled
+
+def clean_dataset(data, outlier_columns=None, normalize_columns=None, 
+                  standardize_columns=None, missing_strategy='mean'):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    cleaned_data = data.copy()
+    
+    # Handle missing values
+    cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy)
+    
+    # Remove outliers
+    if outlier_columns:
+        for col in outlier_columns:
+            cleaned_data = remove_outliers(cleaned_data, col)
+    
+    # Normalize specified columns
+    if normalize_columns:
+        for col in normalize_columns:
+            cleaned_data[col + '_normalized'] = normalize_minmax(cleaned_data, col)
+    
+    # Standardize specified columns
+    if standardize_columns:
+        for col in standardize_columns:
+            cleaned_data[col + '_standardized'] = standardize_zscore(cleaned_data, col)
+    
+    return cleaned_data
+
+def get_data_summary(data):
+    """
+    Generate comprehensive data summary
+    """
+    summary = {
+        'shape': data.shape,
+        'dtypes': data.dtypes.to_dict(),
+        'missing_values': data.isnull().sum().to_dict(),
+        'numeric_stats': data.describe().to_dict(),
+        'unique_counts': data.nunique().to_dict()
+    }
+    return summary
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    np.random.seed(42)
+    sample_data = pd.DataFrame({
+        'feature1': np.random.normal(100, 15, 100),
+        'feature2': np.random.exponential(50, 100),
+        'feature3': np.random.randint(1, 100, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    })
+    
+    # Add some outliers and missing values
+    sample_data.loc[10, 'feature1'] = 500
+    sample_data.loc[20, 'feature2'] = 1000
+    sample_data.loc[30:35, 'feature3'] = np.nan
+    
+    # Clean the data
+    cleaned = clean_dataset(
+        sample_data,
+        outlier_columns=['feature1', 'feature2'],
+        normalize_columns=['feature1'],
+        standardize_columns=['feature2'],
+        missing_strategy='median'
+    )
+    
+    # Get summary
+    summary = get_data_summary(cleaned)
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned.shape}")
+    print(f"Missing values in cleaned data: {cleaned.isnull().sum().sum()}")
