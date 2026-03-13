@@ -358,4 +358,101 @@ if __name__ == "__main__":
         sys.exit(1)
 
     weather_data = get_weather(api_key, city_name)
-    display_weather(weather_data)
+    display_weather(weather_data)import requests
+import json
+from datetime import datetime
+import logging
+
+class WeatherFetcher:
+    def __init__(self, api_key, base_url="http://api.openweathermap.org/data/2.5"):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.session = requests.Session()
+        logging.basicConfig(level=logging.INFO)
+        
+    def get_current_weather(self, city_name, country_code=None):
+        """Fetch current weather data for a given city."""
+        try:
+            query = city_name
+            if country_code:
+                query += f",{country_code}"
+                
+            params = {
+                'q': query,
+                'appid': self.api_key,
+                'units': 'metric'
+            }
+            
+            response = self.session.get(
+                f"{self.base_url}/weather",
+                params=params,
+                timeout=10
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            return self._parse_weather_data(data)
+            
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Failed to fetch weather data: {e}")
+            return None
+        except json.JSONDecodeError as e:
+            logging.error(f"Invalid JSON response: {e}")
+            return None
+    
+    def _parse_weather_data(self, raw_data):
+        """Parse and structure raw weather data."""
+        return {
+            'timestamp': datetime.now().isoformat(),
+            'location': {
+                'city': raw_data.get('name'),
+                'country': raw_data.get('sys', {}).get('country'),
+                'coordinates': raw_data.get('coord', {})
+            },
+            'weather': {
+                'main': raw_data.get('weather', [{}])[0].get('main'),
+                'description': raw_data.get('weather', [{}])[0].get('description'),
+                'temperature': raw_data.get('main', {}).get('temp'),
+                'feels_like': raw_data.get('main', {}).get('feels_like'),
+                'humidity': raw_data.get('main', {}).get('humidity'),
+                'pressure': raw_data.get('main', {}).get('pressure'),
+                'wind_speed': raw_data.get('wind', {}).get('speed'),
+                'wind_direction': raw_data.get('wind', {}).get('deg')
+            },
+            'visibility': raw_data.get('visibility'),
+            'clouds': raw_data.get('clouds', {}).get('all')
+        }
+    
+    def save_to_file(self, data, filename="weather_data.json"):
+        """Save weather data to a JSON file."""
+        try:
+            with open(filename, 'w') as f:
+                json.dump(data, f, indent=2)
+            logging.info(f"Weather data saved to {filename}")
+            return True
+        except IOError as e:
+            logging.error(f"Failed to save data: {e}")
+            return False
+
+def main():
+    # Example usage
+    API_KEY = "your_api_key_here"  # Replace with actual API key
+    
+    fetcher = WeatherFetcher(API_KEY)
+    
+    # Fetch weather for London
+    weather_data = fetcher.get_current_weather("London", "UK")
+    
+    if weather_data:
+        print(f"Current weather in {weather_data['location']['city']}:")
+        print(f"Temperature: {weather_data['weather']['temperature']}°C")
+        print(f"Condition: {weather_data['weather']['description']}")
+        print(f"Humidity: {weather_data['weather']['humidity']}%")
+        
+        # Save to file
+        fetcher.save_to_file(weather_data)
+    else:
+        print("Failed to fetch weather data")
+
+if __name__ == "__main__":
+    main()
