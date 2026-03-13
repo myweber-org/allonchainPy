@@ -582,3 +582,11 @@ def load_and_clean_csv(filepath: str,
     cleaner.remove_duplicates()
     
     return cleaner.get_cleaned_data()
+def deduplicate_list(original_list):
+    seen = set()
+    deduplicated = []
+    for item in original_list:
+        if item not in seen:
+            seen.add(item)
+            deduplicated.append(item)
+    return deduplicated
