@@ -381,3 +381,90 @@ def validate_data(data, required_columns=None, check_missing=True, check_duplica
         validation_report['duplicate_rows'] = duplicate_count
     
     return validation_report
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by removing duplicate rows,
+    standardizing column names, and filling missing values.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+
+    # Standardize column names: lowercase and replace spaces with underscores
+    df_cleaned.columns = df_cleaned.columns.str.lower().str.replace(' ', '_')
+
+    # Fill missing numeric values with column median
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].median())
+
+    # Fill missing categorical values with mode
+    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        mode_value = df_cleaned[col].mode()
+        if not mode_value.empty:
+            df_cleaned[col] = df_cleaned[col].fillna(mode_value.iloc[0])
+
+    return df_cleaned
+
+def validate_dataframe(df):
+    """
+    Validate DataFrame for required columns and data integrity.
+    """
+    required_columns = ['id', 'name', 'value']
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    # Check for negative values in numeric columns
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if (df[col] < 0).any():
+            print(f"Warning: Negative values found in column '{col}'")
+    
+    return True
+
+def process_data(file_path):
+    """
+    Main function to load, clean, and validate data from a CSV file.
+    """
+    try:
+        # Load data
+        df = pd.read_csv(file_path)
+        
+        # Clean data
+        df_cleaned = clean_dataframe(df)
+        
+        # Validate data
+        validate_dataframe(df_cleaned)
+        
+        # Save cleaned data
+        output_path = file_path.replace('.csv', '_cleaned.csv')
+        df_cleaned.to_csv(output_path, index=False)
+        
+        print(f"Data cleaning complete. Cleaned data saved to: {output_path}")
+        return df_cleaned
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at path: {file_path}")
+    except Exception as e:
+        print(f"Error during data processing: {str(e)}")
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'ID': [1, 2, 2, 3, 4],
+        'Name': ['Alice', 'Bob', 'Bob', 'Charlie', None],
+        'Value': [100, 200, 200, None, 400],
+        'Category': ['A', 'B', 'B', 'A', 'A']
+    }
+    
+    df_sample = pd.DataFrame(sample_data)
+    cleaned_df = clean_dataframe(df_sample)
+    print("Original DataFrame:")
+    print(df_sample)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
