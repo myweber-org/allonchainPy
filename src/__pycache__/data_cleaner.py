@@ -1,33 +1,4 @@
 
-import numpy as np
-import pandas as pd
-
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    return filtered_df
-
-def clean_dataset(df, numeric_columns):
-    cleaned_df = df.copy()
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-    cleaned_df = cleaned_df.dropna()
-    cleaned_df = cleaned_df.reset_index(drop=True)
-    return cleaned_df
-
-if __name__ == "__main__":
-    sample_data = {'values': [10, 12, 12, 13, 12, 11, 10, 100, 12, 14, 12, 10]}
-    df = pd.DataFrame(sample_data)
-    print("Original data:")
-    print(df)
-    cleaned = clean_dataset(df, ['values'])
-    print("\nCleaned data:")
-    print(cleaned)
 import pandas as pd
 import numpy as np
 
@@ -37,11 +8,14 @@ def remove_outliers_iqr(df, column):
     
     Parameters:
     df (pd.DataFrame): The input DataFrame.
-    column (str): The column name to clean.
+    column (str): The column name to process.
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed.
+    pd.DataFrame: DataFrame with outliers removed from the specified column.
     """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
     Q1 = df[column].quantile(0.25)
     Q3 = df[column].quantile(0.75)
     IQR = Q3 - Q1
@@ -51,40 +25,58 @@ def remove_outliers_iqr(df, column):
     
     filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
-    return filtered_df
+    return filtered_df.reset_index(drop=True)
 
-def calculate_basic_stats(df, column):
+def calculate_summary_statistics(df, column):
     """
-    Calculate basic statistics for a column.
+    Calculate summary statistics for a DataFrame column.
     
     Parameters:
     df (pd.DataFrame): The input DataFrame.
-    column (str): The column name.
+    column (str): The column name to analyze.
     
     Returns:
-    dict: Dictionary containing count, mean, std, min, and max.
+    dict: Dictionary containing count, mean, std, min, max, and IQR.
     """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
     stats = {
         'count': df[column].count(),
         'mean': df[column].mean(),
         'std': df[column].std(),
         'min': df[column].min(),
-        'max': df[column].max()
+        'max': df[column].max(),
+        'Q1': df[column].quantile(0.25),
+        'Q3': df[column].quantile(0.75),
+        'IQR': df[column].quantile(0.75) - df[column].quantile(0.25)
     }
+    
     return stats
 
+def example_usage():
+    """
+    Example usage of the data cleaning functions.
+    """
+    np.random.seed(42)
+    data = {
+        'id': range(100),
+        'value': np.random.normal(100, 15, 100)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    print("Original DataFrame shape:", df.shape)
+    print("Original summary statistics:")
+    print(calculate_summary_statistics(df, 'value'))
+    
+    cleaned_df = remove_outliers_iqr(df, 'value')
+    
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("Cleaned summary statistics:")
+    print(calculate_summary_statistics(cleaned_df, 'value'))
+    
+    return cleaned_df
+
 if __name__ == "__main__":
-    sample_data = {'values': [10, 12, 12, 13, 12, 11, 10, 100, 12, 14, 15, 10, 9, 8, 12, 11, 200]}
-    df = pd.DataFrame(sample_data)
-    
-    print("Original DataFrame:")
-    print(df)
-    print("\nOriginal Statistics:")
-    print(calculate_basic_stats(df, 'values'))
-    
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    
-    print("\nCleaned DataFrame:")
-    print(cleaned_df)
-    print("\nCleaned Statistics:")
-    print(calculate_basic_stats(cleaned_df, 'values'))
+    cleaned_data = example_usage()
