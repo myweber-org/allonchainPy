@@ -468,3 +468,117 @@ if __name__ == "__main__":
     print(df_sample)
     print("\nCleaned DataFrame:")
     print(cleaned_df)
+import pandas as pd
+import numpy as np
+from typing import Optional, Union, List
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_duplicates(self, subset: Optional[List[str]] = None) -> 'DataCleaner':
+        self.df = self.df.drop_duplicates(subset=subset, keep='first')
+        return self
+        
+    def handle_missing_values(self, 
+                             strategy: str = 'mean', 
+                             columns: Optional[List[str]] = None) -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns.tolist()
+            
+        for col in columns:
+            if col in self.df.columns:
+                if strategy == 'mean':
+                    self.df[col].fillna(self.df[col].mean(), inplace=True)
+                elif strategy == 'median':
+                    self.df[col].fillna(self.df[col].median(), inplace=True)
+                elif strategy == 'mode':
+                    self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+                elif strategy == 'drop':
+                    self.df = self.df.dropna(subset=[col])
+                elif strategy == 'zero':
+                    self.df[col].fillna(0, inplace=True)
+                    
+        return self
+        
+    def remove_outliers(self, 
+                       method: str = 'iqr', 
+                       columns: Optional[List[str]] = None,
+                       threshold: float = 1.5) -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns.tolist()
+            
+        for col in columns:
+            if col in self.df.columns:
+                if method == 'iqr':
+                    Q1 = self.df[col].quantile(0.25)
+                    Q3 = self.df[col].quantile(0.75)
+                    IQR = Q3 - Q1
+                    lower_bound = Q1 - threshold * IQR
+                    upper_bound = Q3 + threshold * IQR
+                    self.df = self.df[(self.df[col] >= lower_bound) & 
+                                     (self.df[col] <= upper_bound)]
+                    
+        return self
+        
+    def normalize_data(self, 
+                      method: str = 'minmax',
+                      columns: Optional[List[str]] = None) -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns.tolist()
+            
+        for col in columns:
+            if col in self.df.columns:
+                if method == 'minmax':
+                    min_val = self.df[col].min()
+                    max_val = self.df[col].max()
+                    if max_val != min_val:
+                        self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+                elif method == 'zscore':
+                    mean_val = self.df[col].mean()
+                    std_val = self.df[col].std()
+                    if std_val != 0:
+                        self.df[col] = (self.df[col] - mean_val) / std_val
+                        
+        return self
+        
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df.copy()
+        
+    def get_cleaning_report(self) -> dict:
+        final_shape = self.df.shape
+        rows_removed = self.original_shape[0] - final_shape[0]
+        cols_removed = self.original_shape[1] - final_shape[1]
+        
+        return {
+            'original_shape': self.original_shape,
+            'final_shape': final_shape,
+            'rows_removed': rows_removed,
+            'columns_removed': cols_removed,
+            'missing_values': self.df.isnull().sum().to_dict(),
+            'data_types': self.df.dtypes.to_dict()
+        }
+        
+    def save_cleaned_data(self, filepath: str, format: str = 'csv'):
+        if format == 'csv':
+            self.df.to_csv(filepath, index=False)
+        elif format == 'excel':
+            self.df.to_excel(filepath, index=False)
+        elif format == 'parquet':
+            self.df.to_parquet(filepath, index=False)
+
+def load_and_clean_csv(filepath: str, 
+                      missing_strategy: str = 'mean',
+                      remove_outliers: bool = True) -> pd.DataFrame:
+    df = pd.read_csv(filepath)
+    cleaner = DataCleaner(df)
+    
+    cleaner.handle_missing_values(strategy=missing_strategy)
+    
+    if remove_outliers:
+        cleaner.remove_outliers()
+        
+    cleaner.remove_duplicates()
+    
+    return cleaner.get_cleaned_data()
