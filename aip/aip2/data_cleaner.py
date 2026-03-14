@@ -122,3 +122,70 @@ def validate_data(data, required_columns, numeric_threshold=0.8):
             validation_results['validation_passed'] = False
     
     return validation_results
+import pandas as pd
+import numpy as np
+
+def remove_missing_values(df, threshold=0.5):
+    """
+    Remove columns with missing values exceeding threshold percentage.
+    """
+    missing_percent = df.isnull().sum() / len(df)
+    columns_to_drop = missing_percent[missing_percent > threshold].index
+    df_cleaned = df.drop(columns=columns_to_drop)
+    return df_cleaned
+
+def fill_missing_with_median(df, columns=None):
+    """
+    Fill missing values with column median.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    df_filled = df.copy()
+    for col in columns:
+        if col in df.columns:
+            df_filled[col] = df_filled[col].fillna(df_filled[col].median())
+    return df_filled
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers using IQR method.
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    df_filtered = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return df_filtered
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize numeric columns to zero mean and unit variance.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    df_standardized = df.copy()
+    for col in columns:
+        if col in df.columns:
+            mean = df_standardized[col].mean()
+            std = df_standardized[col].std()
+            if std > 0:
+                df_standardized[col] = (df_standardized[col] - mean) / std
+    return df_standardized
+
+def clean_dataset(df, missing_threshold=0.5, outlier_columns=None, standardize=True):
+    """
+    Perform comprehensive data cleaning pipeline.
+    """
+    df_cleaned = remove_missing_values(df, threshold=missing_threshold)
+    df_cleaned = fill_missing_with_median(df_cleaned)
+    
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in df_cleaned.columns:
+                df_cleaned = remove_outliers_iqr(df_cleaned, col)
+    
+    if standardize:
+        df_cleaned = standardize_columns(df_cleaned)
+    
+    return df_cleaned
