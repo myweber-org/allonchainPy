@@ -46,4 +46,53 @@ def main():
         display_repositories(repos)
 
 if __name__ == "__main__":
+    main()import requests
+
+def fetch_user_repos(username, per_page=30, page=1):
+    url = f"https://api.github.com/users/{username}/repos"
+    params = {
+        'per_page': per_page,
+        'page': page
+    }
+    response = requests.get(url, params=params)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        response.raise_for_status()
+
+def display_repos(repos):
+    if not repos:
+        print("No repositories found.")
+        return
+    for repo in repos:
+        print(f"Name: {repo['name']}")
+        print(f"Description: {repo['description'] or 'No description'}")
+        print(f"URL: {repo['html_url']}")
+        print(f"Stars: {repo['stargazers_count']}")
+        print(f"Forks: {repo['forks_count']}")
+        print("-" * 40)
+
+def main():
+    username = input("Enter GitHub username: ")
+    try:
+        page = 1
+        while True:
+            repos = fetch_user_repos(username, page=page)
+            if not repos:
+                print("No more repositories.")
+                break
+            print(f"\n--- Page {page} ---")
+            display_repos(repos)
+            if len(repos) < 30:
+                break
+            cont = input("Fetch next page? (y/n): ").strip().lower()
+            if cont != 'y':
+                break
+            page += 1
+    except requests.exceptions.HTTPError as e:
+        print(f"Error fetching repositories: {e}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+if __name__ == "__main__":
     main()
