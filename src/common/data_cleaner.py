@@ -171,3 +171,11 @@ def clean_dataset(df, columns_to_clean):
             cleaned_df = remove_outliers_iqr(cleaned_df, column)
     
     return cleaned_df
+def remove_duplicates(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
